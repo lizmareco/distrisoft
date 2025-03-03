@@ -292,14 +292,6 @@ model EstadoPedido {
   deletedAt       DateTime?           @map("deleted_at")
 }
 
-model EstadoPermiso {
-  idEstadoPermiso   Int       @id(map: "estado_permiso_pk") @default(autoincrement()) @map("id_estado_permiso")
-  descEstadoPermiso String    @map("desc_estado_permiso") @db.VarChar
-  permiso           Permiso[]
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime?           @default(now()) @map("updated_at")
-  deletedAt       DateTime?           @map("deleted_at")
-}
 
 model EstadoProducto {
   idEstadoProducto   Int        @id(map: "estado_producto_pk") @default(autoincrement()) @map("id_estado_producto")
@@ -310,14 +302,7 @@ model EstadoProducto {
   deletedAt       DateTime?           @map("deleted_at")
 }
 
-model EstadoRol {
-  idEstadoRol   Int    @id(map: "estado_rol_pk") @default(autoincrement()) @map("id_estado_rol")
-  descEstadoRol String @map("desc_estado_rol") @db.VarChar
-  rol           Rol[]
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime?           @default(now()) @map("updated_at")
-  deletedAt       DateTime?           @map("deleted_at")
-}
+
 
 model EstadoUsuario {
   idEstadoUsuario   Int       @id(map: "estado_usuario_pk") @default(autoincrement()) @map("id_estado_usuario")
@@ -570,9 +555,7 @@ model PedidoDetalle {
 
 model Permiso {
   idPermiso       Int           @id(map: "permiso_pk") @default(autoincrement()) @map("id_permiso")
-  idEstadoPermiso Int           @map("id_estado_permiso")
   nombrePermiso   String        @map("nombre_permiso") @db.VarChar
-  estadoPermiso   EstadoPermiso @relation(fields: [idEstadoPermiso], references: [idEstadoPermiso], onDelete: NoAction, onUpdate: NoAction, map: "estado_permiso_permiso_fk")
   rolPermiso      RolPermiso[]
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime?           @default(now()) @map("updated_at")
@@ -637,9 +620,7 @@ model Proveedor {
 
 model Rol {
   idRol       Int          @id(map: "rol_pk") @default(autoincrement()) @map("id_rol")
-  idEstadoRol Int          @map("id_estado_rol")
   nombreRol   String       @map("nombre_rol") @db.VarChar
-  estadoRol   EstadoRol    @relation(fields: [idEstadoRol], references: [idEstadoRol], onDelete: NoAction, onUpdate: NoAction, map: "estado_rol_rol_fk")
   rolPermiso  RolPermiso[]
   usuario     Usuario[]
   createdAt       DateTime            @default(now()) @map("created_at")
