@@ -1,4 +1,4 @@
-import migrarPermisoCSV from "./seed/importar_permisos"
+import migrarPermisoCSV from "./seed/importar_permisos.mjs"
 async function main() {
 
 	const subTopics = await migrarPermisoCSV();

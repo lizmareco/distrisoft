@@ -1,12 +1,13 @@
-const fs = require('fs');
-const path = require('path');
-const csv = require('csv-parser');
-const { PrismaClient } = require('@prisma/client');
+import fs from 'fs';
+import path from 'path';
+import csv from 'csv-parser';
+import { PrismaClient } from '@prisma/client';
+
 
 const prisma = new PrismaClient();
 
 async function migrarPermisoCSV() {
-    const filePath = path.join(__dirname, 'prisma', 'seed', 'permisos.csv');
+    const filePath = `${path.resolve()}/prisma/seed/permisos.csv`;
     const results = [];
     
     return new Promise((resolve, reject) => {
@@ -34,3 +35,4 @@ async function migrarPermisoCSV() {
     });
 }
 
+export default migrarPermisoCSV
