@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+
 }
 
 datasource db {
@@ -8,12 +9,12 @@ datasource db {
 }
 
 model AperturaCaja {
-  idAperturaCaja  Int               @id(map: "apertura_caja_pk") @default(autoincrement()) @map("id_apertura_caja")
+  idAperturaCaja  Int               @id @default(autoincrement()) @map("id_apertura_caja")
   saldoInicial    Float             @map("saldo_inicial")
   saldoActual     Float             @map("saldo_actual")
   fechaApertura   DateTime          @map("fecha_apertura") @db.Timestamp(6)
   fechaCierre     DateTime          @map("fecha_cierre") @db.Timestamp(6)
-  idCaja          Float             @map("id_caja")
+  idCaja          Int               @map("id_caja")
   observacion     String            @map("observacion") @db.VarChar
   idEstadoCaja    Int               @map("id_estado_caja")
   caja            Caja              @relation(fields: [idCaja], references: [idCaja], onDelete: NoAction, onUpdate: NoAction, map: "caja_apertura_caja_fk")
@@ -25,7 +26,7 @@ model AperturaCaja {
 }
 
 model Caja {
-  idCaja       Float          @id(map: "caja_pk") @default(dbgenerated("nextval('caja_id_caja_seq'::regclass)")) @map("id_caja")
+  idCaja       Int @id @default(autoincrement()) @map("id_caja")
   idUsuario    Int            @map("id_usuario")
   idEstadoCaja Int            @map("id_estado_caja")
   aperturaCaja AperturaCaja[]
@@ -37,7 +38,7 @@ model Caja {
 }
 
 model CategoriaEmpresa {
-  idCategoriaEmpresa   Int       @id(map: "categoria_empresa_pk") @default(autoincrement()) @map("id_categoria_empresa")
+  idCategoriaEmpresa   Int       @id @default(autoincrement()) @map("id_categoria_empresa")
   descCategoriaEmpresa String    @map("desc_categoria_empresa") @db.VarChar
   empresa              Empresa[]
   createdAt       DateTime            @default(now()) @map("created_at")
@@ -46,7 +47,7 @@ model CategoriaEmpresa {
 }
 
 model Ciudad {
-  idCiudad   Int       @id(map: "ciudad_pk") @default(autoincrement()) @map("id_ciudad")
+  idCiudad   Int       @id @default(autoincrement()) @map("id_ciudad")
   descCiudad String    @map("desc_ciudad") @db.VarChar
   empresa    Empresa[]
   persona    Persona[]
@@ -56,7 +57,7 @@ model Ciudad {
 }
 
 model Cliente {
-  idCliente             Int                     @id(map: "cliente_pk") @default(autoincrement()) @map("id_cliente")
+  idCliente             Int                     @id @default(autoincrement()) @map("id_cliente")
   idPersona             Int                     @map("id_persona")
   idSectorCliente       Int                     @map("id_sector_cliente")
   idCondicionPago       Int                     @map("id_condicion_pago")
@@ -75,7 +76,7 @@ model Cliente {
 }
 
 model CondicionPago {
-  idCondicionPago   Int         @id(map: "condicion_pago_pk") @default(autoincrement()) @map("id_condicion_pago")
+  idCondicionPago   Int         @id @default(autoincrement()) @map("id_condicion_pago")
   descCondicionPago String      @map("desc_condicion_pago") @db.VarChar
   cliente           Cliente[]
   proveedor         Proveedor[]
@@ -85,7 +86,7 @@ model CondicionPago {
 }
 
 model CotizacionCliente {
-  idCotizacionCliente       Int                        @id(map: "cotizacion_cliente_pk") @default(autoincrement()) @map("id_cotizacion_cliente")
+  idCotizacionCliente       Int                        @id @default(autoincrement()) @map("id_cotizacion_cliente")
   fechaCotizacion           DateTime                   @map("fecha_cotizacion") @db.Timestamp(6)
   vendedor                  Int                        @map("vendedor")
   montoTotal                Float                      @map("monto_total")
@@ -102,7 +103,7 @@ model CotizacionCliente {
 }
 
 model CotizacionProveedor {
-  idCotizacionProveedor    Int                    @id(map: "cotizacion_proveedor_pk") @default(autoincrement()) @map("id_cotizacion_proveedor")
+  idCotizacionProveedor    Int                    @id @default(autoincrement()) @map("id_cotizacion_proveedor")
   idProveedor              Int                    @map("id_proveedor")
   fechaCotizacionProveedor DateTime               @map("fecha_cotizacion_proveedor") @db.Timestamp(6)
   validez                  Int                    @map("validez")
@@ -291,6 +292,14 @@ model EstadoPedido {
   deletedAt       DateTime?           @map("deleted_at")
 }
 
+model EstadoPermiso {
+  idEstadoPermiso   Int       @id(map: "estado_permiso_pk") @default(autoincrement()) @map("id_estado_permiso")
+  descEstadoPermiso String    @map("desc_estado_permiso") @db.VarChar
+  permiso           Permiso[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
 
 model EstadoProducto {
   idEstadoProducto   Int        @id(map: "estado_producto_pk") @default(autoincrement()) @map("id_estado_producto")
@@ -467,7 +476,7 @@ model Nota {
   fechaEmision          DateTime               @map("fecha_emision") @db.Timestamp(6)
   motivo                String                 @map("motivo") @db.VarChar
   monto                 Float                  @map("monto")
-  idTipoNota            String                 @map("id_tipo_nota") @db.VarChar
+  idTipoNota            Int                    @map("id_tipo_nota")
   idEstadoNota          Int                    @map("id_estado_nota")
   nroFacClienteCredito  Int?                   @map("nro_fac_cliente_credito")
   nroFacClienteContado  Int?                   @map("nro_fac_cliente_contado")
@@ -561,7 +570,9 @@ model PedidoDetalle {
 
 model Permiso {
   idPermiso       Int           @id(map: "permiso_pk") @default(autoincrement()) @map("id_permiso")
+  idEstadoPermiso Int           @map("id_estado_permiso")
   nombrePermiso   String        @map("nombre_permiso") @db.VarChar
+  estadoPermiso   EstadoPermiso @relation(fields: [idEstadoPermiso], references: [idEstadoPermiso], onDelete: NoAction, onUpdate: NoAction, map: "estado_permiso_permiso_fk")
   rolPermiso      RolPermiso[]
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime?           @default(now()) @map("updated_at")
@@ -689,8 +700,8 @@ model TipoInforme {
 }
 
 model TipoNota {
-  idTipoNota   String @id(map: "tipo_nota_pk") @default(dbgenerated("nextval('tipo_nota_id_tipo_nota_seq'::regclass)")) @map("id_tipo_nota") @db.VarChar
-  descTipoNota String @map("desc_tipo_nota") @db.VarChar
+  idTipoNota   Int @id @default(autoincrement()) @map("id_tipo_nota")
+  descTipoNota String @map("desc_tipo_nota")
   nota         Nota[]
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime?           @default(now()) @map("updated_at")
