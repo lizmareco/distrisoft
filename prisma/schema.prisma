@@ -1,0 +1,774 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AperturaCaja {
+  idAperturaCaja  Int               @id(map: "apertura_caja_pk") @default(autoincrement()) @map("id_apertura_caja")
+  saldoInicial    Float             @map("saldo_inicial")
+  saldoActual     Float             @map("saldo_actual")
+  fechaApertura   DateTime          @map("fecha_apertura") @db.Timestamp(6)
+  fechaCierre     DateTime          @map("fecha_cierre") @db.Timestamp(6)
+  idCaja          Float             @map("id_caja")
+  observacion     String            @map("observacion") @db.VarChar
+  idEstadoCaja    Int               @map("id_estado_caja")
+  caja            Caja              @relation(fields: [idCaja], references: [idCaja], onDelete: NoAction, onUpdate: NoAction, map: "caja_apertura_caja_fk")
+  estadoCaja      EstadoCaja        @relation(fields: [idEstadoCaja], references: [idEstadoCaja], onDelete: NoAction, onUpdate: NoAction, map: "estado_caja_apertura_caja_fk")
+  transaccionCaja TransaccionCaja[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Caja {
+  idCaja       Float          @id(map: "caja_pk") @default(dbgenerated("nextval('caja_id_caja_seq'::regclass)")) @map("id_caja")
+  idUsuario    Int            @map("id_usuario")
+  idEstadoCaja Int            @map("id_estado_caja")
+  aperturaCaja AperturaCaja[]
+  estadoCaja   EstadoCaja     @relation(fields: [idEstadoCaja], references: [idEstadoCaja], onDelete: NoAction, onUpdate: NoAction, map: "estado_caja_caja_fk")
+  usuario      Usuario        @relation(fields: [idUsuario], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_caja_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model CategoriaEmpresa {
+  idCategoriaEmpresa   Int       @id(map: "categoria_empresa_pk") @default(autoincrement()) @map("id_categoria_empresa")
+  descCategoriaEmpresa String    @map("desc_categoria_empresa") @db.VarChar
+  empresa              Empresa[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Ciudad {
+  idCiudad   Int       @id(map: "ciudad_pk") @default(autoincrement()) @map("id_ciudad")
+  descCiudad String    @map("desc_ciudad") @db.VarChar
+  empresa    Empresa[]
+  persona    Persona[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Cliente {
+  idCliente             Int                     @id(map: "cliente_pk") @default(autoincrement()) @map("id_cliente")
+  idPersona             Int                     @map("id_persona")
+  idSectorCliente       Int                     @map("id_sector_cliente")
+  idCondicionPago       Int                     @map("id_condicion_pago")
+  idEmpresa             Int?                    @map("id_empresa")
+  condicionPago         CondicionPago           @relation(fields: [idCondicionPago], references: [idCondicionPago], onDelete: NoAction, onUpdate: NoAction, map: "condicion_pago_cliente_fk")
+  empresa               Empresa?                @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_cliente_fk")
+  persona               Persona                 @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_cliente_fk")
+  sectorCliente         SectorCliente           @relation(fields: [idSectorCliente], references: [idSectorCliente], onDelete: NoAction, onUpdate: NoAction, map: "sector_cliente_cliente_fk")
+  cotizacionCliente     CotizacionCliente[]
+  facturaClienteContado FacturaClienteContado[]
+  facturaClienteCredito FacturaClienteCredito[]
+  pedidoCliente         PedidoCliente[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model CondicionPago {
+  idCondicionPago   Int         @id(map: "condicion_pago_pk") @default(autoincrement()) @map("id_condicion_pago")
+  descCondicionPago String      @map("desc_condicion_pago") @db.VarChar
+  cliente           Cliente[]
+  proveedor         Proveedor[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model CotizacionCliente {
+  idCotizacionCliente       Int                        @id(map: "cotizacion_cliente_pk") @default(autoincrement()) @map("id_cotizacion_cliente")
+  fechaCotizacion           DateTime                   @map("fecha_cotizacion") @db.Timestamp(6)
+  vendedor                  Int                        @map("vendedor")
+  montoTotal                Float                      @map("monto_total")
+  idCliente                 Int                        @map("id_cliente")
+  validez                   Int                        @map("validez")
+  idEstadoCotizacionCliente Int                        @map("id_estado_cotizacion_cliente")
+  cliente                   Cliente                    @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction, map: "cliente_cotizacion_cliente_fk")
+  estadoCotizacionCliente   EstadoCotizacionCliente    @relation(fields: [idEstadoCotizacionCliente], references: [idEstadoCotizacionCliente], onDelete: NoAction, onUpdate: NoAction, map: "estado_cotizacion_cliente_cotizacion_cliente_fk")
+  usuario                   Usuario                    @relation(fields: [vendedor], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_cotizacion_cliente_fk")
+  detalleCotizacionCliente  DetalleCotizacionCliente[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model CotizacionProveedor {
+  idCotizacionProveedor    Int                    @id(map: "cotizacion_proveedor_pk") @default(autoincrement()) @map("id_cotizacion_proveedor")
+  idProveedor              Int                    @map("id_proveedor")
+  fechaCotizacionProveedor DateTime               @map("fecha_cotizacion_proveedor") @db.Timestamp(6)
+  validez                  Int                    @map("validez")
+  montoTotal               Float                  @map("monto_total")
+  idEstadoCotizacionProv   Int                    @map("id_estado_cotizacion_prov")
+  estadoCotizacionProv     EstadoCotizacionProv   @relation(fields: [idEstadoCotizacionProv], references: [idEstadoCotizacionProv], onDelete: NoAction, onUpdate: NoAction, map: "estado_cotizacion_prov_cotizacion_proveedor_fk")
+  proveedor                Proveedor              @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_cotizacion_proveedor_fk")
+  detalleCotizacionProv    DetalleCotizacionProv?
+  ordenCompra              OrdenCompra[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model DetalleCotizacionCliente {
+  idCotizacionCliente Int               @map("id_cotizacion_cliente")
+  idProducto          Int               @map("id_producto")
+  cantidad            Int               @map("cantidad")
+  subtotal            Float             @map("subtotal")
+  cotizacionCliente   CotizacionCliente @relation(fields: [idCotizacionCliente], references: [idCotizacionCliente], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_cliente_detalle_cotizacion_cliente_fk")
+  producto            Producto          @relation(fields: [idProducto], references: [idProducto], onDelete: NoAction, onUpdate: NoAction, map: "producto_detalle_cotizacion_cliente_fk")
+
+  @@id([idCotizacionCliente, idProducto], map: "detalle_cotizacion_cliente_pk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model DetalleCotizacionProv {
+  idCotizacionProveedor Int                 @id(map: "detalle_cotizacion_prov_pk") @map("id_cotizacion_proveedor")
+  cantidad              Int                 @map("cantidad")
+  precioUnitario        Float               @map("precio_unitario")
+  subtotal              Float               @map("subtotal")
+  idMateriaPrima        Int                 @map("id_materia_prima")
+  cotizacionProveedor   CotizacionProveedor @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_detalle_cotizacion_prov_fk")
+  materiaPrima          MateriaPrima        @relation(fields: [idMateriaPrima], references: [idMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "materia_prima_detalle_cotizacion_prov_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model DetallePagoFacCliente {
+  idPagoFactura         Int                   @id(map: "detalle_pago_fac_cliente_pk") @default(autoincrement()) @map("id_pago_factura")
+  nroFacClienteCredito  Int                   @map("nro_fac_cliente_credito")
+  fechaPago             DateTime              @map("fecha_pago") @db.Timestamp(6)
+  montoPago             Float                 @map("monto_pago")
+  idMetodoPago          Int                   @map("id_metodo_pago")
+  observacion           String                @map("observacion") @db.VarChar
+  comprobantePago       String                @map("comprobante_pago") @db.VarChar
+  facturaClienteCredito FacturaClienteCredito @relation(fields: [nroFacClienteCredito], references: [nroFacClienteCredito], onDelete: NoAction, onUpdate: NoAction, map: "factura_cliente_credito_detalle_cobro_factua_fk")
+  metodoPago            MetodoPago            @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_detalle_pago_fac_cliente_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model DetallePagoFacProv {
+  idPagoFactura        Int                @id(map: "detalle_pago_fac_prov_pk") @default(autoincrement()) @map("id_pago_factura")
+  idFacturaCreditoProv Int                @map("id_factura_credito_prov")
+  fechaPago            DateTime           @map("fecha_pago") @db.Timestamp(6)
+  montoPago            Float              @map("monto_pago")
+  idMetodoPago         Int                @map("id_metodo_pago")
+  observacion          String             @map("observacion") @db.VarChar
+  comprobantePago      String             @map("comprobante_pago") @db.VarChar
+  facturaCreditoProv   FacturaCreditoProv @relation(fields: [idFacturaCreditoProv], references: [idFacturaCreditoProv], onDelete: NoAction, onUpdate: NoAction, map: "factura_credito_prov_pago_factura_fk")
+  metodoPago           MetodoPago         @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_pago_factura_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Empresa {
+  idEmpresa          Int              @id(map: "empresa_pk") @default(autoincrement()) @map("id_empresa")
+  idCategoriaEmpresa Int              @map("id_categoria_empresa")
+  razonSocial        String           @map("razon_social") @db.VarChar
+  idTipoPersona      Int              @map("id_tipo_persona")
+  idTipoDocumento    Int              @map("id_tipo_documento")
+  ruc                String           @map("ruc") @db.VarChar
+  direccionEmpresa   String           @map("direccion_empresa") @db.VarChar
+  idCiudad           Int              @map("id_ciudad")
+  correoEmpresa      String           @map("correo_empresa") @db.VarChar
+  telefono           String           @map("telefono") @db.VarChar
+  personaContacto    Int              @map("persona_contacto")
+  cliente            Cliente[]
+  categoriaEmpresa   CategoriaEmpresa @relation(fields: [idCategoriaEmpresa], references: [idCategoriaEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "categoria_empresa_empresa_fk")
+  ciudad             Ciudad           @relation(fields: [idCiudad], references: [idCiudad], onDelete: NoAction, onUpdate: NoAction, map: "ciudad_empresa_fk")
+  persona            Persona          @relation(fields: [personaContacto], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_empresa_fk")
+  tipoDocumento      TipoDocumento    @relation(fields: [idTipoDocumento], references: [idTipoDocumento], onDelete: NoAction, onUpdate: NoAction, map: "tipo_documento_empresa_fk")
+  tipoPersona        TipoPersona      @relation(fields: [idTipoPersona], references: [idTipoPersona], onDelete: NoAction, onUpdate: NoAction, map: "tipo_persona_empresa_fk")
+  proveedor          Proveedor[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoCaja {
+  idEstadoCaja   Int            @id(map: "estado_caja_pk") @default(autoincrement()) @map("id_estado_caja")
+  descEstadoCaja String         @map("desc_estado_caja") @db.VarChar
+  aperturaCaja   AperturaCaja[]
+  caja           Caja[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoCotizacionCliente {
+  idEstadoCotizacionCliente   Int                 @id(map: "estado_cotizacion_cliente_pk") @default(autoincrement()) @map("id_estado_cotizacion_cliente")
+  descEstadoCotizacionCliente String              @map("desc_estado_cotizacion_cliente") @db.VarChar
+  cotizacionCliente           CotizacionCliente[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoCotizacionProv {
+  idEstadoCotizacionProv   Int                   @id(map: "estado_cotizacion_prov_pk") @default(autoincrement()) @map("id_estado_cotizacion_prov")
+  descEstadoCotizacionProv String                @map("desc_estado_cotizacion_prov") @db.VarChar
+  cotizacionProveedor      CotizacionProveedor[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoFactuCliente {
+  idEstadoFactuCliente  Int                     @id(map: "estado_factu_cliente_pk") @default(autoincrement()) @map("id_estado_factu_cliente")
+  descEstFactCliente    String                  @map("desc_est_fact_cliente") @db.VarChar
+  facturaClienteContado FacturaClienteContado[]
+  facturaClienteCredito FacturaClienteCredito[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoFacturaProv {
+  idEstadoFacturaProv Int                  @id(map: "estado_factura_prov_pk") @default(autoincrement()) @map("id_estado_factura_prov")
+  descFacturaProv     String               @map("desc_factura_prov") @db.VarChar
+  facturaContadoProv  FacturaContadoProv[]
+  facturaCreditoProv  FacturaCreditoProv[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoMateriaPrima {
+  idEstadoMateriaPrima   Int            @id(map: "estado_materia_prima_pk") @default(autoincrement()) @map("id_estado_materia_prima")
+  descEstadoMateriaPrima String         @map("desc_estado_materia_prima") @db.VarChar
+  materiaPrima           MateriaPrima[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoNota {
+  idEstadoNota   Int    @id(map: "estado_nota_pk") @default(autoincrement()) @map("id_estado_nota")
+  descEstadoNota String @map("desc_estado_nota") @db.VarChar
+  nota           Nota[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoOrdenCompra {
+  idEstadoOrdenCompra   Int           @id(map: "estado_orden_compra_pk") @default(autoincrement()) @map("id_estado_orden_compra")
+  descEstadoOrdenCompra String        @map("desc_estado_orden_compra") @db.VarChar
+  ordenCompra           OrdenCompra[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoOrdenProd {
+  idEstadoOrdenProd   Int               @id(map: "estado_orden_prod_pk") @default(autoincrement()) @map("id_estado_orden_prod")
+  descEstadoOrdenProd String            @map("desc_estado_orden_prod") @db.VarChar
+  ordenProduccion     OrdenProduccion[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoPedido {
+  idEstadoPedido   Int             @id(map: "estado_pedido_pk") @default(autoincrement()) @map("id_estado_pedido")
+  descEstadoPedido String          @map("desc_estado_pedido") @db.VarChar
+  pedidoCliente    PedidoCliente[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+
+model EstadoProducto {
+  idEstadoProducto   Int        @id(map: "estado_producto_pk") @default(autoincrement()) @map("id_estado_producto")
+  descEstadoProducto String     @map("desc_estado_producto") @db.VarChar
+  producto           Producto[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoRol {
+  idEstadoRol   Int    @id(map: "estado_rol_pk") @default(autoincrement()) @map("id_estado_rol")
+  descEstadoRol String @map("desc_estado_rol") @db.VarChar
+  rol           Rol[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model EstadoUsuario {
+  idEstadoUsuario   Int       @id(map: "estado_usuario_pk") @default(autoincrement()) @map("id_estado_usuario")
+  descEstadoUsuario String    @map("desc_estado_usuario") @db.VarChar
+  usuario           Usuario[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model FacturaClienteContado {
+  nroFacClienteContado Int                @id(map: "factura_cliente_contado_pk") @map("nro_fac_cliente_contado")
+  fechaEmision         DateTime           @map("fecha_emision") @db.Timestamp(6)
+  timbrado             Int                @map("timbrado")
+  idCliente            Int                @map("id_cliente")
+  idPedido             Int                @map("id_pedido")
+  operador             Int                @map("operador")
+  idImpuesto           Int                @map("id_impuesto")
+  montoTotalFactura    Float              @map("monto_total_factura")
+  observacion          String             @map("observacion") @db.VarChar
+  descuento            Float              @map("descuento")
+  idMetodoPago         Int                @map("id_metodo_pago")
+  idEstadoFactuCliente Int                @map("id_estado_factu_cliente")
+  cliente              Cliente            @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction, map: "cliente_factura_cliente_contado_fk")
+  estadoFactuCliente   EstadoFactuCliente @relation(fields: [idEstadoFactuCliente], references: [idEstadoFactuCliente], onDelete: NoAction, onUpdate: NoAction, map: "estado_factu_cliente_factura_cliente_contado_fk")
+  impuestos            Impuestos          @relation(fields: [idImpuesto], references: [idImpuesto], onDelete: NoAction, onUpdate: NoAction, map: "impuestos_factura_cliente_contado_fk")
+  metodoPago           MetodoPago         @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_factura_cliente_contado_fk")
+  pedidoCliente        PedidoCliente      @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_factura_cliente_contado_fk")
+  usuario              Usuario            @relation(fields: [operador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_factura_cliente_contado_fk")
+  nota                 Nota[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model FacturaClienteCredito {
+  nroFacClienteCredito  Int                     @id(map: "factura_cliente_credito_pk") @default(autoincrement()) @map("nro_fac_cliente_credito")
+  montoTotalFactura     String                  @map("monto_total_factura") @db.VarChar
+  idImpuesto            Int                     @map("id_impuesto")
+  idEstadoFactuCliente  Int                     @map("id_estado_factu_cliente")
+  fechaEmision          String                  @map("fecha_emision") @db.VarChar
+  idPedido              Int                     @map("id_pedido")
+  idCliente             Int                     @map("id_cliente")
+  timbrado              Int                     @map("timbrado")
+  operador              Int                     @map("operador")
+  saldoRestante         Float                   @map("saldo_restante")
+  plazoPago             Int                     @map("plazo_pago")
+  fechaVencimiento      DateTime                @map("fecha_vencimiento") @db.Timestamp(6)
+  descuento             Float                   @map("descuento")
+  detallePagoFacCliente DetallePagoFacCliente[] @relation(map: "factura_cliente_credito_detalle_pago_fac_cliente")
+  cliente               Cliente                 @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction, map: "cliente_factura_cliente_credito_fk")
+  estadoFactuCliente    EstadoFactuCliente      @relation(fields: [idEstadoFactuCliente], references: [idEstadoFactuCliente], onDelete: NoAction, onUpdate: NoAction, map: "estado_factu_cliente_factura_cliente_credito_fk")
+  impuestos             Impuestos               @relation(fields: [idImpuesto], references: [idImpuesto], onDelete: NoAction, onUpdate: NoAction, map: "impuestos_factura_cliente_credito_fk")
+  pedidoCliente         PedidoCliente           @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_factura_cliente_credito_fk")
+  usuario               Usuario                 @relation(fields: [operador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_factura_cliente_credito_fk")
+  nota                  Nota[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model FacturaContadoProv {
+  idFacturaContadoProv Int               @id(map: "factura_contado_prov_pk") @default(autoincrement()) @map("id_factura_contado_prov")
+  idProveedor          Int               @map("id_proveedor")
+  fechaEmision         DateTime          @map("fecha_emision") @db.Timestamp(6)
+  nroFacProvContado    String            @map("nro_fac_prov_contado") @db.VarChar
+  montoTotal           Float             @map("monto_total")
+  idEstadoFacturaProv  Int               @map("id_estado_factura_prov")
+  idOrdenCompra        Int?              @map("id_orden_compra")
+  idMetodoPago         Int               @map("id_metodo_pago")
+  comprobantePago      String            @map("comprobante_pago") @db.VarChar
+  estadoFacturaProv    EstadoFacturaProv @relation(fields: [idEstadoFacturaProv], references: [idEstadoFacturaProv], onDelete: NoAction, onUpdate: NoAction, map: "estado_factura_prov_factura_proveedor_fk")
+  metodoPago           MetodoPago        @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_factura_contado_prov_fk")
+  ordenCompra          OrdenCompra?      @relation(fields: [idOrdenCompra], references: [idOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "orden_compra_factura_proveedor_fk")
+  proveedor            Proveedor         @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_factura_proveedor_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model FacturaCreditoProv {
+  idFacturaCreditoProv Int                  @id(map: "factura_credito_prov_pk") @default(autoincrement()) @map("id_factura_credito_prov")
+  montoTotal           Float                @map("monto_total")
+  montoPagado          Float                @map("monto_pagado")
+  saldoRestante        Float                @map("saldo_restante")
+  plazoPago            Int                  @map("plazo_pago")
+  idOrdenCompra        Int?                 @map("id_orden_compra")
+  idEstadoFacturaProv  Int                  @map("id_estado_factura_prov")
+  fechaEmision         DateTime             @map("fecha_emision") @db.Timestamp(6)
+  nroFacProvCredito    String               @map("nro_fac_prov_credito") @db.VarChar
+  idProveedor          Int                  @map("id_proveedor")
+  fechaVencimiento     DateTime             @map("fecha_vencimiento") @db.Timestamp(6)
+  detallePagoFacProv   DetallePagoFacProv[]
+  estadoFacturaProv    EstadoFacturaProv    @relation(fields: [idEstadoFacturaProv], references: [idEstadoFacturaProv], onDelete: NoAction, onUpdate: NoAction, map: "estado_factura_prov_factura_credito_prov_fk")
+  ordenCompra          OrdenCompra?         @relation(fields: [idOrdenCompra], references: [idOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "orden_compra_factura_credito_prov_fk")
+  proveedor            Proveedor            @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_factura_credito_prov_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Impuestos {
+  idImpuesto            Int                     @id(map: "impuestos_pk") @map("id_impuesto")
+  descImpuesto          String                  @map("desc_impuesto") @db.VarChar
+  porcentajeImpuesto    Float                   @map("porcentaje_impuesto")
+  facturaClienteContado FacturaClienteContado[]
+  facturaClienteCredito FacturaClienteCredito[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Informe {
+  idInforme        Int         @id(map: "informe_pk") @default(autoincrement()) @map("id_informe")
+  fechaGeneracion  DateTime    @map("fecha_generacion") @db.Timestamp(6)
+  usuarioGenerador Int         @map("usuario_generador")
+  idTipoInforme    Int         @map("id_tipo_informe")
+  tipoInforme      TipoInforme @relation(fields: [idTipoInforme], references: [idTipoInforme], onDelete: NoAction, onUpdate: NoAction, map: "tipo_informe_informe_fk")
+  usuario          Usuario     @relation(fields: [usuarioGenerador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_informe_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model MateriaPrima {
+  idMateriaPrima        Int                     @id(map: "materia_prima_pk") @default(autoincrement()) @map("id_materia_prima")
+  nombreMateriaPrima    String                  @map("nombre_materia_prima") @db.VarChar
+  descMateriaPrima      String                  @map("desc_materia_prima") @db.VarChar
+  stockActual           Float                   @map("stock_actual")
+  stockMinimo           Float                   @map("stock_minimo")
+  idUnidadMedida        Int                     @map("id_unidad_medida")
+  idEstadoMateriaPrima  Int                     @map("id_estado_materia_prima")
+  detalleCotizacionProv DetalleCotizacionProv[]
+  estadoMateriaPrima    EstadoMateriaPrima      @relation(fields: [idEstadoMateriaPrima], references: [idEstadoMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "estado_materia_prima_materia_prima_fk")
+  unidadMedida          UnidadMedida            @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_materia_prima_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model MetodoPago {
+  idMetodoPago          Int                     @id(map: "metodo_pago_pk") @map("id_metodo_pago")
+  descMetodoPago        String                  @map("desc_metodo_pago") @db.VarChar
+  detallePagoFacCliente DetallePagoFacCliente[]
+  detallePagoFacProv    DetallePagoFacProv[]
+  facturaClienteContado FacturaClienteContado[]
+  facturaContadoProv    FacturaContadoProv[]
+  pedidoCliente         PedidoCliente[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Nota {
+  idNotaCredito         Int                    @id(map: "nota_pk") @default(autoincrement()) @map("id_nota_credito")
+  fechaEmision          DateTime               @map("fecha_emision") @db.Timestamp(6)
+  motivo                String                 @map("motivo") @db.VarChar
+  monto                 Float                  @map("monto")
+  idTipoNota            String                 @map("id_tipo_nota") @db.VarChar
+  idEstadoNota          Int                    @map("id_estado_nota")
+  nroFacClienteCredito  Int?                   @map("nro_fac_cliente_credito")
+  nroFacClienteContado  Int?                   @map("nro_fac_cliente_contado")
+  estadoNota            EstadoNota             @relation(fields: [idEstadoNota], references: [idEstadoNota], onDelete: NoAction, onUpdate: NoAction, map: "estado_nota_nota_fk")
+  facturaClienteContado FacturaClienteContado? @relation(fields: [nroFacClienteContado], references: [nroFacClienteContado], onDelete: NoAction, onUpdate: NoAction, map: "factura_cliente_contado_nota_fk")
+  facturaClienteCredito FacturaClienteCredito? @relation(fields: [nroFacClienteCredito], references: [nroFacClienteCredito], onDelete: NoAction, onUpdate: NoAction, map: "factura_cliente_credito_nota_fk")
+  tipoNota              TipoNota               @relation(fields: [idTipoNota], references: [idTipoNota], onDelete: NoAction, onUpdate: NoAction, map: "tipo_nota_nota_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Notificacion {
+  idNotificacion Int      @id(map: "notificacion_pk") @default(autoincrement()) @map("id_notificacion")
+  mensaje        String   @map("mensaje") @db.VarChar
+  fechaEnvio     DateTime @map("fecha_envio") @db.Date
+  usuarioDestino Int      @map("usuario_destino")
+  leido          Boolean  @map("leido")
+  usuario        Usuario  @relation(fields: [usuarioDestino], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_notificacion_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model OrdenCompra {
+  idOrdenCompra         Int                  @id(map: "orden_compra_pk") @default(autoincrement()) @map("id_orden_compra")
+  fechaOrden            DateTime             @map("fecha_orden") @db.Timestamp(6)
+  idEstadoOrdenCompra   Int                  @map("id_estado_orden_compra")
+  idCotizacionProveedor Int                  @map("id_cotizacion_proveedor")
+  observacion           String               @map("observacion") @db.VarChar
+  facturaContadoProv    FacturaContadoProv[]
+  facturaCreditoProv    FacturaCreditoProv[]
+  cotizacionProveedor   CotizacionProveedor  @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_orden_compra_fk")
+  estadoOrdenCompra     EstadoOrdenCompra    @relation(fields: [idEstadoOrdenCompra], references: [idEstadoOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "estado_orden_compra_orden_compra_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model OrdenProduccion {
+  idOrdenProduccion Int             @id(map: "orden_produccion_pk") @default(autoincrement()) @map("id_orden_produccion")
+  idPedido          Int             @map("id_pedido")
+  fechaInicioProd   DateTime        @map("fecha_inicio_prod") @db.Timestamp(6)
+  fechaFinProd      DateTime        @map("fecha_fin_prod") @db.Timestamp(6)
+  operadorEncargado Int             @map("operador_encargado")
+  idEstadoOrdenProd Int             @map("id_estado_orden_prod")
+  estadoOrdenProd   EstadoOrdenProd @relation(fields: [idEstadoOrdenProd], references: [idEstadoOrdenProd], onDelete: NoAction, onUpdate: NoAction, map: "estado_orden_prod_orden_produccion_fk")
+  pedidoCliente     PedidoCliente   @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_orden_produccion_fk")
+  usuario           Usuario         @relation(fields: [operadorEncargado], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_orden_produccion_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model PedidoCliente {
+  idPedido              Int                     @id(map: "pedido_cliente_pk") @default(autoincrement()) @map("id_pedido")
+  fechaPedido           DateTime                @map("fecha_pedido") @db.Timestamp(6)
+  fechaEntrega          DateTime?               @map("fecha_entrega") @db.Timestamp(6)
+  idCliente             Int                     @map("id_cliente")
+  idEstadoPedido        Int                     @map("id_estado_pedido")
+  montoTotal            Float                   @map("monto_total")
+  vendedor              Int                     @map("vendedor")
+  observacion           String                  @map("observacion") @db.VarChar
+  idMetodoPago          Int                     @map("id_metodo_pago")
+  facturaClienteContado FacturaClienteContado[]
+  facturaClienteCredito FacturaClienteCredito[]
+  ordenProduccion       OrdenProduccion[]
+  cliente               Cliente                 @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction, map: "cliente_pedido_cliente_fk")
+  estadoPedido          EstadoPedido            @relation(fields: [idEstadoPedido], references: [idEstadoPedido], onDelete: NoAction, onUpdate: NoAction, map: "estado_pedido_pedido_cliente_fk")
+  metodoPago            MetodoPago              @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_pedido_cliente_fk")
+  usuario               Usuario                 @relation(fields: [vendedor], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_pedido_cliente_fk")
+  pedidoDetalle         PedidoDetalle[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model PedidoDetalle {
+  idPedido      Int
+  idProducto    Int
+  cantidad      Int
+  subtotal      Float
+  pedidoCliente PedidoCliente @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_pedido_detalle_fk")
+  producto      Producto      @relation(fields: [idProducto], references: [idProducto], onDelete: NoAction, onUpdate: NoAction, map: "producto_pedido_detalle_fk")
+
+  @@id([idPedido, idProducto], map: "pedido_detalle_pk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Permiso {
+  idPermiso       Int           @id(map: "permiso_pk") @default(autoincrement()) @map("id_permiso")
+  nombrePermiso   String        @map("nombre_permiso") @db.VarChar
+  rolPermiso      RolPermiso[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Persona {
+  idPersona       Int           @id(map: "persona_pk") @default(autoincrement()) @map("id_persona")
+  nroDocumento    String        @map("nro_documento") @db.VarChar
+  nombre          String        @map("nombre") @db.VarChar
+  apellido        String        @map("apellido") @db.VarChar
+  fechaNacimiento DateTime      @map("fecha_nacimiento") @db.Date
+  direccion       String        @map("direccion") @db.VarChar
+  nroTelefono     String        @map("nro_telefono") @db.VarChar
+  correoPersona   String        @map("correo_persona") @db.VarChar
+  idCiudad        Int           @map("id_ciudad")
+  idTipoPersona   Int           @map("id_tipo_persona")
+  idTipoDocumento Int           @map("id_tipo_documento")
+  cliente         Cliente[]
+  empresa         Empresa[]
+  ciudad          Ciudad        @relation(fields: [idCiudad], references: [idCiudad], onDelete: NoAction, onUpdate: NoAction, map: "ciudad_persona_fk")
+  tipoDocumento   TipoDocumento @relation(fields: [idTipoDocumento], references: [idTipoDocumento], onDelete: NoAction, onUpdate: NoAction, map: "tipo_documento_persona_fk")
+  tipoPersona     TipoPersona   @relation(fields: [idTipoPersona], references: [idTipoPersona], onDelete: NoAction, onUpdate: NoAction, map: "tipo_persona_persona_fk")
+  usuario         Usuario[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Producto {
+  idProducto               Int                        @id(map: "producto_pk") @default(autoincrement()) @map("id_producto")
+  nombreProducto           String                     @map("nombre_producto") @db.VarChar
+  descripcion              String                     @map("descripcion") @db.VarChar
+  idTipoProducto           Int                        @map("id_tipo_producto")
+  pesoUnidad               Float                      @map("peso_unidad")
+  precioUnitario           Float                      @map("precio_unitario")
+  idEstadoProducto         Int                        @map("id_estado_producto")
+  idUnidadMedida           Int                        @map("id_unidad_medida")
+  detalleCotizacionCliente DetalleCotizacionCliente[]
+  pedidoDetalle            PedidoDetalle[]
+  estadoProducto           EstadoProducto             @relation(fields: [idEstadoProducto], references: [idEstadoProducto], onDelete: NoAction, onUpdate: NoAction, map: "estado_producto_producto_fk")
+  tipoProducto             TipoProducto               @relation(fields: [idTipoProducto], references: [idTipoProducto], onDelete: NoAction, onUpdate: NoAction, map: "tipo_producto_producto_fk")
+  unidadMedida             UnidadMedida               @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_producto_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Proveedor {
+  idProveedor         Int                   @id(map: "proveedor_pk") @default(autoincrement()) @map("id_proveedor")
+  idEmpresa           Int                   @map("id_empresa")
+  idCondicionPago     Int                   @map("id_condicion_pago")
+  cotizacionProveedor CotizacionProveedor[]
+  facturaContadoProv  FacturaContadoProv[]
+  facturaCreditoProv  FacturaCreditoProv[]
+  condicionPago       CondicionPago         @relation(fields: [idCondicionPago], references: [idCondicionPago], onDelete: NoAction, onUpdate: NoAction, map: "condicion_pago_proveedor_fk")
+  empresa             Empresa               @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_proveedor_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Rol {
+  idRol       Int          @id(map: "rol_pk") @default(autoincrement()) @map("id_rol")
+  idEstadoRol Int          @map("id_estado_rol")
+  nombreRol   String       @map("nombre_rol") @db.VarChar
+  estadoRol   EstadoRol    @relation(fields: [idEstadoRol], references: [idEstadoRol], onDelete: NoAction, onUpdate: NoAction, map: "estado_rol_rol_fk")
+  rolPermiso  RolPermiso[]
+  usuario     Usuario[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model RolPermiso {
+  idRol     Int     @map("id_rol")
+  idPermiso Int     @map("id_permiso")
+  permiso   Permiso @relation(fields: [idPermiso], references: [idPermiso], onDelete: NoAction, onUpdate: NoAction, map: "permiso_rol_permiso_fk")
+  rol       Rol     @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_rol_permiso_fk")
+
+  @@id([idRol, idPermiso], map: "rol_permiso_pk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model SectorCliente {
+  idSectorCliente   Int       @id(map: "sector_cliente_pk") @map("id_sector_cliente")
+  descSectorCliente String    @map("desc_sector_cliente") @db.VarChar
+  cliente           Cliente[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model SpatialRefSys {
+  srid      Int     @id
+  authName  String? @map("auth_name") @db.VarChar(256)
+  authSrid  Int?    @map("auth_srid")
+  srtext    String? @map("srtext") @db.VarChar(2048)
+  proj4text String? @map("proj4text") @db.VarChar(2048)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TipoDocumento {
+  idTipoDocumento   Int       @id(map: "tipo_documento_pk") @default(autoincrement()) @map("id_tipo_documento")
+  descTipoDocumento String    @map("desc_tipo_documento") @db.VarChar
+  empresa           Empresa[]
+  persona           Persona[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TipoInforme {
+  idTipoInforme   Int       @id(map: "tipo_informe_pk") @default(autoincrement()) @map("id_tipo_informe")
+  descTipoInforme String    @map("desc_tipo_informe") @db.VarChar
+  informe         Informe[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TipoNota {
+  idTipoNota   String @id(map: "tipo_nota_pk") @default(dbgenerated("nextval('tipo_nota_id_tipo_nota_seq'::regclass)")) @map("id_tipo_nota") @db.VarChar
+  descTipoNota String @map("desc_tipo_nota") @db.VarChar
+  nota         Nota[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TipoPersona {
+  idTipoPersona   Int       @id(map: "tipo_persona_pk") @default(autoincrement()) @map("id_tipo_persona")
+  descTipoPersona String    @map("desc_tipo_persona") @db.VarChar
+  empresa         Empresa[]
+  persona         Persona[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TipoProducto {
+  idTipoProducto   Int        @id(map: "tipo_producto_pk") @default(autoincrement()) @map("id_tipo_producto")
+  descTipoProducto String     @map("desc_tipo_producto") @db.VarChar
+  producto         Producto[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TipoTransaccion {
+  idTipoTransaccion   Int               @id(map: "tipo_transaccion_pk") @default(autoincrement()) @map("id_tipo_transaccion")
+  descTipoTransaccion String            @map("desc_tipo_transaccion") @db.VarChar
+  transaccionCaja     TransaccionCaja[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model TransaccionCaja {
+  idTransaccionCaja Int             @id(map: "transaccion_caja_pk") @default(autoincrement()) @map("id_transaccion_caja")
+  idAperturaCaja    Int             @map("id_apertura_caja")
+  idTipoTransaccion Int             @map("id_tipo_transaccion")
+  monto             Float           @map("monto")
+  fechaTransaccion  DateTime        @map("fecha_transaccion") @db.Timestamp(6)
+  observacion       String          @map("observacion") @db.VarChar
+  aperturaCaja      AperturaCaja    @relation(fields: [idAperturaCaja], references: [idAperturaCaja], onDelete: NoAction, onUpdate: NoAction, map: "apertura_caja_transaccion_caja_fk")
+  tipoTransaccion   TipoTransaccion @relation(fields: [idTipoTransaccion], references: [idTipoTransaccion], onDelete: NoAction, onUpdate: NoAction, map: "tipo_transaccion_transaccion_caja_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model UnidadMedida {
+  idUnidadMedida   Int            @id(map: "unidad_medida_pk") @default(autoincrement()) @map("id_unidad_medida")
+  descUnidadMedida String         @map("desc_unidad_medida") @db.VarChar
+  abreviatura      String         @map("abreviatura") @db.VarChar
+  materiaPrima     MateriaPrima[]
+  producto         Producto[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
+
+model Usuario {
+  idUsuario             Int                     @id(map: "usuario_pk") @default(autoincrement()) @map("id_usuario")
+  contrasena            String                  @db.VarChar
+  nombreUsuario         String                  @map("nombre_usuario") @db.VarChar
+  idRol                 Int                     @map("id_rol")
+  idEstadoUsuario       Int                     @map("id_estado_usuario")
+  idPersona             Int                     @map("id_persona")
+  caja                  Caja[]
+  cotizacionCliente     CotizacionCliente[]
+  facturaClienteContado FacturaClienteContado[]
+  facturaClienteCredito FacturaClienteCredito[]
+  informe               Informe[]
+  notificacion          Notificacion[]
+  ordenProduccion       OrdenProduccion[]
+  pedidoCliente         PedidoCliente[]
+  estadoUsuario         EstadoUsuario           @relation(fields: [idEstadoUsuario], references: [idEstadoUsuario], onDelete: NoAction, onUpdate: NoAction, map: "estado_usuario_usuario_fk")
+  persona               Persona                 @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_usuario_fk")
+  rol                   Rol                     @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_usuario_fk")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime?           @default(now()) @map("updated_at")
+  deletedAt       DateTime?           @map("deleted_at")
+}
