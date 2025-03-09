@@ -760,7 +760,33 @@ model Usuario {
   estadoUsuario         EstadoUsuario           @relation(fields: [idEstadoUsuario], references: [idEstadoUsuario], onDelete: NoAction, onUpdate: NoAction, map: "estado_usuario_usuario_fk")
   persona               Persona                 @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_usuario_fk")
   rol                   Rol                     @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_usuario_fk")
+  accessToken           AccessToken []
+  refreshToken          RefreshToken []
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime?           @default(now()) @map("updated_at")
   deletedAt       DateTime?           @map("deleted_at")
+}
+
+model AccessToken {
+  idAccessToken             Int                 @id @default(autoincrement()) @map("id_access_token")
+  accessToken               String              @unique @map("access_token")
+  idUsuario                 Int                 @map("id_usuario")
+  usuario                   Usuario             @relation(fields: [idUsuario], references: [idUsuario])
+  refreshToken              RefreshToken?
+  createdAt                 DateTime            @default(now()) @map("created_at")
+  updatedAt                 DateTime?           @default(now()) @map("updated_at")
+  deletedAt                 DateTime?           @map("deleted_at")
+}
+
+
+model RefreshToken {
+  idRefreshToken            Int            @id @default(autoincrement()) @map("id_refresh_token")
+  refreshToken              String         @unique @map("refresh_token")
+  idUsuario                 Int            @map("id_usuario")
+  usuario                   Usuario        @relation(fields: [idUsuario], references: [idUsuario])
+  id_access_token             Int            @unique @map("id_access_token")
+  accessToken               AccessToken    @relation(fields: [id_access_token], references: [idAccessToken])
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime?           @default(now())
+  deletedAt                 DateTime?
 }
