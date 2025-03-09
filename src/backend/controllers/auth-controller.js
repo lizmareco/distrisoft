@@ -2,8 +2,6 @@ import {
     UserController,
     AccessTokenController,
     RefreshTokenController,
-    EmailTokenVerificationController,
-    PhoneCodeVerificationController,
     UserLoginController,
     RecoveryTokenController
   } from '@/src/backend/controller/controllers';
@@ -28,48 +26,48 @@ import {
      * @param {Object} data
      * @returns {String} token 
      */
-    async register(data) {
-      try{
-        const emailTokenVerificationController = new EmailTokenVerificationController();
-        const phoneCodeVerificationController = new PhoneCodeVerificationController();
-        const userDTO = await UserDTO.create(data);
-        const user = await this.userController.create(userDTO);
+    // async register(data) {
+    //   try{
+    //     const emailTokenVerificationController = new EmailTokenVerificationController();
+    //     const phoneCodeVerificationController = new PhoneCodeVerificationController();
+    //     const userDTO = await UserDTO.create(data);
+    //     const user = await this.userController.create(userDTO);
         
-        if(user) { 
-          const accessToken =  await this.accessTokenController.create(user, '/profiles/default.png');
-          const promises = [
-            this.refreshTokenController.create(user, accessToken.id),
-            emailTokenVerificationController.create(user),
-            phoneCodeVerificationController.create(user)
-          ]
-          const [refreshToken, emailToken, phoneCode] = await Promise.all(promises);
+    //     if(user) { 
+    //       const accessToken =  await this.accessTokenController.create(user, '/profiles/default.png');
+    //       const promises = [
+    //         this.refreshTokenController.create(user, accessToken.id),
+    //         emailTokenVerificationController.create(user),
+    //         phoneCodeVerificationController.create(user)
+    //       ]
+    //       const [refreshToken, emailToken, phoneCode] = await Promise.all(promises);
           
-          if(emailToken) {
-            console.log('El correo de verificacion fue enviado');
-          }
-          if(phoneCode) {
-            console.log('El código de verificación fue enviado');
-          }
+    //       if(emailToken) {
+    //         console.log('El correo de verificacion fue enviado');
+    //       }
+    //       if(phoneCode) {
+    //         console.log('El código de verificación fue enviado');
+    //       }
   
-          return {
-            accessToken: accessToken.accessToken,
-            refreshToken: refreshToken.refreshToken
-          };
-        };
+    //       return {
+    //         accessToken: accessToken.accessToken,
+    //         refreshToken: refreshToken.refreshToken
+    //       };
+    //     };
   
-        throw new Error('No se ha podido registrar');
-      }catch(e) {
-        console.log('Error registering: ', e);
-        if(e.code === 'P2002') return {
-          error: true,
-          errorCode: e.meta.target
-        };
-        throw CustomError('No se ha podido registrar', HTTP_STATUS_CODES.internalServerError);
-      }
-    }
+    //     throw new Error('No se ha podido registrar');
+    //   }catch(e) {
+    //     console.log('Error registering: ', e);
+    //     if(e.code === 'P2002') return {
+    //       error: true,
+    //       errorCode: e.meta.target
+    //     };
+    //     throw CustomError('No se ha podido registrar', HTTP_STATUS_CODES.internalServerError);
+    //   }
+    // }
   
   
-    async login(data, browserData) {
+    async login(data) {
       try {
         const user = await this.userController.getByEmail(data.email, {includes: ['professional']});
         const canLogin = await this.userLoginController.canLogin(user, data);
@@ -83,12 +81,12 @@ import {
           const [refreshToken, recoveryToken] = await Promise.all(tokensPromises);
   
           // notificate new login
-          await newLoginMail(data.email, {
-            name: user.name,
-            os: browserData.os,
-            browser: browserData.browser,
-            recoveryToken: recoveryToken.recoveryToken
-          });
+          // await newLoginMail(data.email, {
+          //   name: user.name,
+          //   os: browserData.os,
+          //   browser: browserData.browser,
+          //   recoveryToken: recoveryToken.recoveryToken
+          // });
   
           return { accessToken: accessToken.accessToken, refreshToken: refreshToken.refreshToken };
         } else {
@@ -105,59 +103,59 @@ import {
     }
   
   
-    async changePassword(userId, data) {
-      if(!userId) throw new CustomError('No se ha proporcionado un usuario', HTTP_STATUS_CODES.badRequest);
+    // async changePassword(userId, data) {
+    //   if(!userId) throw new CustomError('No se ha proporcionado un usuario', HTTP_STATUS_CODES.badRequest);
   
-      const user = await this.userController.get(userId);
-      const saltOrRound = process.env.SALT_ROUND;
-      const password = await hash(data.newPassword, parseInt(saltOrRound));
+    //   const user = await this.userController.get(userId);
+    //   const saltOrRound = process.env.SALT_ROUND;
+    //   const password = await hash(data.newPassword, parseInt(saltOrRound));
   
-      if(data.hasOwnProperty('actualPassword') && data.hasOwnProperty('newPassword')) {
-        if(await compare(data.actualPassword, user.password)) {  
-          const updatedUser = await this.userController.update(userId, {
-            password: password
-          });
+    //   if(data.hasOwnProperty('actualPassword') && data.hasOwnProperty('newPassword')) {
+    //     if(await compare(data.actualPassword, user.password)) {  
+    //       const updatedUser = await this.userController.update(userId, {
+    //         password: password
+    //       });
           
-          return updatedUser;
-        }
-      }else if(data.hasOwnProperty('confirmPassword') && data.hasOwnProperty('newPassword')) {
-        if(data.newPassword === data.confirmPassword) {
-          const updatedUser = await this.userController.update(userId, {
-            password: password
-          });
+    //       return updatedUser;
+    //     }
+    //   }else if(data.hasOwnProperty('confirmPassword') && data.hasOwnProperty('newPassword')) {
+    //     if(data.newPassword === data.confirmPassword) {
+    //       const updatedUser = await this.userController.update(userId, {
+    //         password: password
+    //       });
   
-          return updatedUser;
-        }
-      }
+    //       return updatedUser;
+    //     }
+    //   }
   
-      return null;
-    }
+    //   return null;
+    // }
   
   
-    async refreshToken(oldTokens) {
-      try {
-        const user = await this.refreshTokenController.getUser(oldTokens.refreshToken);
-        // create new tokens
-        const accessToken = await this.accessTokenController.create(user)
-        const tokensPromises = [
-          this.refreshTokenController.create(user, accessToken.id),
-          this.refreshTokenController.getByRefreshToken(oldTokens.refreshToken)
-        ]
-        const [refreshToken, refreshTokenData] = await Promise.all(tokensPromises);
+    // async refreshToken(oldTokens) {
+    //   try {
+    //     const user = await this.refreshTokenController.getUser(oldTokens.refreshToken);
+    //     // create new tokens
+    //     const accessToken = await this.accessTokenController.create(user)
+    //     const tokensPromises = [
+    //       this.refreshTokenController.create(user, accessToken.id),
+    //       this.refreshTokenController.getByRefreshToken(oldTokens.refreshToken)
+    //     ]
+    //     const [refreshToken, refreshTokenData] = await Promise.all(tokensPromises);
   
-        // delete old tokens
-        const deletePromises = [
-          this.accessTokenController.invalidate(refreshTokenData.accessToken.id),
-          this.refreshTokenController.invalidate(refreshTokenData.id)
-        ]
-        await Promise.allSettled(deletePromises);
+    //     // delete old tokens
+    //     const deletePromises = [
+    //       this.accessTokenController.invalidate(refreshTokenData.accessToken.id),
+    //       this.refreshTokenController.invalidate(refreshTokenData.id)
+    //     ]
+    //     await Promise.allSettled(deletePromises);
   
-        return { accessToken: accessToken.accessToken, refreshToken: refreshToken.refreshToken }
-      }catch(error) {
-        console.error('❌ error refreshing token: ', JSON.stringify(error, null, 2));
-        return null;
-      }
-    }
+    //     return { accessToken: accessToken.accessToken, refreshToken: refreshToken.refreshToken }
+    //   }catch(error) {
+    //     console.error('❌ error refreshing token: ', JSON.stringify(error, null, 2));
+    //     return null;
+    //   }
+    // }
   
   
     async requestResetPassword(data) {
