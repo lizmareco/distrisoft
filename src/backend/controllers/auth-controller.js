@@ -1,24 +1,17 @@
-import {
-    UserController,
-    AccessTokenController,
-    RefreshTokenController,
-    UserLoginController,
-    RecoveryTokenController
-  } from '@/src/backend/controller/controllers';
-  import { newLoginMail, resetPasswordMail } from '@/src/lib/services/notificationMail';
-  import { HTTP_STATUS_CODES } from '@/src/lib/http/http-status-code';
-  import CustomError from '@/src/lib/errors/custom-errors';
-  import { UserDTO } from '@/src/backend/DTO/DTO';
-  import { compare, hash } from 'bcrypt';
-  
+import AccessTokenController from '@/src/backend/controllers/access-controller';
+import UsuarioController from '@/src/backend/controllers/usuario-controller';
+import PersonaController from '@/src/backend/controllers/persona-controller';
+import { HTTP_STATUS_CODES } from '@/src/lib/http/http-status-code';
+import CustomError from '@/src/lib/errors/custom-errors';
+// import RefreshTokenController from '@/src/backend/controllers/refresh-token-controller';
   
   export default class AuthController  {
     constructor() {
-      this.userController = new UserController();
+      this.usuarioController = new UsuarioController();
       this.accessTokenController = new AccessTokenController();
-      this.refreshTokenController = new RefreshTokenController();
-      this.userLoginController = new UserLoginController();
-      this.recoveryTokenController = new RecoveryTokenController();
+      this.personaController = new PersonaController();
+      // this.refreshTokenController = new RefreshTokenController();
+      // this.recoveryTokenController = new RecoveryTokenController();
     }
   
   
@@ -69,29 +62,10 @@ import {
   
     async login(data) {
       try {
-        const user = await this.userController.getByEmail(data.email, {includes: ['professional']});
-        const canLogin = await this.userLoginController.canLogin(user, data);
-        if(user && canLogin) {
-          const TOKEN_TIME_VALID = '1d';
-          const accessToken = await this.accessTokenController.create(user);
-          const tokensPromises = [
-            this.refreshTokenController.create(user, accessToken.id),
-            this.recoveryTokenController.create(user, TOKEN_TIME_VALID)
-          ]
-          const [refreshToken, recoveryToken] = await Promise.all(tokensPromises);
-  
-          // notificate new login
-          // await newLoginMail(data.email, {
-          //   name: user.name,
-          //   os: browserData.os,
-          //   browser: browserData.browser,
-          //   recoveryToken: recoveryToken.recoveryToken
-          // });
-  
-          return { accessToken: accessToken.accessToken, refreshToken: refreshToken.refreshToken };
-        } else {
-          throw new CustomError('¡Correo electrónico o contraseña incorrecta!', HTTP_STATUS_CODES.forbidden);
-        }
+        const persona = await this.personaController.obtenerPersonaConCorreo(data.email);
+        
+        console.log('persona: ', persona);
+        
       } catch(error) {
         if(error.isCustom) {
           throw new CustomError(error.message, error.status);
