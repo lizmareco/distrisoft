@@ -10,10 +10,10 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
-    "@paljs/ui": "^1.1.1",
     "@prisma/client": "^6.4.1",
     "@tailwindcss/postcss": "^4.0.12",
     "csv-parser": "^3.2.0",
+    "jsonwebtoken": "^9.0.2",
     "next": "15.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

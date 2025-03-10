@@ -1,6 +1,7 @@
+import BaseDatasource from "../base-datasource";
 import { prisma } from "@/prisma/client";
 
-export default class PersonaDatasource {
+export default class PersonaDatasource extends BaseDatasource {
   constructor() {
     super(prisma.persona);
   }

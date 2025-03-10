@@ -1,4 +1,4 @@
-import { AccessTokenDatasource } from '@/src/backend/datasource/datasources';
+import AccessTokenDatasource from '@/src/backend/datasources/postgres/accesstoken-datasource';
 // import { ImageController } from '@/src/backend/controller/controllers';
 import { JWT_SECRET, JWT_SECRET_EXPIRE } from '@/settings';
 import BaseController from './base-controller';
