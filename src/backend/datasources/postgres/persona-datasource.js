@@ -1,5 +1,5 @@
-import BaseDatasource from "../base-datasource";
-import { prisma } from "@/prisma/client";
+import BaseDatasource from '@/src/backend/datasources/base-datasource';
+import { prisma } from '@/prisma/client';
 
 export default class PersonaDatasource extends BaseDatasource {
   constructor() {

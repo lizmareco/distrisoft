@@ -3,7 +3,6 @@ import UsuarioController from '@/src/backend/controllers/usuario-controller';
 import PersonaController from '@/src/backend/controllers/persona-controller';
 import { HTTP_STATUS_CODES } from '@/src/lib/http/http-status-code';
 import CustomError from '@/src/lib/errors/custom-errors';
-import BaseController from './base-controller';
 // import RefreshTokenController from '@/src/backend/controllers/refresh-token-controller';
   
 export default class AuthController {
