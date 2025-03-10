@@ -201,7 +201,7 @@ export default class AuthController {
 
       return null;
     } catch(error) {
-      console.error('❌ Error in isLogged: ', JSON.stringify(error, null, 2));
+      console.error('❌ Error in hasAccessToken: ', error);
       return false;
     }
   }

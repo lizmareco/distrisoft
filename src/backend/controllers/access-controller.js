@@ -57,26 +57,26 @@ export default class AccessTokenController extends BaseController {
   // }
 
 
-  // async isValid(accessToken) {
-  //   try {
-  //     const decodedToken = jwt.verify(accessToken, JWT_SECRET);
+  async isValid(accessToken) {
+    try {
+      const decodedToken = jwt.verify(accessToken, JWT_SECRET);
   
-  //     if (decodedToken.exp < Date.now() / 1000) {
-  //       return false;
-  //     }
+      if (decodedToken.exp < Date.now() / 1000) {
+        return false;
+      }
   
-  //     if(jwt.verify(accessToken, process.env.JWT_SECRET)) {
-  //       const tokenList = await this.getAll({
-  //         where: {
-  //           accessToken
-  //         }
-  //       });
+      if(jwt.verify(accessToken, process.env.JWT_SECRET)) {
+        const tokenList = await this.getAll({
+          where: {
+            accessToken
+          }
+        });
         
-  //       return tokenList.length > 0;
-  //     }
-  //     return false;
-  //   }catch(error) {
-  //     return false;
-  //   }
-  // }
+        return tokenList.length > 0;
+      }
+      return false;
+    }catch(error) {
+      return false;
+    }
+  }
 }
