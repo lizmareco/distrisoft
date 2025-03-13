@@ -1,17 +1,17 @@
-import PermisoDatasource from "../datasources/permiso-datasource";
+import PermisoDatasource from "@/backend/datasources/postgres/permiso-datasource";
 
 export default class PermisoController {
     constructor() {
         this.permisoDatasource = new PermisoDatasource();
     }
 
-    async listarTodos(req, res) {
+    async getAllPermisos() {
         try {
-            const permisos = await this.permisoDatasource.listarTodos();
-            return res.status(200).json(permisos);
+            const permisos = await this.permisoDatasource.getAllPermisos();
+            return permisos;
         } catch (error) {
             console.error("Error en listarTodos:", error);
-            return res.status(500).json({ message: "Error al obtener los permisos." });
+            throw new Error("Error al obtener los permisos.");
         }
     }
 }
