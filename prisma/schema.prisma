@@ -303,16 +303,6 @@ model EstadoProducto {
 }
 
 
-
-model EstadoUsuario {
-  idEstadoUsuario   Int       @id(map: "estado_usuario_pk") @default(autoincrement()) @map("id_estado_usuario")
-  descEstadoUsuario String    @map("desc_estado_usuario") @db.VarChar
-  usuario           Usuario[]
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime?           @default(now()) @map("updated_at")
-  deletedAt       DateTime?           @map("deleted_at")
-}
-
 model FacturaClienteContado {
   nroFacClienteContado Int                @id(map: "factura_cliente_contado_pk") @map("nro_fac_cliente_contado")
   fechaEmision         DateTime           @map("fecha_emision") @db.Timestamp(6)
@@ -747,8 +737,8 @@ model Usuario {
   contrasena            String                  @db.VarChar
   nombreUsuario         String                  @map("nombre_usuario") @db.VarChar
   idRol                 Int                     @map("id_rol")
-  idEstadoUsuario       Int                     @map("id_estado_usuario")
   idPersona             Int                     @map("id_persona")
+  estado                String                  @map("estado_usuario")
   caja                  Caja[]
   cotizacionCliente     CotizacionCliente[]
   facturaClienteContado FacturaClienteContado[]
@@ -757,14 +747,13 @@ model Usuario {
   notificacion          Notificacion[]
   ordenProduccion       OrdenProduccion[]
   pedidoCliente         PedidoCliente[]
-  estadoUsuario         EstadoUsuario           @relation(fields: [idEstadoUsuario], references: [idEstadoUsuario], onDelete: NoAction, onUpdate: NoAction, map: "estado_usuario_usuario_fk")
   persona               Persona                 @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_usuario_fk")
   rol                   Rol                     @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_usuario_fk")
   accessToken           AccessToken []
   refreshToken          RefreshToken []
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime?           @default(now()) @map("updated_at")
-  deletedAt       DateTime?           @map("deleted_at")
+  createdAt             DateTime                @default(now()) @map("created_at")
+  updatedAt             DateTime?               @default(now()) @map("updated_at")
+  deletedAt             DateTime?               @map("deleted_at")
 }
 
 model AccessToken {
