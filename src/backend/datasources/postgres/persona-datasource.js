@@ -13,7 +13,19 @@ export default class PersonaDatasource extends BaseDatasource {
         deletedAt: null
       },
       include: {
-        usuario: true
+        usuario: {
+          include: {
+            rol: {
+              include: {
+                rolPermiso: {
+                  include: {
+                    permiso: true
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     });
   }

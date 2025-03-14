@@ -1,15 +1,14 @@
+import RefreshTokenController from '@/src/backend/controllers/refresh-controller';
 import AccessTokenController from '@/src/backend/controllers/access-controller';
 import UsuarioController from '@/src/backend/controllers/usuario-controller';
 import PersonaController from '@/src/backend/controllers/persona-controller';
 import { HTTP_STATUS_CODES } from '@/src/lib/http/http-status-code';
 import CustomError from '@/src/lib/errors/custom-errors';
 import { compare } from 'bcrypt';
-// import RefreshTokenController from '@/src/backend/controllers/refresh-token-controller';
   
 export default class AuthController {
   constructor() {
     this.usuarioController = new UsuarioController();
-    this.accessTokenController = new AccessTokenController();
     this.personaController = new PersonaController();
     // this.refreshTokenController = new RefreshTokenController();
     // this.recoveryTokenController = new RecoveryTokenController();
@@ -63,15 +62,22 @@ export default class AuthController {
 
   async login(data) {
     try {
+      const accessTokenController = new AccessTokenController();
+      const refreshTokenController = new RefreshTokenController();
+
       const persona = await this.personaController.obtenerPersonaConCorreo(data.email);
-      
       if(!persona) {
         throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
       }
 
+      const accessToken = await accessTokenController.create(persona);
+      const refreshToken = await refreshTokenController.create(persona, accessToken);
+      
+      console.log('ace, ', refreshToken);
+
       if(await compare(data.contrasena, persona.usuario[0].contrasena)) {
         return {
-          accessToken: 'aasdf',
+          accessToken: accessToken.accessToken,
           refreshToken: 'asdfasf'
         }
       }

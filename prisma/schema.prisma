@@ -773,8 +773,8 @@ model RefreshToken {
   refreshToken              String         @unique @map("refresh_token")
   idUsuario                 Int            @map("id_usuario")
   usuario                   Usuario        @relation(fields: [idUsuario], references: [idUsuario])
-  id_access_token             Int            @unique @map("id_access_token")
-  accessToken               AccessToken    @relation(fields: [id_access_token], references: [idAccessToken])
+  idAccessToken             Int            @unique @map("id_access_token")
+  accessToken               AccessToken    @relation(fields: [idAccessToken], references: [idAccessToken])
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime?           @default(now())
   deletedAt                 DateTime?
