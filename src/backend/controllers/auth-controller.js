@@ -70,15 +70,14 @@ export default class AuthController {
         throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
       }
 
-      const accessToken = await accessTokenController.create(persona);
-      const refreshToken = await refreshTokenController.create(persona, accessToken);
       
-      console.log('ace, ', refreshToken);
-
       if(await compare(data.contrasena, persona.usuario[0].contrasena)) {
+        const accessToken = await accessTokenController.create(persona);
+        const refreshToken = await refreshTokenController.create(persona, accessToken);
+        
         return {
           accessToken: accessToken.accessToken,
-          refreshToken: 'asdfasf'
+          refreshToken: refreshToken.refreshToken
         }
       }
       
