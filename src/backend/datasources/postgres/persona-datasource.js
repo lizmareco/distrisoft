@@ -7,7 +7,7 @@ export default class PersonaDatasource extends BaseDatasource {
   }
 
   obtenerPersonaConCorreo(correoPersona) {
-    return prisma.persona.findUnique({
+    return prisma.persona.findFirst({
       where: {
         correoPersona,
         deletedAt: null

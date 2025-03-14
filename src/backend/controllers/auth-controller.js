@@ -3,6 +3,7 @@ import UsuarioController from '@/src/backend/controllers/usuario-controller';
 import PersonaController from '@/src/backend/controllers/persona-controller';
 import { HTTP_STATUS_CODES } from '@/src/lib/http/http-status-code';
 import CustomError from '@/src/lib/errors/custom-errors';
+import { compare } from 'bcrypt';
 // import RefreshTokenController from '@/src/backend/controllers/refresh-token-controller';
   
 export default class AuthController {
@@ -64,13 +65,22 @@ export default class AuthController {
     try {
       const persona = await this.personaController.obtenerPersonaConCorreo(data.email);
       
-      console.log('persona: ', persona);
+      if(!persona) {
+        throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
+      }
+
+      if(await compare(data.contrasena, persona.usuario[0].contrasena)) {
+        return {
+          accessToken: 'aasdf',
+          refreshToken: 'asdfasf'
+        }
+      }
       
     } catch(error) {
       if(error.isCustom) {
         throw new CustomError(error.message, error.status);
       } else {
-        console.log('Error in authController.login: ', JSON.stringify(error, null, 2));
+        console.log('Error in authController.login: ', error);
         throw error;
       }
     }

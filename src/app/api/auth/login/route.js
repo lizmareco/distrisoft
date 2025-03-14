@@ -37,8 +37,7 @@ export async function POST(request) {
     }
 
     let loginForm = await request.json();
-    loginForm = validateLoginForm(loginForm);
-    console.log('🔥🔥🔥🔥 ')
+    console.log('🔥🔥🔥🔥 ', loginForm)
     
     const tokens = await authController.login(loginForm);
 
