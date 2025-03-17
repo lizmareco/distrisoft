@@ -1,6 +1,9 @@
 export default class BaseDatasource {
-    constructor(model) {
+  // Se ha modificado el constructor para aceptar un parámetro "primaryKey"
+  // que define el nombre del campo identificador, por defecto 'id'.
+    constructor(model, primaryKey = 'id') {
       this.model = model;
+      this.primaryKey = primaryKey; // Campo identificador dinámico asignado
     }
   
     getAll(arg) {
@@ -41,7 +44,7 @@ export default class BaseDatasource {
           updatedAt: new Date()
         },
         where: {
-          id: id
+          [this.primaryKey]: id // Uso del campo identificador dinámico
         }
       });
     }
@@ -58,7 +61,7 @@ export default class BaseDatasource {
     delete(id) {
       return this.model.update(
         { data: { deletedAt: new Date() },
-          where: { id: id }
+          where: { [this.primaryKey]: id } // Uso del campo identificador dinámico
         }
       );
     }
