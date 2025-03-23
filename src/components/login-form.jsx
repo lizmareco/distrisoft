@@ -23,7 +23,7 @@ export default function LoginForm() {
     if(accessToken) {
       const userData = jwt.decode(accessToken);
       setState.setSession(userData);
-      router.push(pages.home.route);
+      router.push('/');
     }
   }, [accessToken]);
   
