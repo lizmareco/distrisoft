@@ -2,7 +2,7 @@
 
 import { useRootContext } from '@/src/app/context/root';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { apis } from '@/src/apis';
 import jwt from 'jsonwebtoken';
 
