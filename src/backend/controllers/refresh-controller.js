@@ -1,28 +1,36 @@
-import AccessTokenDatasource from '@/src/backend/datasources/postgres/accesstoken-datasource';
+import RefreshTokenDatasource from '@/src/backend/datasources/postgres/refreshtoken-datasource';
 // import { ImageController } from '@/src/backend/controller/controllers';
 import { JWT_SECRET, JWT_SECRET_EXPIRE } from '@/settings';
 import BaseController from './base-controller';
 import jwt from 'jsonwebtoken';
 
 
-export default class AccessTokenController extends BaseController {
+export default class RefreshController extends BaseController {
   constructor() {
-    super(new AccessTokenDatasource());
-    this.accessTokenDatasource = new AccessTokenDatasource()
+    super(new RefreshTokenDatasource());
+    this.accessTokenDatasource = new RefreshTokenDatasource()
   }
 
 
-  async create(persona) {
+  async create(persona, acessToken) {
     try {
       const data = {
         idUsuario: persona.usuario[0].idUsuario,
-        permisos: persona.usuario[0].rol.rolPermiso.map(permiso => permiso.permiso.nombrePermiso)
       }
 
-      const accessToken = await jwt.sign(data, JWT_SECRET, { expiresIn: JWT_SECRET_EXPIRE });
+      const refreshToken = await jwt.sign(data, JWT_SECRET, { expiresIn: JWT_SECRET_EXPIRE });
       return super.create({
-        accessToken,
-        idUsuario: persona.usuario[0].idUsuario
+        refreshToken,
+        accessToken: {
+          connect: {
+            idAccessToken: acessToken.idAccessToken
+          }
+        },
+        usuario: {
+          connect: {
+            idUsuario: persona.usuario[0].idUsuario
+          }
+        }
       });
     } catch(err) {
       console.log('Error in  access token controller (create): ', err);

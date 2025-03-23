@@ -1,4 +1,4 @@
-import BaseDatasource from "@/src/backend/datasource/base-datasource";
+import BaseDatasource from "@/src/backend/datasources/base-datasource";
 import { prisma } from "@/prisma/client";
 
 

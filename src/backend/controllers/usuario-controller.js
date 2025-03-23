@@ -1,5 +1,5 @@
-import UsuarioDatasource from '@/src/backend/datasources/usuario-datasource';
-import BaseController from './base-controller'
+import UsuarioDatasource from '@/src/backend/datasources/postgres/usuario-datasource';
+import BaseController from './base-controller';
 
 
 export default class UsuarioController extends BaseController {
