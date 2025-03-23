@@ -1,3 +1,4 @@
+import { RootContextProvider } from '@/src/app/context/root';
 import "./globals.css";
 
 
@@ -10,7 +11,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body>
-        {children}
+        <RootContextProvider>
+          {children}
+        </RootContextProvider>
       </body>
     </html>
   );
