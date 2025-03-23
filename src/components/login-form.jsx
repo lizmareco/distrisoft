@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apis } from '@/src/apis';
 import jwt from 'jsonwebtoken';
-
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { IconButton, InputAdornment, TextField, Button, Checkbox, FormControlLabel } from '@mui/material';
 
 export default function LoginForm() {
   const [formData, setFormData] = useState({
@@ -16,6 +17,7 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [accessToken, setAccessToken] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { setState } = useRootContext();
   const router = useRouter();
 
@@ -51,7 +53,7 @@ export default function LoginForm() {
         setAccessToken(data.accessToken);
       }
     } catch (err) {
-      setError('Invalid correo or contrasena');
+      setError('Correo o contraseña inválidos');
     } finally {
       setIsLoading(false);
     }
@@ -69,69 +71,75 @@ export default function LoginForm() {
       
       <form onSubmit={handleSubmit}>
         <div className='mb-3'>
-          <label htmlFor='correo' className='block mb-2 text-sm font-medium text-gray-700'>
-            Correo
-          </label>
-          <input
-            id='correo'
-            name='correo'
-            type='correo'
-            autoComplete='correo'
+          <TextField
+            fullWidth
+            label="Correo"
+            id="correo"
+            name="correo"
+            type="email"
+            autoComplete="email"
             required
             value={formData.correo}
             onChange={handleChange}
-            className='w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-            placeholder='Ingrese su correo'
+            InputProps={{ style: { color: 'black' } }}
           />
         </div>
         
         <div className='mb-3'>
-          <label htmlFor='contrasena' className='block mb-2 text-sm font-medium text-gray-700'>
-            Contraseña
-          </label>
-          <input
-            id='contrasena'
-            name='contrasena'
-            type='contrasena'
-            autoComplete='current-contrasena'
+          <TextField
+            fullWidth
+            label="Contraseña"
+            id="contrasena"
+            name="contrasena"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
             required
             value={formData.contrasena}
             onChange={handleChange}
-            className='w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
-            placeholder='Enter your contrasena'
+            InputProps={{
+              style: { color: 'black' },
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
         </div>
         
         <div className='flex items-center mb-6'>
-          <input
-            id='rememberMe'
-            name='rememberMe'
-            type='checkbox'
-            checked={formData.rememberMe}
-            onChange={handleChange}
-            className='h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded'
+          <FormControlLabel
+            control={
+              <Checkbox
+                id="rememberMe"
+                name="rememberMe"
+                checked={formData.rememberMe}
+                onChange={handleChange}
+                color="primary"
+              />
+            }
+            label="Recuérdame"
           />
-          <label htmlFor='rememberMe' className='ml-2 block text-sm text-gray-700'>
-            Remember me
-          </label>
         </div>
         
         <div>
-          <button
-            type='submit'
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            color="primary"
             disabled={isLoading}
-            className={`w-full py-3 px-4 rounded-md text-white font-medium ${
-              isLoading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
-            } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
           >
-            {isLoading ? 'Logging in...' : 'Log In'}
-          </button>
+            {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+          </Button>
         </div>
       </form>
       
       <div className='mt-6 text-center'>
         <a href='#' className='text-sm text-gray-700 hover:text-gray-800'>
-          Olvidaste tú contraseña?
+          ¿Olvidaste tu contraseña?
         </a>
       </div>
     </div>
