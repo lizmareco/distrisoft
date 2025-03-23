@@ -44,6 +44,8 @@ export default function LoginForm() {
       
       if (response.status === 200) {
         const data = await response.json();
+        setAccessToken(data.accessToken);
+        window.location.href = '/';
       }
     } catch (err) {
       setError('Invalid correo or contrasena');

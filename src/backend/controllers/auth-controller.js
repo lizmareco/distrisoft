@@ -206,10 +206,11 @@ export default class AuthController {
    */
   async hasAccessToken(request) {
     try {
+      const accessTokenController = new AccessTokenController();
       const accessTokenCookie = request.cookies.get('at');
       const accessToken = accessTokenCookie?.value;
       
-      const isValid = await this.accessTokenController.isValid(accessToken);
+      const isValid = await accessTokenController.isValid(accessToken);
       if(isValid) {
         return accessToken;
       }
