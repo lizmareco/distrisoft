@@ -2,6 +2,7 @@
 
 import { useRootContext } from '@/src/app/context/root';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { apis } from '@/src/apis';
 import jwt from 'jsonwebtoken';
 
@@ -16,6 +17,7 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [accessToken, setAccessToken] = useState(null);
   const { setState } = useRootContext();
+  const router = useRouter();
 
   useEffect(() => {
     if(accessToken) {
@@ -47,7 +49,6 @@ export default function LoginForm() {
       if (response.status === 200) {
         const data = await response.json();
         setAccessToken(data.accessToken);
-        window.location.href = '/';
       }
     } catch (err) {
       setError('Invalid correo or contrasena');
