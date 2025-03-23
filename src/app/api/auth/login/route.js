@@ -6,24 +6,6 @@ import CustomError from '@/src/lib/errors/custom-errors';
 import { NextResponse } from 'next/server';
 
 
-const validateLoginForm = (loginForm) => {
-  if(!loginForm.email || !loginForm.password) {
-    throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
-  }
-
-  // delete white spaces
-  loginForm.email = loginForm.email.trim();
-  loginForm.password = loginForm.password.trim();
-  if(!emailRegex.test(loginForm.email)) {
-    throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
-  }
-  if(!passwordRegex.test(loginForm.password)) {
-    throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
-  }
-
-  return loginForm;
-}
-
 
 export async function POST(request) {
   try {

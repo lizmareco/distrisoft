@@ -65,12 +65,11 @@ export default class AuthController {
       const accessTokenController = new AccessTokenController();
       const refreshTokenController = new RefreshTokenController();
 
-      const persona = await this.personaController.obtenerPersonaConCorreo(data.email);
+      const persona = await this.personaController.obtenerPersonaConCorreo(data.correo);
       if(!persona) {
         throw new CustomError('Correo electrónico o contraseña incorrecta', HTTP_STATUS_CODES.forbidden);
       }
 
-      
       if(await compare(data.contrasena, persona.usuario[0].contrasena)) {
         const accessToken = await accessTokenController.create(persona);
         const refreshToken = await refreshTokenController.create(persona, accessToken);
@@ -169,6 +168,7 @@ export default class AuthController {
    */
   async resetPassword(resetToken, data) {
     try {
+      const accessTokenController = new AccessTokenController();
       const TOKEN_TIME_VALID = '1d';
       const user = await this.recoveryTokenController.getUser(resetToken);
       if(!user) return null;
@@ -176,7 +176,7 @@ export default class AuthController {
       const updatedUser = await this.changePassword(user.id, data);
       if(!updatedUser) return null;
   
-      const accessToken = await this.accessTokenController.create(user);
+      const accessToken = await accessTokenController.create(user);
       const tokensPromises = [
         this.refreshTokenController.create(user, accessToken.id),
         this.recoveryTokenController.create(user, TOKEN_TIME_VALID),

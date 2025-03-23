@@ -2,12 +2,11 @@
 
 import { apis } from '@/src/apis';
 import { useState } from 'react';
-import { POST } from '../lib/http/fetch-base';
 
 export default function LoginForm() {
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    correo: '',
+    contrasena: '',
     rememberMe: false
   });
   
@@ -28,16 +27,18 @@ export default function LoginForm() {
     setError('');
     
     try {
-      const response = await POST(apis.login.url, {
+      const response = await fetch(apis.login.url, {
+        method: 'POST',
         body: JSON.stringify(formData)
       });
+
 
       if (response.status === 200) {
         const data = await response.json();
         console.log(data);
       }
     } catch (err) {
-      setError('Invalid email or password');
+      setError('Invalid correo or contrasena');
     } finally {
       setIsLoading(false);
     }
@@ -55,36 +56,36 @@ export default function LoginForm() {
       
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
-          <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-700">
-            Email Address
+          <label htmlFor="correo" className="block mb-2 text-sm font-medium text-gray-700">
+            Correo
           </label>
           <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
+            id="correo"
+            name="correo"
+            type="correo"
+            autoComplete="correo"
             required
-            value={formData.email}
+            value={formData.correo}
             onChange={handleChange}
             className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your email"
+            placeholder="Ingrese su correo"
           />
         </div>
         
         <div className="mb-3">
-          <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-700">
-            Password
+          <label htmlFor="contrasena" className="block mb-2 text-sm font-medium text-gray-700">
+            Contraseña
           </label>
           <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
+            id="contrasena"
+            name="contrasena"
+            type="contrasena"
+            autoComplete="current-contrasena"
             required
-            value={formData.password}
+            value={formData.contrasena}
             onChange={handleChange}
             className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter your password"
+            placeholder="Enter your contrasena"
           />
         </div>
         
@@ -117,7 +118,7 @@ export default function LoginForm() {
       
       <div className="mt-6 text-center">
         <a href="#" className="text-sm text-gray-700 hover:text-gray-800">
-          Forgot your password?
+          Olvidaste tú contraseña?
         </a>
       </div>
     </div>
