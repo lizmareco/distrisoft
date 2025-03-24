@@ -1,8 +1,7 @@
-// Importaciones existentes...
+// Importaciones necesarias
 import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
-// Otras importaciones...
 
 // En la parte superior del archivo, añade esta verificación
 if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_TOKEN) {
@@ -28,13 +27,49 @@ class AuthController {
     this.refreshAccessToken = this.refreshAccessToken.bind(this)
     this.invalidarRefreshToken = this.invalidarRefreshToken.bind(this)
     this.invalidarAccessToken = this.invalidarAccessToken.bind(this)
+    this.getUserFromToken = this.getUserFromToken.bind(this)
+    this.hasAccessToken = this.hasAccessToken.bind(this)
   }
 
+  // Verificar si hay un token de acceso válido en la solicitud
   async hasAccessToken(request) {
-    // Tu implementación existente...
+    try {
+      // Obtener el token de las cookies
+      const accessToken = request.cookies.get("at")?.value
+
+      if (!accessToken) {
+        return null
+      }
+
+      // Verificar el token
+      try {
+        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET)
+
+        // Verificar si el token existe en la base de datos y es válido
+        const tokenRecord = await prisma.accessToken.findFirst({
+          where: {
+            accessToken: accessToken,
+            deletedAt: null,
+          },
+        })
+
+        if (!tokenRecord) {
+          return null
+        }
+
+        return accessToken
+      } catch (error) {
+        // Si el token no es válido o está expirado
+        return null
+      }
+    } catch (error) {
+      console.error("Error al verificar el token de acceso:", error)
+      return null
+    }
   }
 
   // Método login modificado para usar nombreUsuario en lugar de correo
+  // y para incluir los datos del usuario directamente en el JWT
   async login(loginForm) {
     const { nombreUsuario, contrasena } = loginForm
 
@@ -117,22 +152,52 @@ class AuthController {
         usuario.rol = rol
       }
 
-      // Crear un objeto con los datos del usuario para devolver al cliente
-      const userData = {
-        id: usuario.idUsuario,
+      // Obtener los permisos del usuario según su rol
+      const permisos = await prisma.rolPermiso.findMany({
+        where: {
+          idRol: usuario.idRol,
+          deletedAt: null,
+        },
+        include: {
+          permiso: {
+            select: {
+              nombrePermiso: true,
+            },
+          },
+        },
+      })
+
+      // Extraer solo los nombres de los permisos
+      const permisosArray = permisos
+        .filter((rp) => rp.permiso) // Asegurarse de que el permiso existe
+        .map((rp) => rp.permiso.nombrePermiso)
+
+      console.log("Permisos del usuario:", permisosArray)
+
+      // Crear el payload del JWT con la estructura adecuada
+      // Incluir directamente los datos del usuario en el payload principal
+      const payload = {
+        idUsuario: usuario.idUsuario,
         nombre: usuario.persona.nombre,
         apellido: usuario.persona.apellido,
         correo: usuario.persona.correoPersona,
-        rol: usuario.rol.nombreRol, // Usar nombreRol en lugar de nombre
+        rol: usuario.rol.nombreRol,
         usuario: usuario.nombreUsuario,
+        permisos: permisosArray,
       }
 
-      console.log("Datos del usuario para el token:", userData)
+      console.log("Payload del token:", payload)
 
-      // Generar tokens (tu implementación existente)
-      const accessToken = jwt.sign(userData, process.env.JWT_SECRET, { expiresIn: "1h" })
+      // Generar tokens con la estructura adecuada
+      const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+        algorithm: "HS256", // Especificar el algoritmo
+      })
 
-      const refreshToken = jwt.sign({ id: usuario.idUsuario }, process.env.JWT_REFRESH_TOKEN, { expiresIn: "7d" })
+      const refreshToken = jwt.sign({ idUsuario: usuario.idUsuario }, process.env.JWT_REFRESH_TOKEN, {
+        expiresIn: "7d",
+        algorithm: "HS256", // Especificar el algoritmo
+      })
 
       // Primero, guardar el token de acceso
       const accessTokenRecord = await prisma.accessToken.create({
@@ -152,10 +217,10 @@ class AuthController {
       })
 
       // Devolver tokens y datos del usuario
+      // No creamos un objeto userData separado, ya que los datos ya están en el token
       return {
         accessToken,
         refreshToken,
-        user: userData,
       }
     } catch (error) {
       console.error("Error en login:", error)
@@ -279,7 +344,7 @@ class AuthController {
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN)
 
         // Verificar que el ID del usuario coincida
-        if (decoded.id !== tokenRecord.idUsuario) {
+        if (decoded.idUsuario !== tokenRecord.idUsuario) {
           return null
         }
       } catch (error) {
@@ -290,23 +355,45 @@ class AuthController {
 
       const usuario = tokenRecord.usuario
 
-      // Crear un objeto con los datos del usuario
-      const userData = {
-        id: usuario.idUsuario,
+      // Obtener los permisos del usuario según su rol
+      const permisos = await prisma.rolPermiso.findMany({
+        where: {
+          idRol: usuario.idRol,
+          deletedAt: null,
+        },
+        include: {
+          permiso: {
+            select: {
+              nombrePermiso: true,
+            },
+          },
+        },
+      })
+
+      // Extraer solo los nombres de los permisos
+      const permisosArray = permisos.filter((rp) => rp.permiso).map((rp) => rp.permiso.nombrePermiso)
+
+      // Crear el payload del JWT con la estructura adecuada
+      // Incluir directamente los datos del usuario en el payload principal
+      const payload = {
+        idUsuario: usuario.idUsuario,
         nombre: usuario.persona.nombre,
         apellido: usuario.persona.apellido,
         correo: usuario.persona.correoPersona,
-        rol: usuario.rol.nombre,
+        rol: usuario.rol.nombreRol,
         usuario: usuario.nombreUsuario,
+        permisos: permisosArray,
       }
 
       // Generar nuevos tokens
-      const newAccessToken = jwt.sign(userData, process.env.JWT_SECRET, {
+      const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_SECRET_EXPIRE || "30m",
+        algorithm: "HS256",
       })
 
-      const newRefreshToken = jwt.sign({ id: usuario.idUsuario }, process.env.JWT_REFRESH_TOKEN, {
+      const newRefreshToken = jwt.sign({ idUsuario: usuario.idUsuario }, process.env.JWT_REFRESH_TOKEN, {
         expiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRE || "15d",
+        algorithm: "HS256",
       })
 
       // Invalidar el token de refresco anterior
@@ -329,10 +416,10 @@ class AuthController {
         },
       })
 
+      // Devolver tokens sin objeto userData separado
       return {
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
-        user: userData,
       }
     } catch (error) {
       console.error("Error al refrescar el token:", error)
@@ -360,6 +447,33 @@ class AuthController {
         deletedAt: new Date(),
       },
     })
+  }
+
+  // Método para obtener los datos del usuario a partir del token
+  async getUserFromToken(token) {
+    try {
+      // Verificar que la clave secreta esté definida
+      if (!process.env.JWT_SECRET) {
+        throw new Error("Error de configuración del servidor: Clave JWT no definida")
+      }
+
+      // Decodificar el token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+
+      // Extraer los datos directamente del token
+      return {
+        idUsuario: decoded.idUsuario,
+        nombre: decoded.nombre,
+        apellido: decoded.apellido,
+        correo: decoded.correo,
+        rol: decoded.rol,
+        usuario: decoded.usuario,
+        permisos: decoded.permisos || [],
+      }
+    } catch (error) {
+      console.error("Error al obtener usuario desde token:", error)
+      return null
+    }
   }
 }
 

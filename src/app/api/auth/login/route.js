@@ -29,14 +29,18 @@ export async function POST(request) {
         )
       }
 
-      // Extraer los datos del usuario para enviarlos al cliente
-      const { accessToken, refreshToken, user } = result
-      console.log("API login: Autenticación exitosa", { user })
+      // Extraer los tokens
+      const { accessToken, refreshToken } = result
+      console.log("API login: Autenticación exitosa")
+
+      // Decodificar el token para obtener los datos del usuario
+      const userData = await authController.getUserFromToken(accessToken)
+      console.log("API login: Datos del usuario extraídos del token", userData)
 
       const response = NextResponse.json(
         {
           accessToken,
-          user, // Incluir los datos del usuario en la respuesta
+          // No incluimos user separado, ya que los datos están en el token
         },
         { status: HTTP_STATUS_CODES.ok },
       )
@@ -102,4 +106,6 @@ export async function POST(request) {
     }
   }
 }
+
+
 

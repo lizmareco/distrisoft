@@ -105,16 +105,36 @@ export default function LoginForm() {
           status: "success",
           message: "Login exitoso",
           data: data,
+          token: {
+            header: JSON.parse(atob(data.accessToken.split(".")[0])),
+            payload: JSON.parse(atob(data.accessToken.split(".")[1])),
+          },
         })
 
         // Establecer la sesión en el contexto
         if (contextData.setState && contextData.setState.setSession) {
           try {
             console.log("Estableciendo sesión con datos:", data.user)
-            contextData.setState.setSession(data.user)
 
-            // Redirigir después de un breve retraso para asegurar que la sesión se establezca
-            // y que el usuario pueda ver el mensaje de éxito
+            // Decodificar el token para obtener los datos del usuario
+            const tokenParts = data.accessToken.split(".")
+            const payload = JSON.parse(atob(tokenParts[1]))
+
+            console.log("Token decodificado:", payload)
+
+            // Establecer la sesión con los datos extraídos directamente del token
+            contextData.setState.setSession({
+              id: payload.idUsuario,
+              nombre: payload.nombre,
+              apellido: payload.apellido,
+              correo: payload.correo,
+              rol: payload.rol,
+              usuario: payload.usuario,
+              token: data.accessToken,
+              permisos: payload.permisos || [],
+            })
+
+            // Redirigir después de un breve retraso
             setTimeout(() => {
               console.log("Redirigiendo a la página principal")
               router.push("/")
@@ -250,7 +270,6 @@ export default function LoginForm() {
             </Alert>
           </Fade>
         )}
-
 
 
         <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
