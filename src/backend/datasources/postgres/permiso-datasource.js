@@ -1,14 +1,16 @@
 import BaseDatasource from "../base-datasource";
-import { prisma } from '@prisma/client';
-//const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
 export default class PermisoDatasource extends BaseDatasource {
     constructor() {
-        super(prisma.permiso);
+        super(prisma.permiso); // modelo "Permiso" en schema.prisma → prisma.permiso en código JS
     }
 
     async getAllPermisos() {
         try {
-            return await prisma.Permiso.findMany({
+            return await prisma.permiso.findMany({
                 where: {
                     deletedAt: null
                 }
@@ -19,5 +21,3 @@ export default class PermisoDatasource extends BaseDatasource {
         }
     }
 }
-
-

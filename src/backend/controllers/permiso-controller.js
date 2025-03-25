@@ -1,4 +1,4 @@
-import PermisoDatasource from "@/backend/datasources/postgres/permiso-datasource";
+import PermisoDatasource from "@/src/backend/datasources/postgres/permiso-datasource";
 
 export default class PermisoController {
     constructor() {
