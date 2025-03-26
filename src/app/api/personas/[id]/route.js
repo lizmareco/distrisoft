@@ -1,15 +1,9 @@
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
-
-const prisma = new PrismaClient()
 
 export async function GET(request, { params }) {
   try {
     const { id } = params
-
-    if (!id) {
-      return NextResponse.json({ message: "ID de persona requerido" }, { status: 400 })
-    }
 
     const persona = await prisma.persona.findUnique({
       where: {
@@ -19,72 +13,51 @@ export async function GET(request, { params }) {
       include: {
         ciudad: true,
         tipoDocumento: true,
-        tipoPersona: true,
       },
     })
 
     if (!persona) {
-      return NextResponse.json({ message: "Persona no encontrada" }, { status: 404 })
+      return NextResponse.json({ error: "Persona no encontrada" }, { status: 404 })
     }
 
-    return NextResponse.json({ persona })
+    return NextResponse.json(persona)
   } catch (error) {
-    console.error(`Error al obtener persona con ID ${params.id}:`, error)
-    return NextResponse.json({ message: "Error al obtener persona", error: error.message }, { status: 500 })
+    console.error("Error al obtener persona:", error)
+    return NextResponse.json({ error: "Error al obtener persona" }, { status: 500 })
   }
 }
 
 export async function PUT(request, { params }) {
   try {
     const { id } = params
+    const data = await request.json()
 
-    if (!id) {
-      return NextResponse.json({ message: "ID de persona requerido" }, { status: 400 })
-    }
-
-    const body = await request.json()
-
-    // Verificar si la persona existe
-    const personaExistente = await prisma.persona.findUnique({
-      where: {
-        idPersona: Number.parseInt(id),
-        deletedAt: null,
-      },
-    })
-
-    if (!personaExistente) {
-      return NextResponse.json({ message: "Persona no encontrada" }, { status: 404 })
-    }
-
-    // Actualizar la persona
     const persona = await prisma.persona.update({
       where: {
         idPersona: Number.parseInt(id),
       },
       data: {
-        nombre: body.nombre,
-        apellido: body.apellido,
-        nroDocumento: body.nroDocumento,
-        fechaNacimiento: new Date(body.fechaNacimiento),
-        direccion: body.direccion,
-        nroTelefono: body.nroTelefono,
-        correoPersona: body.correoPersona,
-        idCiudad: Number.parseInt(body.idCiudad),
-        idTipoPersona: Number.parseInt(body.idTipoPersona),
-        idTipoDocumento: Number.parseInt(body.idTipoDocumento),
+        nroDocumento: data.nroDocumento,
+        nombre: data.nombre,
+        apellido: data.apellido,
+        fechaNacimiento: new Date(data.fechaNacimiento),
+        direccion: data.direccion,
+        nroTelefono: data.nroTelefono,
+        correoPersona: data.correoPersona,
+        idCiudad: Number.parseInt(data.idCiudad),
+        idTipoDocumento: Number.parseInt(data.idTipoDocumento),
         updatedAt: new Date(),
       },
       include: {
         ciudad: true,
         tipoDocumento: true,
-        tipoPersona: true,
       },
     })
 
-    return NextResponse.json({ message: "Persona actualizada exitosamente", persona })
+    return NextResponse.json(persona)
   } catch (error) {
-    console.error(`Error al actualizar persona con ID ${params.id}:`, error)
-    return NextResponse.json({ message: "Error al actualizar persona", error: error.message }, { status: 500 })
+    console.error("Error al actualizar persona:", error)
+    return NextResponse.json({ error: "Error al actualizar persona" }, { status: 500 })
   }
 }
 
@@ -92,23 +65,6 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = params
 
-    if (!id) {
-      return NextResponse.json({ message: "ID de persona requerido" }, { status: 400 })
-    }
-
-    // Verificar si la persona existe
-    const personaExistente = await prisma.persona.findUnique({
-      where: {
-        idPersona: Number.parseInt(id),
-        deletedAt: null,
-      },
-    })
-
-    if (!personaExistente) {
-      return NextResponse.json({ message: "Persona no encontrada" }, { status: 404 })
-    }
-
-    // Soft delete de la persona
     await prisma.persona.update({
       where: {
         idPersona: Number.parseInt(id),
@@ -118,10 +74,12 @@ export async function DELETE(request, { params }) {
       },
     })
 
-    return NextResponse.json({ message: "Persona eliminada exitosamente" })
+    return NextResponse.json({ message: "Persona eliminada correctamente" })
   } catch (error) {
-    console.error(`Error al eliminar persona con ID ${params.id}:`, error)
-    return NextResponse.json({ message: "Error al eliminar persona", error: error.message }, { status: 500 })
+    console.error("Error al eliminar persona:", error)
+    return NextResponse.json({ error: "Error al eliminar persona" }, { status: 500 })
   }
 }
+
+
 
