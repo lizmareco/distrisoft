@@ -1,85 +1,81 @@
 import { PrismaClient } from "@prisma/client";
-import csv from "csv-parser";
 import bcrypt from "bcrypt";
-import path from "path";
-import fs from "fs";
 
 const prisma = new PrismaClient();
+const SALT_ROUNDS = parseInt(process.env.PASSWORD_SALT) || 17;
 
-async function migrarUsuarios() {
-  const filePath = `${path.resolve()}/prisma/seed/permisos.csv`;
-  const results = [];
+async function configurarAdmin() {
+  try {
+    console.log("🚀 Iniciando configuración del usuario admin...");
 
-  const promise1 = [
-    prisma.ciudad.create({
-      data: {
-        descCiudad: "San Lorenzo",
-        deletedAt: null,
-      },
-    }),
-    prisma.tipoDocumento.create({
-      data: {
-        descTipoDocumento: "Cedula",
-        deletedAt: null,
-      },
-    }),
-    prisma.tipoPersona.create({
-      data: {
-        descTipoPersona: "Admin",
-        deletedAt: null,
-      },
-    }),
-  ];
+    // 1. Buscar usuario existente
+    const usuarioExistente = await prisma.usuario.findFirst({
+      where: { nombreUsuario: "admin" },
+      include: { persona: true, rol: true }
+    });
 
-  const [ciudad, tipoDocumento, tipoPersona] = await Promise.all(promise1);
+    const contrasenaHash = await bcrypt.hash("Admin123!", SALT_ROUNDS);
 
-  const promises = [
-    prisma.persona.create({
-      data: {
-        nombre: "admin",
-        apellido: "admin",
-        correoPersona: "correo@correo.com",
-        fechaNacimiento: new Date(),
-        nroDocumento: "12345678",
-        direccion: "calle falsa 123",
-        nroTelefono: "595995123456",
-        // idCiudad: 1,
-        ciudad: {
-          connect: {
-            idCiudad: ciudad.idCiudad,
+    // 2. Actualizar o crear usuario
+    if (usuarioExistente) {
+      console.log("🔄 Usuario admin existente encontrado, actualizando...");
+      
+      // Actualización CORREGIDA usando la relación 'rol' en lugar de 'idRol'
+      await prisma.usuario.update({
+        where: { idUsuario: usuarioExistente.idUsuario },
+        data: {
+          contrasena: contrasenaHash,
+          rol: {
+            connect: { idRol: 1 } // Forma correcta de actualizar la relación
           },
-        },
-        tipoDocumento: {
-          connect: {
-            idTipoDocumento: tipoDocumento.idTipoDocumento,
+          estado: "ACTIVO",
+          persona: {
+            update: {
+              nombre: "Admin",
+              apellido: "Sistema",
+              correoPersona: "admin@distrisoft.com"
+            }
+          }
+        }
+      });
+    } else {
+      console.log("🆕 Creando nuevo usuario admin...");
+      
+      // Creación CORREGIDA usando la relación 'rol'
+      await prisma.usuario.create({
+        data: {
+          nombreUsuario: "admin",
+          contrasena: contrasenaHash,
+          estado: "ACTIVO",
+          rol: {
+            connect: { idRol: 1 } // Forma correcta de establecer la relación
           },
-        },
-        tipoPersona: {
-          connect: {
-            idTipoPersona: tipoPersona.idTipoPersona,
-          },
-        },
-        deletedAt: null,
-      },
-    }),
-    prisma.rol.findFirst({
-      where: {
-        nombreRol: "admin",
-      },
-    }),
-  ];
+          persona: {
+            create: {
+              nombre: "Admin",
+              apellido: "Sistema",
+              correoPersona: "admin@distrisoft.com",
+              fechaNacimiento: new Date("1980-01-01"),
+              nroDocumento: "12345678",
+              direccion: "Sede Central",
+              nroTelefono: "595981123456",
+              idCiudad: 1,
+              idTipoDocumento: 1
+            }
+          }
+        }
+      });
+    }
 
-  const [persona, rol] = await Promise.all(promises);
+    console.log("🎉 Configuración completada exitosamente!");
 
-  await prisma.usuario.create({
-    data: {
-      nombreUsuario: "admin",
-      estado: "ACTIVO",
-      contrasena: await bcrypt.hash("adminPassw0rd", parseInt(process.env.PASSWORD_SALT)),
-      idPersona: persona.idPersona,
-      idRol: rol.idRol,
-    },
-  });
+  } catch (error) {
+    console.error("❌ Error crítico:", error.message || error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-export default migrarUsuarios;
+// Ejecutar
+configurarAdmin();
