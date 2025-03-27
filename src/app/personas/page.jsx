@@ -23,6 +23,7 @@ import DeleteIcon from "@mui/icons-material/Delete"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
+import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState([])
@@ -110,9 +111,14 @@ export default function PersonasPage() {
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h5" component="h1">
-          Listado de Personas
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Button component={Link} href="/gestion" variant="outlined" sx={{ mr: 2 }} startIcon={<ArrowBackIcon />}>
+            Volver a Gestión
+          </Button>
+          <Typography variant="h5" component="h1">
+            Listado de Personas
+          </Typography>
+        </Box>
         <Link href="/personas/nueva" passHref>
           <Button variant="contained" color="primary" startIcon={<AddIcon />}>
             Nueva Persona

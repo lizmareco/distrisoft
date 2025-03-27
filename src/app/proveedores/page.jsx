@@ -16,17 +16,20 @@ import {
   Box,
   CircularProgress,
   Alert,
+  Chip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
+import BusinessIcon from "@mui/icons-material/Business"
+import PaymentIcon from "@mui/icons-material/Payment"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 
-export default function EmpresasPage() {
-  const [empresas, setEmpresas] = useState([])
+export default function ProveedoresPage() {
+  const [proveedores, setProveedores] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const router = useRouter()
@@ -34,21 +37,21 @@ export default function EmpresasPage() {
   // Estado para el diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
-    empresaId: null,
-    empresaNombre: "",
+    proveedorId: null,
+    proveedorNombre: "",
   })
 
   useEffect(() => {
-    const fetchEmpresas = async () => {
+    const fetchProveedores = async () => {
       try {
-        console.log("Cargando empresas...")
-        const response = await fetch("/api/empresas")
+        console.log("Cargando proveedores...")
+        const response = await fetch("/api/proveedores")
         if (!response.ok) {
-          throw new Error("Error al cargar empresas")
+          throw new Error("Error al cargar proveedores")
         }
         const data = await response.json()
-        console.log(`Se cargaron ${data.length} empresas`)
-        setEmpresas(data)
+        console.log(`Se cargaron ${data.length} proveedores`)
+        setProveedores(data)
       } catch (error) {
         console.error("Error:", error)
         setError(error.message)
@@ -57,29 +60,29 @@ export default function EmpresasPage() {
       }
     }
 
-    fetchEmpresas()
+    fetchProveedores()
   }, [])
 
-  const handleDeleteClick = (id, razonSocial) => {
+  const handleDeleteClick = (id, nombre) => {
     setConfirmDialog({
       open: true,
-      empresaId: id,
-      empresaNombre: razonSocial,
+      proveedorId: id,
+      proveedorNombre: nombre,
     })
   }
 
   const handleConfirmDelete = async () => {
     try {
-      const response = await fetch(`/api/empresas/${confirmDialog.empresaId}`, {
+      const response = await fetch(`/api/proveedores/${confirmDialog.proveedorId}`, {
         method: "DELETE",
       })
 
       if (!response.ok) {
-        throw new Error("Error al eliminar empresa")
+        throw new Error("Error al eliminar proveedor")
       }
 
-      // Actualizar la lista de empresas
-      setEmpresas(empresas.filter((empresa) => empresa.idEmpresa !== confirmDialog.empresaId))
+      // Actualizar la lista de proveedores
+      setProveedores(proveedores.filter((proveedor) => proveedor.idProveedor !== confirmDialog.proveedorId))
 
       // Cerrar el diálogo
       setConfirmDialog({ ...confirmDialog, open: false })
@@ -96,8 +99,8 @@ export default function EmpresasPage() {
   }
 
   const handleEdit = (id) => {
-    console.log(`Navegando a /empresas/${id}`)
-    router.push(`/empresas/${id}`)
+    console.log(`Navegando a /proveedores/${id}`)
+    router.push(`/proveedores/${id}`)
   }
 
   if (loading) {
@@ -116,14 +119,12 @@ export default function EmpresasPage() {
             Volver a Gestión
           </Button>
           <Typography variant="h5" component="h1">
-            Listado de Empresas
+            Gestión de Proveedores
           </Typography>
         </Box>
-        <Link href="/empresas/nueva" passHref>
-          <Button variant="contained" color="primary" startIcon={<AddIcon />}>
-            Nueva Empresa
-          </Button>
-        </Link>
+        <Button variant="contained" color="primary" startIcon={<AddIcon />} component={Link} href="/proveedores/nuevo">
+          Registrar Nuevo Proveedor
+        </Button>
       </Box>
 
       {error && (
@@ -138,38 +139,53 @@ export default function EmpresasPage() {
             <TableHead>
               <TableRow>
                 <TableCell>ID</TableCell>
-                <TableCell>Razón Social</TableCell>
+                <TableCell>Empresa</TableCell>
                 <TableCell>RUC</TableCell>
-                <TableCell>Categoría</TableCell>
-                <TableCell>Ciudad</TableCell>
                 <TableCell>Contacto</TableCell>
+                <TableCell>Condición de Pago</TableCell>
+                <TableCell>Fecha Registro</TableCell>
                 <TableCell>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {empresas.length > 0 ? (
-                empresas.map((empresa) => (
-                  <TableRow key={empresa.idEmpresa}>
-                    <TableCell>{empresa.idEmpresa}</TableCell>
-                    <TableCell>{empresa.razonSocial}</TableCell>
-                    <TableCell>{empresa.ruc}</TableCell>
-                    <TableCell>{empresa.categoriaEmpresa?.descCategoriaEmpresa || "N/A"}</TableCell>
-                    <TableCell>{empresa.ciudad?.descCiudad || "N/A"}</TableCell>
+              {proveedores.length > 0 ? (
+                proveedores.map((proveedor) => (
+                  <TableRow key={proveedor.idProveedor}>
+                    <TableCell>{proveedor.idProveedor}</TableCell>
                     <TableCell>
-                      {empresa.persona ? `${empresa.persona.nombre} ${empresa.persona.apellido}` : "N/A"}
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <BusinessIcon sx={{ mr: 1, color: "primary.main" }} />
+                        {proveedor.empresa.razonSocial}
+                      </Box>
                     </TableCell>
+                    <TableCell>{proveedor.empresa.ruc}</TableCell>
+                    <TableCell>
+                      {proveedor.empresa.persona
+                        ? `${proveedor.empresa.persona.nombre} ${proveedor.empresa.persona.apellido}`
+                        : "No especificado"}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        icon={<PaymentIcon />}
+                        label={proveedor.condicionPago.descCondicionPago}
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{new Date(proveedor.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <IconButton
                         color="primary"
-                        onClick={() => handleEdit(empresa.idEmpresa)}
-                        aria-label="Editar empresa"
+                        onClick={() => handleEdit(proveedor.idProveedor)}
+                        aria-label="Editar proveedor"
                       >
                         <EditIcon />
                       </IconButton>
                       <IconButton
                         color="error"
-                        onClick={() => handleDeleteClick(empresa.idEmpresa, empresa.razonSocial)}
-                        aria-label="Eliminar empresa"
+                        onClick={() => handleDeleteClick(proveedor.idProveedor, proveedor.empresa.razonSocial)}
+                        aria-label="Eliminar proveedor"
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -179,7 +195,7 @@ export default function EmpresasPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    No hay empresas registradas
+                    No hay proveedores registrados
                   </TableCell>
                 </TableRow>
               )}
@@ -191,8 +207,8 @@ export default function EmpresasPage() {
       {/* Diálogo de confirmación para eliminar */}
       <ConfirmDialog
         open={confirmDialog.open}
-        title="Eliminar Empresa"
-        message={`¿Está seguro que desea eliminar la empresa "${confirmDialog.empresaNombre}"? Esta acción no se puede deshacer.`}
+        title="Eliminar Proveedor"
+        message={`¿Está seguro que desea eliminar al proveedor ${confirmDialog.proveedorNombre}? Esta acción no se puede deshacer.`}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
         type="delete"
