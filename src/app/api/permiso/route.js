@@ -1,4 +1,4 @@
-import PermisoController from "@/backend/controllers/permiso-controller";
+import PermisoController from "@/src/backend/controllers/permiso-controller";
 
 const permisoController = new PermisoController();
 
