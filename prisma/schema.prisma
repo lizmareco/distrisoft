@@ -729,6 +729,7 @@ model Usuario {
   idRol                 Int                     @map("id_rol")
   idPersona             Int                     @map("id_persona")
   estado                String                  @map("estado_usuario")
+  ultimoCambioContrasena DateTime               @default(now()) @map("ultimo_cambio_contrasena") // Nuevo campo
   caja                  Caja[]
   cotizacionCliente     CotizacionCliente[]
   facturaClienteContado FacturaClienteContado[]

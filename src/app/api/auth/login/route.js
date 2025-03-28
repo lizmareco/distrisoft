@@ -2,6 +2,9 @@ import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/settings"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
 
 export async function POST(request) {
   try {
@@ -29,9 +32,9 @@ export async function POST(request) {
         )
       }
 
-      // Extraer los tokens
-      const { accessToken, refreshToken } = result
-      console.log("API login: Autenticación exitosa")
+      // Extraer los tokens y la información de cuenta vencida
+      const { accessToken, refreshToken, cuentaVencida } = result
+      console.log("API login: Autenticación exitosa", cuentaVencida ? "- Cuenta con contraseña vencida" : "")
 
       // Decodificar el token para obtener los datos del usuario
       const userData = await authController.getUserFromToken(accessToken)
@@ -40,6 +43,7 @@ export async function POST(request) {
       const response = NextResponse.json(
         {
           accessToken,
+          cuentaVencida: cuentaVencida,
           // No incluimos user separado, ya que los datos están en el token
         },
         { status: HTTP_STATUS_CODES.ok },
@@ -66,6 +70,7 @@ export async function POST(request) {
 
       // Capturar errores específicos del login
       const errorMessage = error.message || "Ha ocurrido un error"
+      console.log("API login: Mensaje de error:", errorMessage)
 
       // Verificar si es un error de cuenta bloqueada
       if (errorMessage.includes("bloqueada")) {
@@ -73,6 +78,18 @@ export async function POST(request) {
           {
             message: errorMessage,
             cuentaBloqueada: true,
+          },
+          { status: HTTP_STATUS_CODES.forbidden },
+        )
+      }
+
+      // Verificar si es un error de contraseña vencida
+      if (errorMessage.includes("contraseña ha vencido")) {
+        console.log("API login: Detectada cuenta con contraseña vencida")
+        return NextResponse.json(
+          {
+            message: errorMessage,
+            cuentaVencida: true,
           },
           { status: HTTP_STATUS_CODES.forbidden },
         )
@@ -106,6 +123,4 @@ export async function POST(request) {
     }
   }
 }
-
-
 
