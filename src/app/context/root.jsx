@@ -1,31 +1,37 @@
-'use client'
+"use client"
 
-import { createContext, useContext, useState, useEffect } from "react";
-import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code";
-import jwt from "jsonwebtoken";
+import { createContext, useContext, useState } from "react"
 
-const RootContext = createContext({});
+// Crear el contexto
+const RootContext = createContext(undefined)
 
-export const RootContextProvider = ({ children }) => {
-  useEffect(() => {
-    console.log('asdfasdf')
-  }, []);
+// Proveedor del contexto
+export function RootProvider({ children }) {
+  const [session, setSession] = useState(null)
 
-  const [session, setSession] = useState(null);
-  const globalState = {
+  // Valores y funciones que queremos exponer
+  const value = {
     session,
-  }
-  const setState = {
-    setSession,
+    setState: {
+      setSession,
+    },
   }
 
-  return (
-    <RootContext.Provider value={{ globalState, setState }}>
-      {children}
-    </RootContext.Provider>
-  )
+  return <RootContext.Provider value={value}>{children}</RootContext.Provider>
+}
+
+// Hook personalizado para usar el contexto
+export function useRootContext() {
+  const context = useContext(RootContext)
+  if (context === undefined) {
+    console.warn("useRootContext debe ser usado dentro de un RootProvider")
+    // Devolver un objeto vacío en lugar de null para evitar errores
+    return { session: null, setState: { setSession: () => {} } }
+  }
+  return context
 }
 
 
 
-export const useRootContext = () => useContext(RootContext);
+
+
