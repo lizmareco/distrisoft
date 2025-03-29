@@ -31,14 +31,22 @@ export async function POST(request) {
     }
 
     // Si aún no hay token, verificar si hay un ID de usuario en el cuerpo de la solicitud
-    // (esto es solo para pruebas y desarrollo, no recomendado para producción)
-    if (!token && process.env.NODE_ENV !== "production" && body.userId) {
-      console.log("Usando ID de usuario del cuerpo para pruebas:", body.userId)
-      const userId = body.userId
+    if (!token && body.userId) {
+      // Asegurarse de que userId sea un número
+      const userId = Number.parseInt(body.userId, 10)
+      console.log("ID de usuario convertido a número:", userId)
+
+      // Verificar que userId sea un número válido
+      if (isNaN(userId)) {
+        console.error("ID de usuario inválido:", body.userId)
+        return NextResponse.json({ error: "ID de usuario inválido" }, { status: 400 })
+      }
 
       // Buscar el usuario en la base de datos
       const user = await prisma.usuario.findUnique({
-        where: { idUsuario: userId },
+        where: {
+          idUsuario: userId, // Ya convertido a número
+        },
       })
 
       if (!user) {
