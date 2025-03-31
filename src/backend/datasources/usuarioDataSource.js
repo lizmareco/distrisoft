@@ -59,7 +59,7 @@ export const usuarioDataSource = {
     }
   },
 
-  // Verificar si una persona ya tiene dos usuarios
+  // Verificar si una persona ya tiene un usuario
   verificarLimiteUsuarios: async (personaId) => {
     try {
       const cantidadUsuarios = await prisma.usuario.count({
@@ -71,7 +71,7 @@ export const usuarioDataSource = {
           deletedAt: null,
         },
       })
-      return cantidadUsuarios >= 2
+      return cantidadUsuarios >= 1
     } catch (error) {
       console.error(`Error al verificar límite de usuarios para persona ${personaId}:`, error)
       throw new Error("Error al verificar límite de usuarios")

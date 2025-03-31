@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcryptjs"
+import { validatePasswordComplexity } from "../../../utils/passwordUtils"
 
 const prisma = new PrismaClient()
 
@@ -52,6 +54,14 @@ export async function POST(request) {
       throw new Error("Faltan campos obligatorios: nombreUsuario, contrasena, idRol, idPersona o estado")
     }
 
+    // Validar complejidad de la contraseña
+    const passwordValidation = validatePasswordComplexity(datos.contrasena)
+    if (!passwordValidation.isValid) {
+      throw new Error(
+        `La contraseña no cumple con los requisitos de seguridad: ${passwordValidation.errors.join(", ")}`,
+      )
+    }
+
     // Verificar si la persona existe
     const persona = await prisma.persona.findUnique({
       where: {
@@ -64,7 +74,8 @@ export async function POST(request) {
       throw new Error(`Persona con ID ${datos.idPersona} no encontrada`)
     }
 
-    // Verificar si la persona ya tiene dos usuarios
+    // Modificar la verificación del límite de usuarios
+    // Verificar si la persona ya tiene un usuario
     const cantidadUsuarios = await prisma.usuario.count({
       where: {
         idPersona: Number.parseInt(datos.idPersona),
@@ -75,15 +86,20 @@ export async function POST(request) {
       },
     })
 
-    if (cantidadUsuarios >= 2) {
-      throw new Error(`La persona ya tiene el máximo de 2 usuarios permitidos`)
+    if (cantidadUsuarios >= 1) {
+      throw new Error(`La persona ya tiene un usuario activo y no puede tener más`)
     }
 
-    // Crear el usuario con los campos correctos
+    // Encriptar la contraseña
+    const saltRounds = 10
+    const hashedPassword = await bcrypt.hash(datos.contrasena, saltRounds)
+    console.log("API: Contraseña encriptada correctamente")
+
+    // Crear el usuario con los campos correctos y la contraseña encriptada
     const usuario = await prisma.usuario.create({
       data: {
         nombreUsuario: datos.nombreUsuario,
-        contrasena: datos.contrasena, // Nota: En producción, deberías hashear esta contraseña
+        contrasena: hashedPassword, // Usar la contraseña encriptada
         idRol: Number.parseInt(datos.idRol),
         idPersona: Number.parseInt(datos.idPersona),
         estado: datos.estado || "ACTIVO",

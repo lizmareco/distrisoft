@@ -1,7 +1,7 @@
 // Importaciones necesarias
 import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 
 // En la parte superior del archivo, añade esta verificación
 if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_TOKEN) {

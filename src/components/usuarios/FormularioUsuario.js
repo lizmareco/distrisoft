@@ -17,7 +17,15 @@ import {
   Alert,
   CircularProgress,
   Autocomplete,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Collapse,
 } from "@mui/material"
+import CheckCircleIcon from "@mui/icons-material/CheckCircle"
+import CancelIcon from "@mui/icons-material/Cancel"
+import { validatePasswordComplexity } from "../../utils/passwordUtils"
 
 export default function FormularioUsuario({ id }) {
   const router = useRouter()
@@ -37,6 +45,18 @@ export default function FormularioUsuario({ id }) {
   const [personas, setPersonas] = useState([])
   const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
   const [buscandoPersonas, setBuscandoPersonas] = useState(false)
+  const [passwordValidation, setPasswordValidation] = useState({
+    isValid: false,
+    validations: {
+      length: false,
+      uppercase: false,
+      lowercase: false,
+      number: false,
+      special: false,
+    },
+    errors: [],
+  })
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false)
   const [snackbar, setSnackbar] = useState({
     abierto: false,
     mensaje: "",
@@ -130,12 +150,38 @@ export default function FormularioUsuario({ id }) {
       [name]: type === "checkbox" ? checked : value,
     })
 
-    // Limpiar error del campo
-    if (errores[name]) {
-      setErrores({
-        ...errores,
-        [name]: null,
-      })
+    // Validar complejidad de contraseña
+    if (name === "contrasena") {
+      const validation = validatePasswordComplexity(value)
+      setPasswordValidation(validation)
+
+      // Mostrar requisitos de contraseña cuando el usuario comienza a escribir
+      if (value && !showPasswordRequirements) {
+        setShowPasswordRequirements(true)
+      } else if (!value) {
+        setShowPasswordRequirements(false)
+      }
+
+      // Actualizar errores de contraseña
+      if (validation.isValid || !value) {
+        setErrores({
+          ...errores,
+          contrasena: null,
+        })
+      } else {
+        setErrores({
+          ...errores,
+          contrasena: "La contraseña no cumple con los requisitos de seguridad",
+        })
+      }
+    } else {
+      // Limpiar error del campo
+      if (errores[name]) {
+        setErrores({
+          ...errores,
+          [name]: null,
+        })
+      }
     }
   }
 
@@ -168,8 +214,8 @@ export default function FormularioUsuario({ id }) {
     // Solo validar contraseña en modo creación o si se ha ingresado una nueva contraseña
     if (!esEdicion && !formulario.contrasena) {
       nuevosErrores.contrasena = "La contraseña es obligatoria"
-    } else if (formulario.contrasena && formulario.contrasena.length < 6) {
-      nuevosErrores.contrasena = "La contraseña debe tener al menos 6 caracteres"
+    } else if (formulario.contrasena && !passwordValidation.isValid) {
+      nuevosErrores.contrasena = "La contraseña no cumple con los requisitos de seguridad"
     }
 
     if (!formulario.idPersona) {
@@ -189,6 +235,12 @@ export default function FormularioUsuario({ id }) {
     e.preventDefault()
 
     if (!validarFormulario()) {
+      // Mostrar alerta si hay errores de validación
+      setSnackbar({
+        abierto: true,
+        mensaje: "Por favor, corrija los errores en el formulario",
+        tipo: "error",
+      })
       return
     }
 
@@ -310,7 +362,7 @@ export default function FormularioUsuario({ id }) {
               )}
             />
             <Typography variant="caption" color="textSecondary">
-              Nota: Una persona no puede tener más de 2 usuarios activos
+              Nota: Una persona no puede tener más de 1 usuario activo
             </Typography>
           </Grid>
           <Grid item xs={12}>
@@ -338,7 +390,69 @@ export default function FormularioUsuario({ id }) {
               error={!!errores.contrasena}
               helperText={errores.contrasena}
               required={!esEdicion}
+              onFocus={() => setShowPasswordRequirements(true)}
             />
+
+            {/* Requisitos de contraseña */}
+            <Collapse in={showPasswordRequirements}>
+              <Box sx={{ mt: 1, mb: 2, bgcolor: "background.paper", p: 2, borderRadius: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  La contraseña debe cumplir con los siguientes requisitos:
+                </Typography>
+                <List dense>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordValidation.validations.length ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="Al menos 8 caracteres" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordValidation.validations.uppercase ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="Al menos una letra mayúscula" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordValidation.validations.lowercase ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="Al menos una letra minúscula" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordValidation.validations.number ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="Al menos un número" />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemIcon>
+                      {passwordValidation.validations.special ? (
+                        <CheckCircleIcon color="success" />
+                      ) : (
+                        <CancelIcon color="error" />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText primary="Al menos un carácter especial (!@#$%^&*...)" />
+                  </ListItem>
+                </List>
+              </Box>
+            </Collapse>
           </Grid>
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth margin="normal" error={!!errores.idRol} required>
@@ -380,7 +494,12 @@ export default function FormularioUsuario({ id }) {
           <Button variant="outlined" onClick={handleCancelar} disabled={guardando}>
             Cancelar
           </Button>
-          <Button type="submit" variant="contained" color="primary" disabled={guardando}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={guardando || (formulario.contrasena && !passwordValidation.isValid && !esEdicion)}
+          >
             {guardando ? (
               <>
                 <CircularProgress size={24} sx={{ mr: 1 }} />

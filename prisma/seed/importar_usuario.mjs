@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = parseInt(process.env.PASSWORD_SALT) || 17;

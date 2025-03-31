@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
+import bcrypt from "bcryptjs"
+import { validatePasswordComplexity } from "../../../../utils/passwordUtils"
 
 const prisma = new PrismaClient()
 
@@ -60,7 +62,8 @@ export async function PUT(request, { params }) {
         throw new Error(`Persona con ID ${datos.idPersona} no encontrada`)
       }
 
-      // Verificar si la persona ya tiene dos usuarios
+      // Modificar la verificación del límite de usuarios
+      // Verificar si la persona ya tiene un usuario
       const cantidadUsuarios = await prisma.usuario.count({
         where: {
           idPersona: Number.parseInt(datos.idPersona),
@@ -71,8 +74,8 @@ export async function PUT(request, { params }) {
         },
       })
 
-      if (cantidadUsuarios >= 2) {
-        throw new Error(`La persona ya tiene el máximo de 2 usuarios permitidos`)
+      if (cantidadUsuarios >= 1) {
+        throw new Error(`La persona ya tiene un usuario activo y no puede tener más`)
       }
     }
 
@@ -85,7 +88,18 @@ export async function PUT(request, { params }) {
 
     // Solo actualizar la contraseña si se proporciona una nueva
     if (datos.contrasena) {
-      datosActualizados.contrasena = datos.contrasena
+      // Validar complejidad de la contraseña
+      const passwordValidation = validatePasswordComplexity(datos.contrasena)
+      if (!passwordValidation.isValid) {
+        throw new Error(
+          `La contraseña no cumple con los requisitos de seguridad: ${passwordValidation.errors.join(", ")}`,
+        )
+      }
+
+      // Encriptar la nueva contraseña
+      const saltRounds = 10
+      datosActualizados.contrasena = await bcrypt.hash(datos.contrasena, saltRounds)
+      console.log("API: Contraseña actualizada y encriptada correctamente")
     }
 
     // Solo actualizar idPersona si se proporciona
