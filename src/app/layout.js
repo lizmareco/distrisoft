@@ -23,6 +23,6 @@ export default function RootLayout({ children }) {
         </AppRouterCacheProvider>
       </body>
     </html>
-  )
+  );
 }
 

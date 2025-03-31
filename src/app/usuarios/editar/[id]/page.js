@@ -11,6 +11,6 @@ export default function EditarUsuarioPage({ params }) {
       <h1>Editar Usuario</h1>
       <FormularioUsuario id={params.id} />
     </div>
-  )
+  );
 }
 

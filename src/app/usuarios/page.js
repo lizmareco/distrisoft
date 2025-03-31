@@ -11,6 +11,6 @@ export default function UsuariosPage() {
       <h1>Gestión de Usuarios</h1>
       <ListaUsuarios />
     </div>
-  )
+  );
 }
 

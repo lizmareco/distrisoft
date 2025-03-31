@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { usuarioController } from "../../../../backend/controllers/usuarioController"
+import { usuarioController } from "../../../../backend/controller/usuarioController"
 
 // GET /api/usuarios/[id] - Obtener un usuario por ID
 export async function GET(request, { params }) {

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -19,6 +18,7 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
+  Autocomplete,
 } from "@mui/material"
 
 export default function FormularioUsuario({ id }) {
@@ -26,17 +26,19 @@ export default function FormularioUsuario({ id }) {
   const esEdicion = !!id
 
   const [formulario, setFormulario] = useState({
-    nombre: "",
-    apellido: "",
     email: "",
     password: "",
     rol: "usuario",
     activo: true,
+    personaId: "",
   })
 
   const [errores, setErrores] = useState({})
   const [cargando, setCargando] = useState(esEdicion)
   const [guardando, setGuardando] = useState(false)
+  const [personas, setPersonas] = useState([])
+  const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
+  const [buscandoPersonas, setBuscandoPersonas] = useState(false)
   const [snackbar, setSnackbar] = useState({
     abierto: false,
     mensaje: "",
@@ -57,13 +59,19 @@ export default function FormularioUsuario({ id }) {
           // No incluir la contraseña en el formulario de edición
           const { usuario } = datos
           setFormulario({
-            nombre: usuario.nombre || "",
-            apellido: usuario.apellido || "",
             email: usuario.email || "",
             password: "", // No mostrar la contraseña actual
             rol: usuario.rol || "usuario",
             activo: usuario.activo,
+            personaId: usuario.personaId || "",
           })
+
+          if (usuario.persona) {
+            setPersonaSeleccionada({
+              id: usuario.persona.id,
+              label: `${usuario.persona.nombre} ${usuario.persona.apellido} (${usuario.persona.nroDocumento})`,
+            })
+          }
         } catch (error) {
           console.error("Error:", error)
           setSnackbar({
@@ -77,8 +85,41 @@ export default function FormularioUsuario({ id }) {
       }
 
       cargarUsuario()
+    } else {
+      // Cargar lista inicial de personas
+      cargarPersonas()
     }
   }, [id, esEdicion])
+
+  // Cargar personas
+  const cargarPersonas = async (termino = "") => {
+    setBuscandoPersonas(true)
+    try {
+      const url = termino ? `/api/personas/buscar?termino=${encodeURIComponent(termino)}` : "/api/personas"
+
+      const respuesta = await fetch(url)
+      if (!respuesta.ok) {
+        throw new Error("Error al cargar personas")
+      }
+
+      const datos = await respuesta.json()
+      const listaPersonas = datos.personas.map((persona) => ({
+        id: persona.id,
+        label: `${persona.nombre} ${persona.apellido} (${persona.nroDocumento})`,
+      }))
+
+      setPersonas(listaPersonas)
+    } catch (error) {
+      console.error("Error:", error)
+      setSnackbar({
+        abierto: true,
+        mensaje: "Error al cargar la lista de personas",
+        tipo: "error",
+      })
+    } finally {
+      setBuscandoPersonas(false)
+    }
+  }
 
   // Manejar cambios en los campos del formulario
   const handleChange = (e) => {
@@ -97,17 +138,26 @@ export default function FormularioUsuario({ id }) {
     }
   }
 
+  // Manejar selección de persona
+  const handlePersonaChange = (event, newValue) => {
+    setPersonaSeleccionada(newValue)
+    setFormulario({
+      ...formulario,
+      personaId: newValue ? newValue.id : "",
+    })
+
+    // Limpiar error del campo
+    if (errores.personaId) {
+      setErrores({
+        ...errores,
+        personaId: null,
+      })
+    }
+  }
+
   // Validar formulario
   const validarFormulario = () => {
     const nuevosErrores = {}
-
-    if (!formulario.nombre.trim()) {
-      nuevosErrores.nombre = "El nombre es obligatorio"
-    }
-
-    if (!formulario.apellido.trim()) {
-      nuevosErrores.apellido = "El apellido es obligatorio"
-    }
 
     if (!formulario.email.trim()) {
       nuevosErrores.email = "El email es obligatorio"
@@ -120,6 +170,10 @@ export default function FormularioUsuario({ id }) {
       nuevosErrores.password = "La contraseña es obligatoria"
     } else if (formulario.password && formulario.password.length < 6) {
       nuevosErrores.password = "La contraseña debe tener al menos 6 caracteres"
+    }
+
+    if (!formulario.personaId) {
+      nuevosErrores.personaId = "Debe seleccionar una persona"
     }
 
     setErrores(nuevosErrores)
@@ -210,31 +264,42 @@ export default function FormularioUsuario({ id }) {
 
       <Box component="form" onSubmit={handleSubmit} noValidate>
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              name="nombre"
-              label="Nombre"
-              value={formulario.nombre}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              error={!!errores.nombre}
-              helperText={errores.nombre}
-              required
+          <Grid item xs={12}>
+            <Autocomplete
+              id="persona-select"
+              options={personas}
+              loading={buscandoPersonas}
+              value={personaSeleccionada}
+              onChange={handlePersonaChange}
+              onInputChange={(event, newInputValue) => {
+                if (newInputValue.length > 2) {
+                  cargarPersonas(newInputValue)
+                }
+              }}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Persona"
+                  margin="normal"
+                  error={!!errores.personaId}
+                  helperText={errores.personaId}
+                  required
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {buscandoPersonas ? <CircularProgress color="inherit" size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
             />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              name="apellido"
-              label="Apellido"
-              value={formulario.apellido}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              error={!!errores.apellido}
-              helperText={errores.apellido}
-              required
-            />
+            <Typography variant="caption" color="textSecondary">
+              Nota: Una persona no puede tener más de 2 usuarios activos
+            </Typography>
           </Grid>
           <Grid item xs={12}>
             <TextField

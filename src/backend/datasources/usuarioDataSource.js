@@ -6,14 +6,37 @@ export const usuarioDataSource = {
   // Obtener todos los usuarios
   obtenerUsuarios: async () => {
     try {
-      return await prisma.usuario.findMany({
+      console.log("DataSource: Consultando usuarios en la base de datos")
+      const usuarios = await prisma.usuario.findMany({
+        where: {
+          estado: {
+            not: "INACTIVO",
+          },
+          deletedAt: null, // Solo usuarios no eliminados
+        },
+        include: {
+          persona: {
+            select: {
+              nombre: true,
+              apellido: true,
+              nroDocumento: true,
+            },
+          },
+          rol: {
+            select: {
+              nombreRol: true, // Cambiado de nombre a nombreRol
+            },
+          },
+        },
         orderBy: {
-          nombreUsuario: "asc",
+          createdAt: "desc",
         },
       })
+      console.log("DataSource: Usuarios encontrados:", usuarios.length)
+      return usuarios
     } catch (error) {
-      console.error("Error al obtener usuarios:", error)
-      throw new Error("No se pudieron obtener los usuarios")
+      console.error("Error al obtener usuarios en datasource:", error)
+      throw new Error("No se pudieron obtener los usuarios: " + (error.message || "Error de base de datos"))
     }
   },
 
@@ -21,11 +44,37 @@ export const usuarioDataSource = {
   obtenerUsuarioPorId: async (id) => {
     try {
       return await prisma.usuario.findUnique({
-        where: { id: Number.parseInt(id) },
+        where: {
+          idUsuario: Number.parseInt(id),
+          deletedAt: null,
+        },
+        include: {
+          persona: true,
+          rol: true,
+        },
       })
     } catch (error) {
       console.error(`Error al obtener usuario con ID ${id}:`, error)
       throw new Error(`No se pudo encontrar el usuario con ID ${id}`)
+    }
+  },
+
+  // Verificar si una persona ya tiene dos usuarios
+  verificarLimiteUsuarios: async (personaId) => {
+    try {
+      const cantidadUsuarios = await prisma.usuario.count({
+        where: {
+          idPersona: Number.parseInt(personaId),
+          estado: {
+            not: "INACTIVO",
+          },
+          deletedAt: null,
+        },
+      })
+      return cantidadUsuarios >= 2
+    } catch (error) {
+      console.error(`Error al verificar límite de usuarios para persona ${personaId}:`, error)
+      throw new Error("Error al verificar límite de usuarios")
     }
   },
 
@@ -34,6 +83,10 @@ export const usuarioDataSource = {
     try {
       return await prisma.usuario.create({
         data: datos,
+        include: {
+          persona: true,
+          rol: true,
+        },
       })
     } catch (error) {
       console.error("Error al crear usuario:", error)
@@ -45,8 +98,12 @@ export const usuarioDataSource = {
   actualizarUsuario: async (id, datos) => {
     try {
       return await prisma.usuario.update({
-        where: { id: Number.parseInt(id) },
+        where: { idUsuario: Number.parseInt(id) },
         data: datos,
+        include: {
+          persona: true,
+          rol: true,
+        },
       })
     } catch (error) {
       console.error(`Error al actualizar usuario con ID ${id}:`, error)
@@ -58,8 +115,11 @@ export const usuarioDataSource = {
   eliminarUsuario: async (id) => {
     try {
       return await prisma.usuario.update({
-        where: { id: Number.parseInt(id) },
-        data: { activo: false },
+        where: { idUsuario: Number.parseInt(id) },
+        data: {
+          estado: "INACTIVO",
+          deletedAt: new Date(),
+        },
       })
     } catch (error) {
       console.error(`Error al eliminar usuario con ID ${id}:`, error)
@@ -71,7 +131,7 @@ export const usuarioDataSource = {
   eliminarUsuarioPermanente: async (id) => {
     try {
       return await prisma.usuario.delete({
-        where: { id: Number.parseInt(id) },
+        where: { idUsuario: Number.parseInt(id) },
       })
     } catch (error) {
       console.error(`Error al eliminar permanentemente usuario con ID ${id}:`, error)

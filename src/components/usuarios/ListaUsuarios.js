@@ -21,10 +21,12 @@ import {
   DialogTitle,
   Snackbar,
   Alert,
+  Chip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
+import PersonIcon from "@mui/icons-material/Person"
 
 export default function ListaUsuarios() {
   const router = useRouter()
@@ -43,14 +45,21 @@ export default function ListaUsuarios() {
   useEffect(() => {
     const cargarUsuarios = async () => {
       try {
+        console.log("Intentando cargar usuarios desde:", "/api/usuarios")
         const respuesta = await fetch("/api/usuarios")
+        console.log("Respuesta recibida:", respuesta.status, respuesta.statusText)
+
         if (!respuesta.ok) {
-          throw new Error("Error al cargar usuarios")
+          const errorData = await respuesta.json().catch(() => ({}))
+          console.error("Error en respuesta:", errorData)
+          throw new Error(`Error al cargar usuarios: ${respuesta.status} ${respuesta.statusText}`)
         }
+
         const datos = await respuesta.json()
+        console.log("Datos recibidos:", datos)
         setUsuarios(datos.usuarios || [])
       } catch (error) {
-        console.error("Error:", error)
+        console.error("Error detallado:", error)
         setError("No se pudieron cargar los usuarios. Por favor, intenta de nuevo más tarde.")
       } finally {
         setCargando(false)
@@ -87,7 +96,7 @@ export default function ListaUsuarios() {
     if (!usuarioAEliminar) return
 
     try {
-      const respuesta = await fetch(`/api/usuarios/${usuarioAEliminar.id}`, {
+      const respuesta = await fetch(`/api/usuarios/${usuarioAEliminar.idUsuario}`, {
         method: "DELETE",
       })
 
@@ -96,7 +105,7 @@ export default function ListaUsuarios() {
       }
 
       // Actualizar la lista de usuarios
-      setUsuarios(usuarios.filter((u) => u.id !== usuarioAEliminar.id))
+      setUsuarios(usuarios.filter((u) => u.idUsuario !== usuarioAEliminar.idUsuario))
 
       // Mostrar mensaje de éxito
       setSnackbar({
@@ -143,9 +152,8 @@ export default function ListaUsuarios() {
           <TableHead>
             <TableRow>
               <TableCell>ID</TableCell>
-              <TableCell>Nombre</TableCell>
-              <TableCell>Apellido</TableCell>
-              <TableCell>Email</TableCell>
+              <TableCell>Usuario</TableCell>
+              <TableCell>Persona</TableCell>
               <TableCell>Rol</TableCell>
               <TableCell>Estado</TableCell>
               <TableCell>Acciones</TableCell>
@@ -154,21 +162,39 @@ export default function ListaUsuarios() {
           <TableBody>
             {usuarios.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={6} align="center">
                   No hay usuarios registrados
                 </TableCell>
               </TableRow>
             ) : (
               usuarios.map((usuario) => (
-                <TableRow key={usuario.id}>
-                  <TableCell>{usuario.id}</TableCell>
-                  <TableCell>{usuario.nombre}</TableCell>
-                  <TableCell>{usuario.apellido}</TableCell>
-                  <TableCell>{usuario.email}</TableCell>
-                  <TableCell>{usuario.rol}</TableCell>
-                  <TableCell>{usuario.activo ? "Activo" : "Inactivo"}</TableCell>
+                <TableRow key={usuario.idUsuario}>
+                  <TableCell>{usuario.idUsuario}</TableCell>
+                  <TableCell>{usuario.nombreUsuario}</TableCell>
                   <TableCell>
-                    <IconButton color="primary" onClick={() => irAEditarUsuario(usuario.id)} title="Editar">
+                    {usuario.persona ? (
+                      <Chip
+                        icon={<PersonIcon />}
+                        label={`${usuario.persona.nombre} ${usuario.persona.apellido}`}
+                        variant="outlined"
+                        size="small"
+                      />
+                    ) : (
+                      <Typography variant="caption" color="error">
+                        Sin asignar
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>{usuario.rol?.nombreRol || usuario.idRol}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={usuario.estado}
+                      color={usuario.estado === "ACTIVO" ? "success" : "primary"}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <IconButton color="primary" onClick={() => irAEditarUsuario(usuario.idUsuario)} title="Editar">
                       <EditIcon />
                     </IconButton>
                     <IconButton color="error" onClick={() => confirmarEliminar(usuario)} title="Eliminar">
@@ -187,8 +213,8 @@ export default function ListaUsuarios() {
         <DialogTitle>Confirmar eliminación</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Estás seguro de que deseas eliminar al usuario {usuarioAEliminar?.nombre} {usuarioAEliminar?.apellido}?
-            Esta acción no se puede deshacer.
+            ¿Estás seguro de que deseas eliminar al usuario {usuarioAEliminar?.nombreUsuario}? Esta acción no se puede
+            deshacer.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

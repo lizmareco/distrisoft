@@ -11,6 +11,6 @@ export default function NuevoUsuarioPage() {
       <h1>Crear Nuevo Usuario</h1>
       <FormularioUsuario />
     </div>
-  )
+  );
 }
 
