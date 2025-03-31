@@ -13,8 +13,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormControlLabel,
-  Switch,
   Snackbar,
   Alert,
   CircularProgress,
@@ -26,11 +24,11 @@ export default function FormularioUsuario({ id }) {
   const esEdicion = !!id
 
   const [formulario, setFormulario] = useState({
-    email: "",
-    password: "",
-    rol: "usuario",
-    activo: true,
-    personaId: "",
+    nombreUsuario: "",
+    contrasena: "",
+    idRol: "",
+    estado: "ACTIVO",
+    idPersona: "",
   })
 
   const [errores, setErrores] = useState({})
@@ -59,16 +57,16 @@ export default function FormularioUsuario({ id }) {
           // No incluir la contraseña en el formulario de edición
           const { usuario } = datos
           setFormulario({
-            email: usuario.email || "",
-            password: "", // No mostrar la contraseña actual
-            rol: usuario.rol || "usuario",
-            activo: usuario.activo,
-            personaId: usuario.personaId || "",
+            nombreUsuario: usuario.nombreUsuario || "",
+            contrasena: "", // No mostrar la contraseña actual
+            idRol: usuario.idRol || "",
+            estado: usuario.estado || "ACTIVO",
+            idPersona: usuario.idPersona || "",
           })
 
           if (usuario.persona) {
             setPersonaSeleccionada({
-              id: usuario.persona.id,
+              id: usuario.persona.idPersona,
               label: `${usuario.persona.nombre} ${usuario.persona.apellido} (${usuario.persona.nroDocumento})`,
             })
           }
@@ -88,6 +86,7 @@ export default function FormularioUsuario({ id }) {
     } else {
       // Cargar lista inicial de personas
       cargarPersonas()
+      setCargando(false)
     }
   }, [id, esEdicion])
 
@@ -103,14 +102,16 @@ export default function FormularioUsuario({ id }) {
       }
 
       const datos = await respuesta.json()
+      console.log("Personas recibidas:", datos)
+
       const listaPersonas = datos.personas.map((persona) => ({
-        id: persona.id,
+        id: persona.idPersona,
         label: `${persona.nombre} ${persona.apellido} (${persona.nroDocumento})`,
       }))
 
       setPersonas(listaPersonas)
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error al cargar personas:", error)
       setSnackbar({
         abierto: true,
         mensaje: "Error al cargar la lista de personas",
@@ -140,17 +141,18 @@ export default function FormularioUsuario({ id }) {
 
   // Manejar selección de persona
   const handlePersonaChange = (event, newValue) => {
+    console.log("Persona seleccionada:", newValue)
     setPersonaSeleccionada(newValue)
     setFormulario({
       ...formulario,
-      personaId: newValue ? newValue.id : "",
+      idPersona: newValue ? newValue.id : "",
     })
 
     // Limpiar error del campo
-    if (errores.personaId) {
+    if (errores.idPersona) {
       setErrores({
         ...errores,
-        personaId: null,
+        idPersona: null,
       })
     }
   }
@@ -159,21 +161,23 @@ export default function FormularioUsuario({ id }) {
   const validarFormulario = () => {
     const nuevosErrores = {}
 
-    if (!formulario.email.trim()) {
-      nuevosErrores.email = "El email es obligatorio"
-    } else if (!/\S+@\S+\.\S+/.test(formulario.email)) {
-      nuevosErrores.email = "El email no es válido"
+    if (!formulario.nombreUsuario.trim()) {
+      nuevosErrores.nombreUsuario = "El nombre de usuario es obligatorio"
     }
 
     // Solo validar contraseña en modo creación o si se ha ingresado una nueva contraseña
-    if (!esEdicion && !formulario.password) {
-      nuevosErrores.password = "La contraseña es obligatoria"
-    } else if (formulario.password && formulario.password.length < 6) {
-      nuevosErrores.password = "La contraseña debe tener al menos 6 caracteres"
+    if (!esEdicion && !formulario.contrasena) {
+      nuevosErrores.contrasena = "La contraseña es obligatoria"
+    } else if (formulario.contrasena && formulario.contrasena.length < 6) {
+      nuevosErrores.contrasena = "La contraseña debe tener al menos 6 caracteres"
     }
 
-    if (!formulario.personaId) {
-      nuevosErrores.personaId = "Debe seleccionar una persona"
+    if (!formulario.idPersona) {
+      nuevosErrores.idPersona = "Debe seleccionar una persona"
+    }
+
+    if (!formulario.idRol) {
+      nuevosErrores.idRol = "Debe seleccionar un rol"
     }
 
     setErrores(nuevosErrores)
@@ -191,13 +195,21 @@ export default function FormularioUsuario({ id }) {
     setGuardando(true)
 
     try {
-      // Preparar datos para enviar
-      const datosAEnviar = { ...formulario }
+      // Preparar datos para enviar según el modelo Usuario
+      const datosAEnviar = {
+        nombreUsuario: formulario.nombreUsuario,
+        contrasena: formulario.contrasena,
+        idRol: Number.parseInt(formulario.idRol),
+        idPersona: Number.parseInt(formulario.idPersona),
+        estado: formulario.estado,
+      }
 
       // Si estamos en modo edición y no se ha ingresado una nueva contraseña, eliminarla
-      if (esEdicion && !datosAEnviar.password) {
-        delete datosAEnviar.password
+      if (esEdicion && !datosAEnviar.contrasena) {
+        delete datosAEnviar.contrasena
       }
+
+      console.log("Enviando datos:", datosAEnviar)
 
       const url = esEdicion ? `/api/usuarios/${id}` : "/api/usuarios"
       const metodo = esEdicion ? "PUT" : "POST"
@@ -282,8 +294,8 @@ export default function FormularioUsuario({ id }) {
                   {...params}
                   label="Persona"
                   margin="normal"
-                  error={!!errores.personaId}
-                  helperText={errores.personaId}
+                  error={!!errores.idPersona}
+                  helperText={errores.idPersona}
                   required
                   InputProps={{
                     ...params.InputProps,
@@ -303,48 +315,64 @@ export default function FormularioUsuario({ id }) {
           </Grid>
           <Grid item xs={12}>
             <TextField
-              name="email"
-              label="Email"
-              type="email"
-              value={formulario.email}
+              name="nombreUsuario"
+              label="Nombre de Usuario"
+              value={formulario.nombreUsuario}
               onChange={handleChange}
               fullWidth
               margin="normal"
-              error={!!errores.email}
-              helperText={errores.email}
+              error={!!errores.nombreUsuario}
+              helperText={errores.nombreUsuario}
               required
             />
           </Grid>
           <Grid item xs={12}>
             <TextField
-              name="password"
+              name="contrasena"
               label={esEdicion ? "Nueva Contraseña (dejar en blanco para mantener la actual)" : "Contraseña"}
               type="password"
-              value={formulario.password}
+              value={formulario.contrasena}
               onChange={handleChange}
               fullWidth
               margin="normal"
-              error={!!errores.password}
-              helperText={errores.password}
+              error={!!errores.contrasena}
+              helperText={errores.contrasena}
               required={!esEdicion}
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth margin="normal">
+            <FormControl fullWidth margin="normal" error={!!errores.idRol} required>
               <InputLabel id="rol-label">Rol</InputLabel>
-              <Select labelId="rol-label" name="rol" value={formulario.rol} onChange={handleChange} label="Rol">
-                <MenuItem value="usuario">Usuario</MenuItem>
-                <MenuItem value="admin">Administrador</MenuItem>
-                <MenuItem value="editor">Editor</MenuItem>
+              <Select labelId="rol-label" name="idRol" value={formulario.idRol} onChange={handleChange} label="Rol">
+                <MenuItem value={1}>Administrador</MenuItem>
+                <MenuItem value={2}>Vendedor</MenuItem>
+                <MenuItem value={3}>Operador</MenuItem>
+                {/* Agregar más roles según sea necesario */}
               </Select>
+              {errores.idRol && (
+                <Typography color="error" variant="caption">
+                  {errores.idRol}
+                </Typography>
+              )}
             </FormControl>
           </Grid>
           <Grid item xs={12} sm={6}>
-            <FormControlLabel
-              control={<Switch name="activo" checked={formulario.activo} onChange={handleChange} color="primary" />}
-              label="Usuario Activo"
-              sx={{ mt: 2 }}
-            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="estado-label">Estado</InputLabel>
+              <Select
+                labelId="estado-label"
+                name="estado"
+                value={formulario.estado}
+                onChange={handleChange}
+                label="Estado"
+              >
+                <MenuItem value="ACTIVO">Activo</MenuItem>
+                <MenuItem value="PENDIENTE">Pendiente</MenuItem>
+                <MenuItem value="SUSPENDIDO">Suspendido</MenuItem>
+                <MenuItem value="BLOQUEADO">Bloqueado</MenuItem>
+                <MenuItem value="INACTIVO">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
           </Grid>
         </Grid>
 
