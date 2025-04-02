@@ -130,6 +130,22 @@ export default function ListaUsuarios() {
     setSnackbar({ ...snackbar, abierto: false })
   }
 
+  // Función para determinar el color del chip de estado
+  const getEstadoColor = (estado) => {
+    switch (estado) {
+      case "ACTIVO":
+        return "success"
+      case "BLOQUEADO":
+        return "error"
+      case "INACTIVO":
+        return "default"
+      case "VENCIDO":
+        return "warning"
+      default:
+        return "primary"
+    }
+  }
+
   if (cargando) {
     return <Typography>Cargando usuarios...</Typography>
   }
@@ -187,11 +203,7 @@ export default function ListaUsuarios() {
                   </TableCell>
                   <TableCell>{usuario.rol?.nombreRol || usuario.idRol}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={usuario.estado}
-                      color={usuario.estado === "ACTIVO" ? "success" : "primary"}
-                      size="small"
-                    />
+                    <Chip label={usuario.estado} color={getEstadoColor(usuario.estado)} size="small" />
                   </TableCell>
                   <TableCell>
                     <IconButton color="primary" onClick={() => irAEditarUsuario(usuario.idUsuario)} title="Editar">

@@ -9,10 +9,7 @@ export const usuarioDataSource = {
       console.log("DataSource: Consultando usuarios en la base de datos")
       const usuarios = await prisma.usuario.findMany({
         where: {
-          estado: {
-            not: "INACTIVO",
-          },
-          deletedAt: null, // Solo usuarios no eliminados
+          deletedAt: null, // Solo usuarios no eliminados lógicamente
         },
         include: {
           persona: {
@@ -59,15 +56,13 @@ export const usuarioDataSource = {
     }
   },
 
-  // Verificar si una persona ya tiene un usuario
+  // Verificar si una persona ya tiene un usuario activo
   verificarLimiteUsuarios: async (personaId) => {
     try {
       const cantidadUsuarios = await prisma.usuario.count({
         where: {
           idPersona: Number.parseInt(personaId),
-          estado: {
-            not: "INACTIVO",
-          },
+          estado: "ACTIVO",
           deletedAt: null,
         },
       })

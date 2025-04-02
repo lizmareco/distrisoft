@@ -11,10 +11,7 @@ export async function GET() {
     console.log("API: Recibida solicitud para obtener usuarios")
     const usuarios = await prisma.usuario.findMany({
       where: {
-        estado: {
-          not: "INACTIVO",
-        },
-        deletedAt: null,
+        deletedAt: null, // Solo excluimos los eliminados lógicamente
       },
       include: {
         persona: {
@@ -74,14 +71,11 @@ export async function POST(request) {
       throw new Error(`Persona con ID ${datos.idPersona} no encontrada`)
     }
 
-    // Modificar la verificación del límite de usuarios
-    // Verificar si la persona ya tiene un usuario
+    // Verificar si la persona ya tiene un usuario activo
     const cantidadUsuarios = await prisma.usuario.count({
       where: {
         idPersona: Number.parseInt(datos.idPersona),
-        estado: {
-          not: "INACTIVO",
-        },
+        estado: "ACTIVO",
         deletedAt: null,
       },
     })

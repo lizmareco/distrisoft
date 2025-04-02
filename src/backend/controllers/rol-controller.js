@@ -1,4 +1,7 @@
-import RolDatasource from "@/backend/datasources/postgres/rol-datasource";
+
+import RolDatasource from "src/backend/datasources/postgres/rol-datasource";  // Ajustar la ruta correctamente
+
+
 
 export default class RolController {
   constructor() {

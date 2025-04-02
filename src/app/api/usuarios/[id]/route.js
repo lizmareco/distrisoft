@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import bcrypt from "bcryptjs"
+import bcrypt from "bcrypt"
 import { validatePasswordComplexity } from "../../../../utils/passwordUtils"
 
 const prisma = new PrismaClient()
@@ -8,7 +8,9 @@ const prisma = new PrismaClient()
 // GET /api/usuarios/[id] - Obtener un usuario por ID
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    // Asegurarse de que params.id esté disponible antes de usarlo
+    const id = await params.id
+
     const usuario = await prisma.usuario.findUnique({
       where: {
         idUsuario: Number.parseInt(id),
@@ -33,7 +35,9 @@ export async function GET(request, { params }) {
 // PUT /api/usuarios/[id] - Actualizar un usuario
 export async function PUT(request, { params }) {
   try {
-    const { id } = params
+    // Asegurarse de que params.id esté disponible antes de usarlo
+    const id = await params.id
+
     const datos = await request.json()
 
     // Verificar si el usuario existe
@@ -62,14 +66,11 @@ export async function PUT(request, { params }) {
         throw new Error(`Persona con ID ${datos.idPersona} no encontrada`)
       }
 
-      // Modificar la verificación del límite de usuarios
-      // Verificar si la persona ya tiene un usuario
+      // Verificar si la persona ya tiene un usuario activo
       const cantidadUsuarios = await prisma.usuario.count({
         where: {
           idPersona: Number.parseInt(datos.idPersona),
-          estado: {
-            not: "INACTIVO",
-          },
+          estado: "ACTIVO",
           deletedAt: null,
         },
       })
@@ -131,7 +132,8 @@ export async function PUT(request, { params }) {
 // DELETE /api/usuarios/[id] - Eliminar un usuario
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params
+    // Asegurarse de que params.id esté disponible antes de usarlo
+    const id = await params.id
 
     // Verificar si el usuario existe
     const usuarioExistente = await prisma.usuario.findUnique({

@@ -1,10 +1,11 @@
 import BaseDatasource from "../base-datasource";
-import { prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+const prisma = new PrismaClient();
 
 export default class RolDatasource extends BaseDatasource {
   constructor() {
     // Se inyecta el modelo "rol" y se especifica que el campo identificador es "idRol"
-    super(prisma.rol, 'idRol');
+    super(prisma.Rol, 'idRol');
   }
 
   async getAllRoles() {

@@ -1,16 +1,19 @@
-import FormularioUsuario from "../../../../components/usuarios/FormularioUsuario"
+"use client"; // Asegura que este componente se ejecute en el cliente
 
-export const metadata = {
-  title: "Editar Usuario",
-  description: "Formulario para editar un usuario existente",
-}
+import { useParams } from "next/navigation";
+import FormularioUsuario from "../../../../components/usuarios/FormularioUsuario";
 
-export default function EditarUsuarioPage({ params }) {
+// Importa el metadata desde el archivo del servidor
+import { metadata } from "./metadata";
+
+export default function EditarUsuarioPage() {
+  const params = useParams();
+  const id = params?.id;
+
   return (
     <div>
-      <h1>Editar Usuario</h1>
-      <FormularioUsuario id={params.id} />
+      <h1>{metadata.title}</h1>
+      {id ? <FormularioUsuario id={id} /> : <p>Cargando...</p>}
     </div>
   );
 }
-

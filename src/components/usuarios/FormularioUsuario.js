@@ -43,6 +43,8 @@ export default function FormularioUsuario({ id }) {
   const [cargando, setCargando] = useState(esEdicion)
   const [guardando, setGuardando] = useState(false)
   const [personas, setPersonas] = useState([])
+  const [roles, setRoles] = useState([])
+  const [cargandoRoles, setCargandoRoles] = useState(false)
   const [personaSeleccionada, setPersonaSeleccionada] = useState(null)
   const [buscandoPersonas, setBuscandoPersonas] = useState(false)
   const [passwordValidation, setPasswordValidation] = useState({
@@ -65,6 +67,9 @@ export default function FormularioUsuario({ id }) {
 
   // Cargar datos del usuario si estamos en modo edición
   useEffect(() => {
+    // Cargar roles
+    cargarRoles()
+
     if (esEdicion) {
       const cargarUsuario = async () => {
         try {
@@ -109,6 +114,50 @@ export default function FormularioUsuario({ id }) {
       setCargando(false)
     }
   }, [id, esEdicion])
+
+  // Cargar roles usando el controlador de roles
+  const cargarRoles = async () => {
+    setCargandoRoles(true)
+    try {
+      // Intentamos con la ruta /api/rol
+      const respuesta = await fetch("/api/rol")
+      if (!respuesta.ok) {
+        throw new Error("Error al cargar roles")
+      }
+      const datos = await respuesta.json()
+      console.log("Roles recibidos:", datos)
+
+      // Adaptamos según la estructura de respuesta
+      // Si la API devuelve directamente un array de roles
+      if (Array.isArray(datos)) {
+        setRoles(datos)
+      }
+      // Si la API devuelve un objeto con una propiedad roles
+      else if (datos.roles && Array.isArray(datos.roles)) {
+        setRoles(datos.roles)
+      }
+      // Si la API devuelve un objeto con otra estructura
+      else {
+        console.warn("Estructura de respuesta de roles desconocida:", datos)
+        setRoles([])
+      }
+    } catch (error) {
+      console.error("Error al cargar roles:", error)
+      // Intentamos con roles hardcodeados como fallback
+      setRoles([
+        { idRol: 1, nombreRol: "Administrador" },
+        { idRol: 2, nombreRol: "Vendedor" },
+        { idRol: 3, nombreRol: "Operador" },
+      ])
+      setSnackbar({
+        abierto: true,
+        mensaje: "Error al cargar la lista de roles. Se usarán roles predeterminados.",
+        tipo: "warning",
+      })
+    } finally {
+      setCargandoRoles(false)
+    }
+  }
 
   // Cargar personas
   const cargarPersonas = async (termino = "") => {
@@ -457,11 +506,23 @@ export default function FormularioUsuario({ id }) {
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth margin="normal" error={!!errores.idRol} required>
               <InputLabel id="rol-label">Rol</InputLabel>
-              <Select labelId="rol-label" name="idRol" value={formulario.idRol} onChange={handleChange} label="Rol">
-                <MenuItem value={1}>Administrador</MenuItem>
-                <MenuItem value={2}>Vendedor</MenuItem>
-                <MenuItem value={3}>Operador</MenuItem>
-                {/* Agregar más roles según sea necesario */}
+              <Select
+                labelId="rol-label"
+                name="idRol"
+                value={formulario.idRol}
+                onChange={handleChange}
+                label="Rol"
+                disabled={cargandoRoles}
+              >
+                {cargandoRoles ? (
+                  <MenuItem disabled>Cargando roles...</MenuItem>
+                ) : (
+                  roles.map((rol) => (
+                    <MenuItem key={rol.idRol} value={rol.idRol}>
+                      {rol.nombreRol}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
               {errores.idRol && (
                 <Typography color="error" variant="caption">
@@ -481,10 +542,9 @@ export default function FormularioUsuario({ id }) {
                 label="Estado"
               >
                 <MenuItem value="ACTIVO">Activo</MenuItem>
-                <MenuItem value="PENDIENTE">Pendiente</MenuItem>
-                <MenuItem value="SUSPENDIDO">Suspendido</MenuItem>
-                <MenuItem value="BLOQUEADO">Bloqueado</MenuItem>
                 <MenuItem value="INACTIVO">Inactivo</MenuItem>
+                <MenuItem value="BLOQUEADO">Bloqueado</MenuItem>
+                <MenuItem value="VENCIDO">Vencido</MenuItem>
               </Select>
             </FormControl>
           </Grid>
