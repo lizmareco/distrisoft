@@ -47,13 +47,15 @@ model CategoriaEmpresa {
 }
 
 model Ciudad {
-  idCiudad   Int       @id @default(autoincrement()) @map("id_ciudad")
-  descCiudad String    @map("desc_ciudad") @db.VarChar
-  empresa    Empresa[]
-  persona    Persona[]
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime?           @default(now()) @map("updated_at")
-  deletedAt       DateTime?           @map("deleted_at")
+  idCiudad         Int         @id @default(autoincrement()) @map("id_ciudad")
+  descCiudad       String      @map("desc_ciudad") @db.VarChar
+  departamentoId   Int         @map("id_departamento") 
+  departamento     Departamento @relation(fields: [departamentoId], references: [idDepartamento])
+  empresa         Empresa[]
+  persona         Persona[]
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime?    @default(now()) @map("updated_at")
+  deletedAt       DateTime?    @map("deleted_at")
 }
 
 model Cliente {
@@ -179,7 +181,6 @@ model Empresa {
   idEmpresa          Int              @id(map: "empresa_pk") @default(autoincrement()) @map("id_empresa")
   idCategoriaEmpresa Int              @map("id_categoria_empresa")
   razonSocial        String           @map("razon_social") @db.VarChar
-  idTipoPersona      Int              @map("id_tipo_persona")
   idTipoDocumento    Int              @map("id_tipo_documento")
   ruc                String           @map("ruc") @db.VarChar
   direccionEmpresa   String           @map("direccion_empresa") @db.VarChar
@@ -192,7 +193,6 @@ model Empresa {
   ciudad             Ciudad           @relation(fields: [idCiudad], references: [idCiudad], onDelete: NoAction, onUpdate: NoAction, map: "ciudad_empresa_fk")
   persona            Persona          @relation(fields: [personaContacto], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_empresa_fk")
   tipoDocumento      TipoDocumento    @relation(fields: [idTipoDocumento], references: [idTipoDocumento], onDelete: NoAction, onUpdate: NoAction, map: "tipo_documento_empresa_fk")
-  tipoPersona        TipoPersona      @relation(fields: [idTipoPersona], references: [idTipoPersona], onDelete: NoAction, onUpdate: NoAction, map: "tipo_persona_empresa_fk")
   proveedor          Proveedor[]
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime?           @default(now()) @map("updated_at")
@@ -562,13 +562,11 @@ model Persona {
   nroTelefono     String        @map("nro_telefono") @db.VarChar
   correoPersona   String        @map("correo_persona") @db.VarChar
   idCiudad        Int           @map("id_ciudad")
-  idTipoPersona   Int           @map("id_tipo_persona")
   idTipoDocumento Int           @map("id_tipo_documento")
   cliente         Cliente[]
   empresa         Empresa[]
   ciudad          Ciudad        @relation(fields: [idCiudad], references: [idCiudad], onDelete: NoAction, onUpdate: NoAction, map: "ciudad_persona_fk")
   tipoDocumento   TipoDocumento @relation(fields: [idTipoDocumento], references: [idTipoDocumento], onDelete: NoAction, onUpdate: NoAction, map: "tipo_documento_persona_fk")
-  tipoPersona     TipoPersona   @relation(fields: [idTipoPersona], references: [idTipoPersona], onDelete: NoAction, onUpdate: NoAction, map: "tipo_persona_persona_fk")
   usuario         Usuario[]
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime?           @default(now()) @map("updated_at")
@@ -679,15 +677,7 @@ model TipoNota {
   deletedAt       DateTime?           @map("deleted_at")
 }
 
-model TipoPersona {
-  idTipoPersona   Int       @id(map: "tipo_persona_pk") @default(autoincrement()) @map("id_tipo_persona")
-  descTipoPersona String    @map("desc_tipo_persona") @db.VarChar
-  empresa         Empresa[]
-  persona         Persona[]
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime?           @default(now()) @map("updated_at")
-  deletedAt       DateTime?           @map("deleted_at")
-}
+
 
 model TipoProducto {
   idTipoProducto   Int        @id(map: "tipo_producto_pk") @default(autoincrement()) @map("id_tipo_producto")
@@ -739,6 +729,7 @@ model Usuario {
   idRol                 Int                     @map("id_rol")
   idPersona             Int                     @map("id_persona")
   estado                String                  @map("estado_usuario")
+  ultimoCambioContrasena DateTime               @default(now()) @map("ultimo_cambio_contrasena") // Nuevo campo
   caja                  Caja[]
   cotizacionCliente     CotizacionCliente[]
   facturaClienteContado FacturaClienteContado[]
@@ -778,4 +769,14 @@ model RefreshToken {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime?           @default(now())
   deletedAt                 DateTime?
+}
+
+
+model Departamento {
+  idDepartamento   Int       @id @default(autoincrement()) @map("id_departamento")
+  descDepartamento String    @map("desc_departamento") @db.VarChar
+  ciudades         Ciudad[]  
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime? @default(now()) @map("updated_at")
+  deletedAt        DateTime? @map("deleted_at")
 }
