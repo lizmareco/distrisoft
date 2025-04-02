@@ -1,4 +1,4 @@
-import RolController from "@/backend/controllers/rol-controller";
+import RolController from "@/src/backend/controllers/rol-controller";
 
 const rolController = new RolController();
 
