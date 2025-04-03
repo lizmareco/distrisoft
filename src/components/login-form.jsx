@@ -4,7 +4,7 @@ import { useRootContext } from "@/src/app/context/root"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { apis } from "@/src/apis"
-import { Visibility, VisibilityOff, CheckCircleOutline } from "@mui/icons-material"
+import { Visibility, VisibilityOff } from "@mui/icons-material"
 import {
   IconButton,
   InputAdornment,
@@ -14,13 +14,10 @@ import {
   FormControlLabel,
   Alert,
   Box,
-  Container,
-  Paper,
-  Typography,
   CircularProgress,
-  Fade,
 } from "@mui/material"
 import Image from "next/image"
+import Link from "next/link"
 
 export default function LoginForm() {
   // Estado para controlar si el componente está montado
@@ -37,6 +34,9 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [intentosFallidos, setIntentosFallidos] = useState(0)
   const [cuentaBloqueada, setCuentaBloqueada] = useState(false)
+  const [cuentaVencida, setCuentaVencida] = useState(false)
+  // Agregar un nuevo estado para almacenar el ID del usuario
+  const [userId, setUserId] = useState(null)
 
   const router = useRouter()
 
@@ -69,12 +69,15 @@ export default function LoginForm() {
     }))
   }
 
+  // En el método handleSubmit, actualizar el manejo de errores para diferenciar entre BLOQUEADO y VENCIDO
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
     setSuccess(false)
     setDebugInfo(null)
+    setCuentaVencida(false)
+    setUserId(null)
 
     try {
       console.log("Enviando solicitud de login:", formData)
@@ -97,8 +100,31 @@ export default function LoginForm() {
         setIntentosFallidos(0)
         setCuentaBloqueada(false)
 
-        // Mostrar mensaje de éxito
-        setSuccess(true)
+        // Extraer el ID de usuario del token decodificado
+        try {
+          // Después de decodificar el token
+          const tokenParts = data.accessToken.split(".")
+          const header = JSON.parse(atob(tokenParts[0]))
+          const payload = JSON.parse(atob(tokenParts[1]))
+
+          // Extraer el ID de usuario del payload del token
+          if (payload.idUsuario) {
+            setUserId(payload.idUsuario)
+            console.log("ID de usuario extraído del token:", payload.idUsuario)
+          }
+        } catch (tokenError) {
+          console.error("Error al extraer ID de usuario del token:", tokenError)
+        }
+
+        // Verificar si la cuenta tiene contraseña vencida
+        if (data.cuentaVencida) {
+          setCuentaVencida(true)
+          setError("Tu contraseña ha vencido. Por favor, cámbiala para continuar usando el sistema.")
+          setSuccess(false) // No mostrar mensaje de éxito si la contraseña está vencida
+        } else {
+          // Mostrar mensaje de éxito solo si la contraseña no está vencida
+          setSuccess(true)
+        }
 
         // Guardar información de depuración
         setDebugInfo({
@@ -114,31 +140,32 @@ export default function LoginForm() {
         // Establecer la sesión en el contexto
         if (contextData.setState && contextData.setState.setSession) {
           try {
-            console.log("Estableciendo sesión con datos:", data.user)
+            console.log("Estableciendo sesión con datos:", data)
 
-            // Decodificar el token para obtener los datos del usuario
+            // Decodificar el token para mostrar en depuración
             const tokenParts = data.accessToken.split(".")
+            const header = JSON.parse(atob(tokenParts[0]))
             const payload = JSON.parse(atob(tokenParts[1]))
 
-            console.log("Token decodificado:", payload)
+            console.log("Token decodificado:", { header, payload })
 
-            // Establecer la sesión con los datos extraídos directamente del token
+            // Establecer la sesión con los datos del usuario y el token
             contextData.setState.setSession({
-              id: payload.idUsuario,
-              nombre: payload.nombre,
-              apellido: payload.apellido,
-              correo: payload.correo,
-              rol: payload.rol,
-              usuario: payload.usuario,
+              ...payload,
               token: data.accessToken,
-              permisos: payload.permisos || [],
             })
 
-            // Redirigir después de un breve retraso
-            setTimeout(() => {
-              console.log("Redirigiendo a la página principal")
-              router.push("/")
-            }, 1500)
+            // Verificar si la cuenta tiene contraseña vencida
+            if (data.cuentaVencida) {
+              setCuentaVencida(true)
+              setError("Tu contraseña ha vencido. Por favor, cámbiala para continuar usando el sistema.")
+            } else {
+              // Redirigir después de un breve retraso solo si la contraseña no está vencida
+              setTimeout(() => {
+                console.log("Redirigiendo a la página principal")
+                router.push("/")
+              }, 1500)
+            }
           } catch (contextError) {
             console.error("Error al establecer la sesión:", contextError)
             setError("Error al establecer la sesión. Por favor, inténtalo de nuevo.")
@@ -162,11 +189,29 @@ export default function LoginForm() {
         if (data.cuentaBloqueada) {
           setCuentaBloqueada(true)
           setError("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
+        } else if (data.cuentaVencida) {
+          setCuentaVencida(true)
+          setError("Tu contraseña ha vencido. Por favor, cámbiala para continuar usando el sistema.")
+
+          // Intentar extraer el ID de usuario del token si está disponible
+          try {
+            if (data.accessToken) {
+              const tokenParts = data.accessToken.split(".")
+              const payload = JSON.parse(atob(tokenParts[1]))
+              if (payload.idUsuario) {
+                setUserId(payload.idUsuario)
+              }
+            }
+          } catch (tokenError) {
+            console.error("Error al extraer ID de usuario del token:", tokenError)
+          }
         } else if (data.intentosRestantes !== undefined) {
           const nuevosIntentosFallidos = 3 - data.intentosRestantes
           setIntentosFallidos(nuevosIntentosFallidos)
           setError(
-            `Usuario o contraseña inválidos. Te quedan ${data.intentosRestantes} ${data.intentosRestantes === 1 ? "intento" : "intentos"}.`,
+            `Usuario o contraseña inválidos. Te quedan ${data.intentosRestantes} ${
+              data.intentosRestantes === 1 ? "intento" : "intentos"
+            }.`,
           )
         } else {
           setError(data.message || "Usuario o contraseña inválidos")
@@ -198,151 +243,103 @@ export default function LoginForm() {
 
   // Una vez montado, renderizamos el formulario completo
   return (
-    <Container
-      maxWidth="sm"
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
-      }}
-    >
-      <Paper
-        elevation={3}
-        sx={{
-          width: "100%",
-          p: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          overflow: "hidden", // Evita barras de desplazamiento
-        }}
-      >
-        <Box sx={{ mb: 3, display: "flex", justifyContent: "center" }}>
+    <div className="flex items-center justify-center min-h-screen w-full">
+      <div className="w-full max-w-sm sm:max-w-md md:max-w-lg p-6 bg-white rounded-lg shadow-lg">
+        <div className="flex justify-center mb-6">
           <Image src="/logo.png" alt="Logo" width={100} height={100} />
-        </Box>
+        </div>
 
-        <Typography
-          variant="h4"
-          component="h1"
-          gutterBottom
-          align="center"
-          sx={{ fontWeight: "bold", color: "text.primary" }}
-        >
-          Bienvenido a DistriSoft
-        </Typography>
-
-        {!contextData.setState && (
-          <Alert severity="error" sx={{ width: "100%", mb: 2 }}>
-            Error de configuración: El contexto no está disponible. Por favor, contacta al administrador.
-          </Alert>
-        )}
+        <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">Bienvenido a DistriSoft</h2>
 
         {error && (
-          <Alert severity={cuentaBloqueada ? "error" : "warning"} sx={{ width: "100%", mb: 2 }}>
+          <Alert severity={cuentaBloqueada ? "error" : "warning"} className="mb-4">
             {error}
+            {cuentaVencida && (
+              <Box sx={{ mt: 1 }}>
+                <Button
+                  component={Link}
+                  href={`/profile/change-password?vencida=true${userId ? `&userId=${userId}` : ""}`}
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  sx={{ mt: 1 }}
+                >
+                  Cambiar contraseña
+                </Button>
+              </Box>
+            )}
           </Alert>
         )}
 
         {success && (
-          <Fade in={success}>
-            <Alert
-              icon={<CheckCircleOutline fontSize="inherit" />}
-              severity="success"
-              sx={{
-                width: "100%",
-                mb: 2,
-                display: "flex",
-                alignItems: "center",
-                "& .MuiAlert-message": {
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  width: "100%",
-                },
-              }}
-            >
-              <Typography variant="body1" sx={{ fontWeight: "medium" }}>
-                ¡Inicio de sesión exitoso! Redirigiendo...
-              </Typography>
-              <CircularProgress size={20} color="success" sx={{ ml: 2 }} />
-            </Alert>
-          </Fade>
+          <Alert severity="success" className="mb-4">
+            ¡Inicio de sesión exitoso! Redirigiendo...
+          </Alert>
         )}
 
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <TextField
+              fullWidth
+              label="Nombre de Usuario"
+              id="nombreUsuario"
+              name="nombreUsuario"
+              type="text"
+              autoComplete="username"
+              required
+              value={formData.nombreUsuario}
+              onChange={handleChange}
+              InputProps={{ style: { color: "black" } }}
+              disabled={cuentaBloqueada || isLoading}
+            />
+          </div>
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ width: "100%" }}>
-          <TextField
-            margin="normal"
-            fullWidth
-            label="Nombre de Usuario"
-            id="nombreUsuario"
-            name="nombreUsuario"
-            type="text"
-            autoComplete="username"
-            required
-            value={formData.nombreUsuario}
-            onChange={handleChange}
-            disabled={cuentaBloqueada || isLoading || success}
-            sx={{ mb: 2 }}
-          />
+          <div className="mb-4">
+            <TextField
+              fullWidth
+              label="Contraseña"
+              id="contrasena"
+              name="contrasena"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              required
+              value={formData.contrasena}
+              onChange={handleChange}
+              InputProps={{
+                style: { color: "black" },
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      disabled={cuentaBloqueada || isLoading}
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              disabled={cuentaBloqueada || isLoading}
+            />
+          </div>
 
-          <TextField
-            margin="normal"
-            fullWidth
-            label="Contraseña"
-            id="contrasena"
-            name="contrasena"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            required
-            value={formData.contrasena}
-            onChange={handleChange}
-            disabled={cuentaBloqueada || isLoading || success}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowPassword(!showPassword)}
-                    edge="end"
-                    disabled={cuentaBloqueada || isLoading || success}
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mb: 2 }}
-          />
+          <div className="mb-4">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  id="rememberMe"
+                  name="rememberMe"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                  color="primary"
+                  disabled={cuentaBloqueada || isLoading}
+                />
+              }
+              label="Recuérdame"
+            />
+          </div>
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                id="rememberMe"
-                name="rememberMe"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-                color="primary"
-                disabled={cuentaBloqueada || isLoading || success}
-              />
-            }
-            label="Recuérdame"
-            sx={{ mb: 2 }}
-          />
-
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            color="primary"
-            disabled={isLoading || cuentaBloqueada || success || !contextData.setState}
-            sx={{
-              py: 1.5,
-              mb: 2,
-              fontSize: "1rem",
-            }}
-          >
+          <Button type="submit" fullWidth variant="contained" color="primary" disabled={isLoading || cuentaBloqueada}>
             {isLoading ? (
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
@@ -352,26 +349,15 @@ export default function LoginForm() {
               "Iniciar sesión"
             )}
           </Button>
+        </form>
 
-          <Box sx={{ textAlign: "center", mt: 2 }}>
-            <Typography
-              variant="body2"
-              component="a"
-              href="#"
-              sx={{
-                color: "text.secondary",
-                textDecoration: "none",
-                "&:hover": {
-                  textDecoration: "underline",
-                },
-              }}
-            >
-              ¿Olvidaste tu contraseña?
-            </Typography>
-          </Box>
-        </Box>
-      </Paper>
-    </Container>
+        <div className="mt-4 text-center">
+          <a href="#" className="text-sm text-gray-700 hover:text-gray-800">
+            ¿Olvidaste tu contraseña?
+          </a>
+        </div>
+      </div>
+    </div>
   )
 }
 

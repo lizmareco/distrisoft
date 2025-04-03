@@ -1,5 +1,6 @@
 import BaseDatasource from "../base-datasource";
 import { PrismaClient } from '@prisma/client';
+
 const prisma = new PrismaClient();
 
 export default class RolDatasource extends BaseDatasource {
@@ -11,9 +12,7 @@ export default class RolDatasource extends BaseDatasource {
   async getAllRoles() {
     try {
       return await this.model.findMany({
-        where: {
-          deletedAt: null
-        },
+       
         include: {
           // Se incluye la relación para obtener los permisos asignados al rol
           rolPermiso: {

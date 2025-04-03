@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcryptjs"
 
+// Importar el servicio de vencimiento de contraseñas
+import PasswordExpirationService from "../services/password-expiration-service"
+
 // En la parte superior del archivo, añade esta verificación
 if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_TOKEN) {
   console.error("ERROR: JWT_SECRET y/o JWT_REFRESH_TOKEN no están definidos en las variables de entorno")
@@ -29,6 +32,12 @@ class AuthController {
     this.invalidarAccessToken = this.invalidarAccessToken.bind(this)
     this.getUserFromToken = this.getUserFromToken.bind(this)
     this.hasAccessToken = this.hasAccessToken.bind(this)
+
+    this.passwordExpirationService = new PasswordExpirationService()
+
+    // Vincular nuevos métodos
+    this.cambiarContrasena = this.cambiarContrasena.bind(this)
+    this.resetPassword = this.resetPassword.bind(this)
   }
 
   // Verificar si hay un token de acceso válido en la solicitud
@@ -68,8 +77,7 @@ class AuthController {
     }
   }
 
-  // Método login modificado para usar nombreUsuario en lugar de correo
-  // y para incluir los datos del usuario directamente en el JWT
+  // Método login modificado para manejar correctamente usuarios con contraseña vencida
   async login(loginForm) {
     const { nombreUsuario, contrasena } = loginForm
 
@@ -91,12 +99,47 @@ class AuthController {
         throw new Error("Usuario o contraseña incorrecta")
       }
 
+      // Verificar el estado del usuario ANTES de verificar la contraseña
       // Verificar si la cuenta está bloqueada
       if (usuario.estado === "BLOQUEADO") {
         throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
       }
 
-      // Verificar la contraseña
+      // Si la cuenta tiene contraseña vencida, permitir el inicio de sesión pero marcar como vencida
+      if (usuario.estado === "VENCIDO") {
+        console.log("Usuario con contraseña vencida:", usuario.nombreUsuario)
+
+        // Verificar la contraseña
+        const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena)
+
+        if (!contrasenaValida) {
+          // Obtener los intentos fallidos recientes
+          const ultimosIntentosFallidos = await this.obtenerIntentosFallidos(usuario.idUsuario)
+          const totalIntentosFallidos = ultimosIntentosFallidos.length + 1 // +1 por el intento actual
+
+          // Registrar este intento fallido
+          await this.registrarIntentoFallido(usuario.idUsuario)
+
+          // Si alcanzamos el máximo de intentos, bloqueamos la cuenta
+          if (totalIntentosFallidos >= MAX_INTENTOS_FALLIDOS) {
+            await this.bloquearCuenta(usuario.idUsuario)
+            throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
+          }
+
+          // Si no, devolvemos un error con la cantidad de intentos restantes
+          const intentosRestantes = MAX_INTENTOS_FALLIDOS - totalIntentosFallidos
+          throw new Error(
+            `Usuario o contraseña incorrecta. Te quedan ${intentosRestantes} ${
+              intentosRestantes === 1 ? "intento" : "intentos"
+            }.`,
+          )
+        }
+
+        // Si la contraseña es correcta, generar tokens pero marcar la cuenta como vencida
+        return await this.generarTokens(usuario, true)
+      }
+
+      // Para usuarios con estado ACTIVO, verificar la contraseña normalmente
       const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena)
 
       if (!contrasenaValida) {
@@ -125,6 +168,17 @@ class AuthController {
       // Si la contraseña es correcta, reiniciamos los intentos fallidos
       await this.limpiarIntentosFallidos(usuario.idUsuario)
 
+      // Generar tokens para usuario normal (no vencido)
+      return await this.generarTokens(usuario, false)
+    } catch (error) {
+      console.error("Error en login:", error)
+      throw error
+    }
+  }
+
+  // Método para generar tokens (extraído para evitar duplicación de código)
+  async generarTokens(usuario, cuentaVencida) {
+    try {
       // Verificar que las claves secretas estén definidas
       if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_TOKEN) {
         throw new Error("Error de configuración del servidor: Claves JWT no definidas")
@@ -217,13 +271,13 @@ class AuthController {
       })
 
       // Devolver tokens y datos del usuario
-      // No creamos un objeto userData separado, ya que los datos ya están en el token
       return {
         accessToken,
         refreshToken,
+        cuentaVencida,
       }
     } catch (error) {
-      console.error("Error en login:", error)
+      console.error("Error al generar tokens:", error)
       throw error
     }
   }
@@ -473,6 +527,84 @@ class AuthController {
     } catch (error) {
       console.error("Error al obtener usuario desde token:", error)
       return null
+    }
+  }
+
+  // Método para cambiar contraseña
+  async cambiarContrasena(idUsuario, contrasenaActual, nuevaContrasena) {
+    try {
+      // Buscar el usuario
+      const usuario = await prisma.usuario.findUnique({
+        where: {
+          idUsuario: idUsuario,
+          deletedAt: null,
+        },
+      })
+
+      if (!usuario) {
+        throw new Error("Usuario no encontrado")
+      }
+
+      // Verificar la contraseña actual
+      const contrasenaValida = await bcrypt.compare(contrasenaActual, usuario.contrasena)
+
+      if (!contrasenaValida) {
+        throw new Error("La contraseña actual es incorrecta")
+      }
+
+      // Hashear la nueva contraseña
+      const hashedPassword = await bcrypt.hash(nuevaContrasena, 10)
+
+      // Actualizar la contraseña y la fecha de último cambio
+      await prisma.usuario.update({
+        where: {
+          idUsuario: idUsuario,
+        },
+        data: {
+          contrasena: hashedPassword,
+          ultimoCambioContrasena: new Date(),
+          updatedAt: new Date(),
+        },
+      })
+
+      return true
+    } catch (error) {
+      console.error("Error al cambiar contraseña:", error)
+      throw error
+    }
+  }
+
+  // Modificar el método de reset de contraseña existente para actualizar la fecha
+  async resetPassword(idUsuario, nuevaContrasena) {
+    try {
+      // Hashear la nueva contraseña
+      const hashedPassword = await bcrypt.hash(nuevaContrasena, 10)
+
+      // Obtener el usuario actual para verificar su estado
+      const usuario = await prisma.usuario.findUnique({
+        where: {
+          idUsuario: idUsuario,
+        },
+      })
+
+      // Actualizar la contraseña y la fecha de último cambio
+      await prisma.usuario.update({
+        where: {
+          idUsuario: idUsuario,
+        },
+        data: {
+          contrasena: hashedPassword,
+          ultimoCambioContrasena: new Date(),
+          updatedAt: new Date(),
+          // Si el usuario estaba bloqueado por contraseña vencida, activarlo
+          estado: usuario.estado === "VENCIDO" ? "ACTIVO" : usuario.estado,
+        },
+      })
+
+      return true
+    } catch (error) {
+      console.error("Error al restablecer contraseña:", error)
+      throw error
     }
   }
 }
