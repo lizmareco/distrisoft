@@ -1,7 +1,7 @@
 // Importaciones necesarias
 import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 
 // Importar el servicio de vencimiento de contraseñas
 import PasswordExpirationService from "../services/password-expiration-service"

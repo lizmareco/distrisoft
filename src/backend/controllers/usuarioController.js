@@ -1,4 +1,5 @@
 import { usuarioDataSource } from "../datasources/usuarioDataSource"
+// Using relative import within the same directory
 import { personaController } from "./personaController"
 
 export const usuarioController = {
@@ -41,10 +42,10 @@ export const usuarioController = {
         throw new Error(`Persona con ID ${datos.idPersona} no encontrada`)
       }
 
-      // Verificar si la persona ya tiene dos usuarios
+      // Verificar si la persona ya tiene un usuario
       const tieneMaximoUsuarios = await usuarioDataSource.verificarLimiteUsuarios(datos.idPersona)
       if (tieneMaximoUsuarios) {
-        throw new Error(`La persona ya tiene el máximo de 2 usuarios permitidos`)
+        throw new Error(`La persona ya tiene un usuario activo y no puede tener más`)
       }
 
       // Asegurar que el estado sea ACTIVO por defecto

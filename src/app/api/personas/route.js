@@ -1,53 +1,25 @@
-import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
 
+const prisma = new PrismaClient()
+
+// GET /api/personas - Obtener todas las personas
 export async function GET() {
   try {
+    console.log("API: Consultando personas en la base de datos")
     const personas = await prisma.persona.findMany({
-      include: {
-        ciudad: true,
-        tipoDocumento: true,
-      },
       where: {
         deletedAt: null,
       },
-    })
-
-    return NextResponse.json(personas)
-  } catch (error) {
-    console.error("Error al obtener personas:", error)
-    return NextResponse.json({ error: "Error al obtener personas" }, { status: 500 })
-  }
-}
-
-export async function POST(request) {
-  try {
-    const data = await request.json()
-
-    const persona = await prisma.persona.create({
-      data: {
-        nroDocumento: data.nroDocumento,
-        nombre: data.nombre,
-        apellido: data.apellido,
-        fechaNacimiento: new Date(data.fechaNacimiento),
-        direccion: data.direccion,
-        nroTelefono: data.nroTelefono,
-        correoPersona: data.correoPersona,
-        idCiudad: Number.parseInt(data.idCiudad),
-        idTipoDocumento: Number.parseInt(data.idTipoDocumento),
-      },
-      include: {
-        ciudad: true,
-        tipoDocumento: true,
+      orderBy: {
+        apellido: "asc",
       },
     })
-
-    return NextResponse.json(persona)
+    console.log("API: Personas encontradas:", personas.length)
+    return NextResponse.json({ personas }, { status: 200 })
   } catch (error) {
-    console.error("Error al crear persona:", error)
-    return NextResponse.json({ error: "Error al crear persona" }, { status: 500 })
+    console.error("API: Error al obtener personas:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
-
-
 
