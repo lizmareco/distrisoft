@@ -1,4 +1,16 @@
 {
     "WillLuke.nextjs.addTypesOnSave": true,
-    "WillLuke.nextjs.hasPrompted": true
+    "WillLuke.nextjs.hasPrompted": true,
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "bcdnkllsjyvs2kekjumv-postgresql.services.clever-cloud.com",
+            "port": 6934,
+            "driver": "PostgreSQL",
+            "name": "project2",
+            "database": "bcdnkllsjyvs2kekjumv",
+            "username": "uvcqh9nd6cu1mraevpct",
+            "password": "LjHxuILHWHOfnQRG9pxo"
+        }
+    ]
 }
