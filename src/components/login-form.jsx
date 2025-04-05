@@ -243,7 +243,7 @@ export default function LoginForm() {
 
   // Una vez montado, renderizamos el formulario completo
   return (
-    <div className="flex items-center justify-center min-h-screen w-full">
+    <div className="flex items-center justify-center min-h-[calc(100vh-64px)] w-full">
       <div className="w-full max-w-sm sm:max-w-md md:max-w-lg p-6 bg-white rounded-lg shadow-lg">
         <div className="flex justify-center mb-6">
           <Image src="/logo.png" alt="Logo" width={100} height={100} />

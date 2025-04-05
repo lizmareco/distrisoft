@@ -35,7 +35,7 @@ export default function ListaProducto() {
   const fetchProductos = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/producto")
+      const response = await fetch("/api/productos")
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -78,7 +78,7 @@ export default function ListaProducto() {
 
   const handleDelete = async () => {
     try {
-      const response = await fetch(`/api/producto/${selectedProducto.idProducto}`, {
+      const response = await fetch(`/api/productos/${selectedProducto.idProducto}`, {
         method: "DELETE",
       })
 

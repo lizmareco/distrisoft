@@ -1,7 +1,7 @@
 import Navbar from "@/src/components/navbar"
 import SessionTimeout from "@/src/components/session-timeout"
 
-export default function DashboardLayout({ children }) {
+export default function AdminLayout({ children }) {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />

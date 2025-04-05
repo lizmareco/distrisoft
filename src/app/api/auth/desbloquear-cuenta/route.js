@@ -14,7 +14,7 @@ export async function POST(request) {
 
     // Verificar rol de administrador (implementa esta lógica según tu sistema)
     const userData = await authController.getUserFromToken(accessToken)
-    if (!userData || userData.rol !== "ADMINISTRADOR") {
+    if (!userData || userData.rol !== "ADMINISTRADOR_SISTEMA") {
       return NextResponse.json(
         { message: "No tienes permisos para realizar esta acción" },
         { status: HTTP_STATUS_CODES.forbidden },
@@ -28,8 +28,8 @@ export async function POST(request) {
       return NextResponse.json({ message: "ID de usuario requerido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
-    // Desbloquear la cuenta
-    await authController.desbloquearCuenta(idUsuario)
+    // Desbloquear la cuenta usando el método que ya registra la auditoría
+    await authController.desbloquearCuenta(idUsuario, request)
 
     return NextResponse.json({ message: "Cuenta desbloqueada exitosamente" }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {

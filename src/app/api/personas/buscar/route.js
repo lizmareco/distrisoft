@@ -38,7 +38,8 @@ export async function GET(request) {
     }
 
     console.log("API: Personas encontradas:", personas.length)
-    return NextResponse.json({ personas }, { status: 200 })
+    // Devolver directamente el array de personas, no un objeto con propiedad personas
+    return NextResponse.json(personas, { status: 200 })
   } catch (error) {
     console.error("API: Error al buscar personas:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

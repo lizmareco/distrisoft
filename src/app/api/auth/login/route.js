@@ -22,7 +22,8 @@ export async function POST(request) {
 
     try {
       console.log("API login: Intentando autenticar usuario")
-      const result = await authController.login(loginForm)
+      // Asegurarse de pasar el objeto request al método login
+      const result = await authController.login(loginForm, request)
 
       if (!result || !result.accessToken) {
         console.log("API login: Autenticación fallida - No se generaron tokens")

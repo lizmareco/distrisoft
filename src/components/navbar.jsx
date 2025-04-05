@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   AppBar,
@@ -8,41 +8,65 @@ import {
   Typography,
   IconButton,
   Box,
-  Drawer,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Divider,
   Avatar,
   Menu,
   MenuItem,
   Tooltip,
+  Divider,
+  ListItemIcon,
+  Button,
+  useMediaQuery,
+  useTheme,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  CircularProgress,
 } from "@mui/material"
-import { Menu as MenuIcon, Dashboard, Person, LockReset, Logout } from "@mui/icons-material"
-import Link from "next/link"
+import { Logout, AdminPanelSettings, History, Security, Dashboard, Menu as MenuIcon } from "@mui/icons-material"
 
 // Importar el componente de notificaciones
 import NotificationBell from "./notification-bell"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function Navbar() {
   const router = useRouter()
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const { session } = useRootContext()
   const [userMenuAnchor, setUserMenuAnchor] = useState(null)
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"))
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userProfile, setUserProfile] = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  // Datos estáticos del usuario
-  const userData = {
-    nombre: "Usuario",
-    apellido: "Prueba",
-    rol: "Administrador",
-  }
+  // Cargar datos del perfil del usuario
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (session) {
+        try {
+          setLoading(true)
+          const response = await fetch("/api/usuarios/profile", {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          })
 
-  const toggleDrawer = (open) => (event) => {
-    if (event && event.type === "keydown" && (event.key === "Tab" || event.key === "Shift")) {
-      return
+          if (response.ok) {
+            const data = await response.json()
+            setUserProfile(data)
+          }
+        } catch (error) {
+          console.error("Error al cargar perfil:", error)
+        } finally {
+          setLoading(false)
+        }
+      }
     }
-    setDrawerOpen(open)
-  }
+
+    fetchUserProfile()
+  }, [session])
 
   const handleUserMenuOpen = (event) => {
     setUserMenuAnchor(event.currentTarget)
@@ -52,103 +76,212 @@ export default function Navbar() {
     setUserMenuAnchor(null)
   }
 
-  // Función para cerrar sesión
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleUserMenuClose()
-    // Simular cierre de sesión
-    alert("Sesión cerrada")
-    router.push("/auth/login")
+
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      // Mostrar alerta personalizada
+      alert("Sesión cerrada exitosamente")
+
+      // Redirigir al login
+      router.push("/auth/login")
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error)
+      alert("Error al cerrar sesión")
+    }
   }
 
-  // Lista de elementos del menú lateral
-  const menuItems = [
-    { text: "Dashboard", icon: <Dashboard />, path: "/" },
-    { text: "Perfil", icon: <Person />, path: "/profile" },
-    { text: "Cambiar Contraseña", icon: <LockReset />, path: "/profile/change-password" },
-  ]
+  const handleNavigate = (path) => {
+    handleUserMenuClose()
+    setMobileMenuOpen(false)
+    router.push(path)
+  }
+
+  // Verificar si el usuario es administrador
+  const isAdmin = session?.rol === "ADMINISTRADOR_SISTEMA"
+
+  // Enlaces de navegación (solo Dashboard)
+  const navLinks = [{ text: "Dashboard", path: "/", icon: <Dashboard fontSize="small" /> }]
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen)
+  }
+
+  // Obtener las iniciales del usuario para el avatar
+  const getUserInitials = () => {
+    if (userProfile?.persona?.nombre) {
+      return userProfile.persona.nombre.charAt(0).toUpperCase()
+    }
+    if (session?.nombre) {
+      return session.nombre.charAt(0).toUpperCase()
+    }
+    return "U"
+  }
 
   return (
-    <>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }} onClick={toggleDrawer(true)}>
-            <MenuIcon />
+    <AppBar position="static">
+      <Toolbar>
+        <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
+          <IconButton color="inherit" edge="start" onClick={() => router.push("/")} sx={{ mr: 2 }}>
+            <Dashboard />
           </IconButton>
-
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ mr: 4 }}>
             DistriSoft
           </Typography>
 
-          {/* Área de notificaciones y perfil */}
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <NotificationBell />
+          {/* Enlaces de navegación para escritorio */}
+          {!isMobile && (
+            <Box sx={{ display: "flex" }}>
+              {navLinks.map((link) => (
+                <Button
+                  key={link.path}
+                  color="inherit"
+                  startIcon={link.icon}
+                  onClick={() => handleNavigate(link.path)}
+                  sx={{ mx: 0.5 }}
+                >
+                  {link.text}
+                </Button>
+              ))}
+            </Box>
+          )}
+        </Box>
 
-            <Tooltip title="Perfil de usuario">
-              <IconButton color="inherit" onClick={handleUserMenuOpen}>
-                <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.dark" }}>{userData.nombre.charAt(0)}</Avatar>
-              </IconButton>
-            </Tooltip>
+        {/* Botón de menú para móviles */}
+        {isMobile && (
+          <IconButton color="inherit" edge="start" onClick={toggleMobileMenu} sx={{ mr: 2 }}>
+            <MenuIcon />
+          </IconButton>
+        )}
 
-            <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={handleUserMenuClose}>
-              <MenuItem disabled>
-                <Typography variant="subtitle1">
-                  {userData.nombre} {userData.apellido}
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <NotificationBell />
+
+          <Tooltip title="Perfil de usuario">
+            <IconButton color="inherit" onClick={handleUserMenuOpen}>
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.dark" }}>{getUserInitials()}</Avatar>
+              )}
+            </IconButton>
+          </Tooltip>
+
+          <Menu
+            anchorEl={userMenuAnchor}
+            open={Boolean(userMenuAnchor)}
+            onClose={handleUserMenuClose}
+            PaperProps={{
+              elevation: 3,
+              sx: { minWidth: 200 },
+            }}
+          >
+            {userProfile && (
+              <Box sx={{ px: 2, py: 1 }}>
+                <Typography variant="subtitle1" noWrap>
+                  {`${userProfile.persona.nombre || ""} ${userProfile.persona.apellido || ""}`}
                 </Typography>
-              </MenuItem>
+                <Typography variant="body2" color="text.secondary" noWrap>
+                  {userProfile.rol || "Usuario"}
+                </Typography>
+              </Box>
+            )}
 
-              <Divider />
+            {!userProfile && session && (
+              <Box sx={{ px: 2, py: 1 }}>
+                <Typography variant="subtitle1" noWrap>
+                  {`${session.nombre || ""} ${session.apellido || ""}`}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" noWrap>
+                  {session.rol || "Usuario"}
+                </Typography>
+              </Box>
+            )}
 
-              <MenuItem
-                onClick={() => {
-                  handleUserMenuClose()
-                  router.push("/profile/change-password")
-                }}
-              >
-                <ListItemIcon>
-                  <LockReset fontSize="small" />
-                </ListItemIcon>
-                Cambiar Contraseña
-              </MenuItem>
-
-              <MenuItem onClick={handleLogout}>
-                <ListItemIcon>
-                  <Logout fontSize="small" />
-                </ListItemIcon>
-                Cerrar Sesión
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Toolbar>
-      </AppBar>
-
-      {/* Drawer lateral */}
-      <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
-        <Box sx={{ width: 250 }} role="presentation" onClick={toggleDrawer(false)} onKeyDown={toggleDrawer(false)}>
-          <List>
-            <ListItem>
-              <Typography variant="h6">DistriSoft</Typography>
-            </ListItem>
             <Divider />
 
-            {menuItems.map((item) => (
-              <ListItem button key={item.text} component={Link} href={item.path}>
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
+            <MenuItem onClick={() => handleNavigate("/profile")}>
+              <ListItemIcon>
+                <Dashboard fontSize="small" />
+              </ListItemIcon>
+              Mi Perfil
+            </MenuItem>
+
+            <MenuItem onClick={() => handleNavigate("/profile/change-password")}>
+              <ListItemIcon>
+                <Security fontSize="small" />
+              </ListItemIcon>
+              Cambiar Contraseña
+            </MenuItem>
+
+            {isAdmin && (
+              <>
+                <Divider />
+                <MenuItem onClick={() => handleNavigate("/admin/auditoria")}>
+                  <ListItemIcon>
+                    <History fontSize="small" />
+                  </ListItemIcon>
+                  Auditoría
+                </MenuItem>
+                <MenuItem onClick={() => handleNavigate("/admin")}>
+                  <ListItemIcon>
+                    <AdminPanelSettings fontSize="small" />
+                  </ListItemIcon>
+                  Administración
+                </MenuItem>
+              </>
+            )}
+
+            <Divider />
+
+            <MenuItem onClick={handleLogout}>
+              <ListItemIcon>
+                <Logout fontSize="small" />
+              </ListItemIcon>
+              Cerrar Sesión
+            </MenuItem>
+          </Menu>
+        </Box>
+      </Toolbar>
+
+      {/* Menú lateral para móviles */}
+      <Drawer anchor="left" open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)}>
+        <Box sx={{ width: 250 }} role="presentation">
+          <List>
+            {navLinks.map((link) => (
+              <ListItem button key={link.path} onClick={() => handleNavigate(link.path)}>
+                <ListItemIcon>{link.icon}</ListItemIcon>
+                <ListItemText primary={link.text} />
               </ListItem>
             ))}
-
-            <Divider />
-
-            <ListItem button onClick={handleLogout}>
-              <ListItemIcon>
-                <Logout />
-              </ListItemIcon>
-              <ListItemText primary="Cerrar Sesión" />
-            </ListItem>
           </List>
+          <Divider />
+          {isAdmin && (
+            <List>
+              <ListItem button onClick={() => handleNavigate("/admin/auditoria")}>
+                <ListItemIcon>
+                  <History />
+                </ListItemIcon>
+                <ListItemText primary="Auditoría" />
+              </ListItem>
+              <ListItem button onClick={() => handleNavigate("/admin")}>
+                <ListItemIcon>
+                  <AdminPanelSettings />
+                </ListItemIcon>
+                <ListItemText primary="Administración" />
+              </ListItem>
+            </List>
+          )}
         </Box>
       </Drawer>
-    </>
+    </AppBar>
   )
 }
 

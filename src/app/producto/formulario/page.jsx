@@ -85,7 +85,7 @@ export default function FormularioProductoPage() {
 
         // Si hay un ID, cargar los datos del producto
         if (id) {
-          const productoResponse = await fetch(`/api/producto/${id}`)
+          const productoResponse = await fetch(`/api/productos/${id}`)
           if (!productoResponse.ok) {
             showAlert("Error al cargar producto", "error")
             setLoadingData(false)
@@ -207,7 +207,7 @@ export default function FormularioProductoPage() {
     setLoading(true)
 
     try {
-      const url = id ? `/api/producto/${id}` : "/api/producto"
+      const url = id ? `/api/productos/${id}` : "/api/productos"
       const method = id ? "PUT" : "POST"
 
       // Asegurarse de que los valores numéricos sean números
