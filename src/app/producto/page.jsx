@@ -96,7 +96,7 @@ export default function ListaProducto() {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Botón de Volver */}
       <Box display="flex" alignItems="center" mb={3}>
-        <Button component={Link} href="/gestion-productos" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+        <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión
         </Button>
       </Box>

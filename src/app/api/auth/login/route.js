@@ -41,11 +41,19 @@ export async function POST(request) {
       const userData = await authController.getUserFromToken(accessToken)
       console.log("API login: Datos del usuario extraídos del token", userData)
 
+      // Nota: No es necesario registrar el login exitoso aquí, ya se registra en el controlador de autenticación
       const response = NextResponse.json(
         {
           accessToken,
+          refreshToken,
           cuentaVencida: cuentaVencida,
-          // No incluimos user separado, ya que los datos están en el token
+          user: {
+            id: userData.idUsuario,
+            nombre: userData.nombre,
+            apellido: userData.apellido,
+            correo: userData.correo,
+            rol: userData.rol,
+          },
         },
         { status: HTTP_STATUS_CODES.ok },
       )

@@ -22,29 +22,36 @@ import {
   ListItem,
   ListItemText,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material"
-import { Logout, AdminPanelSettings, History, Security, Dashboard, Menu as MenuIcon } from "@mui/icons-material"
+import { Logout, AdminPanelSettings, History, Security, Dashboard, Menu as MenuIcon, Person } from "@mui/icons-material"
 
-// Importar el componente de notificaciones
-import NotificationBell from "./notification-bell"
+
 import { useRootContext } from "@/src/app/context/root"
 
 export default function Navbar() {
   const router = useRouter()
-  const { session } = useRootContext()
+  const { session, setState } = useRootContext()
   const [userMenuAnchor, setUserMenuAnchor] = useState(null)
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down("md"))
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
-  // Cargar datos del perfil del usuario
+  // Load user profile data
   useEffect(() => {
     const fetchUserProfile = async () => {
+      // First check if there's a session in the context
       if (session) {
         try {
           setLoading(true)
+          console.log("Navbar: Intentando cargar perfil de usuario desde API")
           const response = await fetch("/api/usuarios/profile", {
             method: "GET",
             credentials: "include",
@@ -55,12 +62,97 @@ export default function Navbar() {
 
           if (response.ok) {
             const data = await response.json()
+            console.log("Navbar: Perfil cargado correctamente", data)
             setUserProfile(data)
+          } else {
+            console.warn("Navbar: Error al cargar perfil:", response.status)
+            // Si falla, usar los datos básicos del contexto
+            setUserProfile({
+              nombreUsuario: session.usuario || session.nombre,
+              persona: {
+                nombre: session.nombre || "",
+                apellido: session.apellido || "",
+              },
+              rol: session.rol || "",
+            })
           }
         } catch (error) {
-          console.error("Error al cargar perfil:", error)
+          console.error("Navbar: Error al cargar perfil:", error)
+          // Si hay error, usar los datos básicos del contexto
+          setUserProfile({
+            nombreUsuario: session.usuario || session.nombre,
+            persona: {
+              nombre: session.nombre || "",
+              apellido: session.apellido || "",
+            },
+            rol: session.rol || "",
+          })
         } finally {
           setLoading(false)
+        }
+      } else {
+        // Si no hay sesión en el contexto, check localStorage
+        const storedUser = localStorage.getItem("user")
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser)
+            console.log("Navbar: Usando datos de usuario desde localStorage", userData)
+
+            // Try to get complete profile data
+            const accessToken = localStorage.getItem("accessToken")
+            if (accessToken) {
+              try {
+                const response = await fetch("/api/usuarios/profile", {
+                  method: "GET",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${accessToken}`,
+                  },
+                })
+
+                if (response.ok) {
+                  const data = await response.json()
+                  console.log("Navbar: Perfil actualizado cargado desde API", data)
+                  setUserProfile(data)
+                } else {
+                  console.warn("Navbar: No se pudo cargar perfil completo:", response.status)
+                  // Si falla, usar los datos básicos de localStorage
+                  setUserProfile({
+                    nombreUsuario: userData.nombre,
+                    persona: {
+                      nombre: userData.nombre,
+                      apellido: userData.apellido,
+                    },
+                    rol: userData.rol,
+                  })
+                }
+              } catch (error) {
+                console.error("Navbar: Error al cargar perfil completo:", error)
+                // Si hay error, usar los datos básicos de localStorage
+                setUserProfile({
+                  nombreUsuario: userData.nombre,
+                  persona: {
+                    nombre: userData.nombre,
+                    apellido: userData.apellido,
+                  },
+                  rol: userData.rol,
+                })
+              }
+            } else {
+              // Si no hay token, usar los datos básicos de localStorage
+              setUserProfile({
+                nombreUsuario: userData.nombre,
+                persona: {
+                  nombre: userData.nombre,
+                  apellido: userData.apellido,
+                },
+                rol: userData.rol,
+              })
+            }
+          } catch (error) {
+            console.error("Navbar: Error al procesar datos de usuario:", error)
+          }
         }
       }
     }
@@ -76,10 +168,16 @@ export default function Navbar() {
     setUserMenuAnchor(null)
   }
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
     handleUserMenuClose()
+    setLogoutDialogOpen(true)
+  }
+
+  const handleLogoutConfirm = async () => {
+    setLogoutDialogOpen(false)
 
     try {
+      // Call the logout API
       await fetch("/api/auth/logout", {
         method: "POST",
         headers: {
@@ -87,15 +185,25 @@ export default function Navbar() {
         },
       })
 
-      // Mostrar alerta personalizada
-      alert("Sesión cerrada exitosamente")
+      // Clear localStorage
+      localStorage.removeItem("accessToken")
+      localStorage.removeItem("user")
 
-      // Redirigir al login
+      // Clear session in context
+      if (setState && setState.setSession) {
+        setState.setSession(null)
+      }
+
+      // Redirect to login
       router.push("/auth/login")
     } catch (error) {
-      console.error("Error al cerrar sesión:", error)
+      console.error("Error logging out:", error)
       alert("Error al cerrar sesión")
     }
+  }
+
+  const handleLogoutCancel = () => {
+    setLogoutDialogOpen(false)
   }
 
   const handleNavigate = (path) => {
@@ -104,17 +212,17 @@ export default function Navbar() {
     router.push(path)
   }
 
-  // Verificar si el usuario es administrador
-  const isAdmin = session?.rol === "ADMINISTRADOR_SISTEMA"
+  // Check if user is admin
+  const isAdmin = userProfile?.rol === "ADMINISTRADOR_SISTEMA" || session?.rol === "ADMINISTRADOR_SISTEMA"
 
-  // Enlaces de navegación (solo Dashboard)
-  const navLinks = [{ text: "Dashboard", path: "/", icon: <Dashboard fontSize="small" /> }]
+  // Navigation links (only Dashboard)
+  const navLinks = [{ text: "Dashboard", path: "/dashboard", icon: <Dashboard fontSize="small" /> }]
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen)
   }
 
-  // Obtener las iniciales del usuario para el avatar
+  // Get user initials for avatar
   const getUserInitials = () => {
     if (userProfile?.persona?.nombre) {
       return userProfile.persona.nombre.charAt(0).toUpperCase()
@@ -125,18 +233,60 @@ export default function Navbar() {
     return "U"
   }
 
+  const handleLogout = async () => {
+    handleUserMenuClose()
+
+    // Mostrar confirmación antes de cerrar sesión
+    const confirmar = window.confirm("¿Estás seguro que deseas cerrar sesión?")
+    if (!confirmar) {
+      return
+    }
+
+    try {
+      // Mostrar mensaje de carga
+      console.log("Cerrando sesión...")
+
+      // Llamar a la API de logout
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      })
+
+      // Limpiar localStorage
+      localStorage.removeItem("accessToken")
+      localStorage.removeItem("user")
+
+      // Limpiar el contexto si está disponible
+      if (setState && setState.setSession) {
+        setState.setSession(null)
+      }
+
+      // Mostrar alerta de éxito
+      alert("Sesión cerrada exitosamente")
+
+      // Redirigir al login usando window.location para forzar recarga completa
+      window.location.href = "/auth/login"
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error)
+      alert("Error al cerrar sesión: " + error.message)
+    }
+  }
+
   return (
     <AppBar position="static">
       <Toolbar>
         <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
-          <IconButton color="inherit" edge="start" onClick={() => router.push("/")} sx={{ mr: 2 }}>
+          <IconButton color="inherit" edge="start" onClick={() => router.push("/dashboard")} sx={{ mr: 2 }}>
             <Dashboard />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ mr: 4 }}>
             DistriSoft
           </Typography>
 
-          {/* Enlaces de navegación para escritorio */}
+          {/* Desktop navigation links */}
           {!isMobile && (
             <Box sx={{ display: "flex" }}>
               {navLinks.map((link) => (
@@ -154,7 +304,7 @@ export default function Navbar() {
           )}
         </Box>
 
-        {/* Botón de menú para móviles */}
+        {/* Mobile menu button */}
         {isMobile && (
           <IconButton color="inherit" edge="start" onClick={toggleMobileMenu} sx={{ mr: 2 }}>
             <MenuIcon />
@@ -162,8 +312,6 @@ export default function Navbar() {
         )}
 
         <Box sx={{ display: "flex", alignItems: "center" }}>
-          <NotificationBell />
-
           <Tooltip title="Perfil de usuario">
             <IconButton color="inherit" onClick={handleUserMenuOpen}>
               {loading ? (
@@ -209,7 +357,7 @@ export default function Navbar() {
 
             <MenuItem onClick={() => handleNavigate("/profile")}>
               <ListItemIcon>
-                <Dashboard fontSize="small" />
+                <Person fontSize="small" />
               </ListItemIcon>
               Mi Perfil
             </MenuItem>
@@ -243,15 +391,15 @@ export default function Navbar() {
 
             <MenuItem onClick={handleLogout}>
               <ListItemIcon>
-                <Logout fontSize="small" />
+                <Logout fontSize="small" color="error" />
               </ListItemIcon>
-              Cerrar Sesión
+              <Typography color="error">Cerrar Sesión</Typography>
             </MenuItem>
           </Menu>
         </Box>
       </Toolbar>
 
-      {/* Menú lateral para móviles */}
+      {/* Mobile side menu */}
       <Drawer anchor="left" open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)}>
         <Box sx={{ width: 250 }} role="presentation">
           <List>
@@ -265,13 +413,13 @@ export default function Navbar() {
           <Divider />
           {isAdmin && (
             <List>
-              <ListItem button onClick={() => handleNavigate("/admin/auditoria")}>
+              <ListItem button key="/admin/auditoria" onClick={() => handleNavigate("/admin/auditoria")}>
                 <ListItemIcon>
                   <History />
                 </ListItemIcon>
                 <ListItemText primary="Auditoría" />
               </ListItem>
-              <ListItem button onClick={() => handleNavigate("/admin")}>
+              <ListItem button key="/admin" onClick={() => handleNavigate("/admin")}>
                 <ListItemIcon>
                   <AdminPanelSettings />
                 </ListItemIcon>
@@ -281,6 +429,22 @@ export default function Navbar() {
           )}
         </Box>
       </Drawer>
+
+      {/* Logout confirmation dialog */}
+      <Dialog open={logoutDialogOpen} onClose={handleLogoutCancel}>
+        <DialogTitle>Confirmar cierre de sesión</DialogTitle>
+        <DialogContent>
+          <DialogContentText>¿Estás seguro que deseas cerrar sesión?</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleLogoutCancel} color="primary">
+            Cancelar
+          </Button>
+          <Button onClick={handleLogoutConfirm} color="error" variant="contained">
+            Cerrar Sesión
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppBar>
   )
 }

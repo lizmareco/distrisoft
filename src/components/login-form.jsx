@@ -100,20 +100,36 @@ export default function LoginForm() {
         setIntentosFallidos(0)
         setCuentaBloqueada(false)
 
-        // Extraer el ID de usuario del token decodificado
-        try {
-          // Después de decodificar el token
-          const tokenParts = data.accessToken.split(".")
-          const header = JSON.parse(atob(tokenParts[0]))
-          const payload = JSON.parse(atob(tokenParts[1]))
+        // Guardar tokens en localStorage para persistencia
+        if (data.accessToken) {
+          localStorage.setItem("accessToken", data.accessToken)
+          console.log("Token guardado en localStorage")
 
-          // Extraer el ID de usuario del payload del token
-          if (payload.idUsuario) {
-            setUserId(payload.idUsuario)
-            console.log("ID de usuario extraído del token:", payload.idUsuario)
+          // Decodificar el token para obtener información del usuario
+          try {
+            const tokenParts = data.accessToken.split(".")
+            const payload = JSON.parse(atob(tokenParts[1]))
+
+            // Guardar información básica del usuario
+            localStorage.setItem(
+              "user",
+              JSON.stringify({
+                id: payload.idUsuario,
+                nombre: payload.nombre,
+                apellido: payload.apellido,
+                rol: payload.rol,
+              }),
+            )
+            console.log("Datos de usuario guardados en localStorage")
+
+            // Extraer el ID de usuario del payload del token
+            if (payload.idUsuario) {
+              setUserId(payload.idUsuario)
+              console.log("ID de usuario extraído del token:", payload.idUsuario)
+            }
+          } catch (tokenError) {
+            console.error("Error al procesar token:", tokenError)
           }
-        } catch (tokenError) {
-          console.error("Error al extraer ID de usuario del token:", tokenError)
         }
 
         // Verificar si la cuenta tiene contraseña vencida
@@ -124,6 +140,11 @@ export default function LoginForm() {
         } else {
           // Mostrar mensaje de éxito solo si la contraseña no está vencida
           setSuccess(true)
+
+          // SOLUCIÓN: Usar window.location.href para redirección directa
+          console.log("Redirigiendo directamente al dashboard...")
+          window.location.href = "/dashboard"
+          return // Detener la ejecución del resto del código
         }
 
         // Guardar información de depuración
@@ -161,9 +182,12 @@ export default function LoginForm() {
               setError("Tu contraseña ha vencido. Por favor, cámbiala para continuar usando el sistema.")
             } else {
               // Redirigir después de un breve retraso solo si la contraseña no está vencida
+              console.log("Preparando redirección a la página principal...")
+
+              // SOLUCIÓN ALTERNATIVA: Si la redirección directa no funcionó, intentar con router.push
               setTimeout(() => {
-                console.log("Redirigiendo a la página principal")
-                router.push("/")
+                console.log("Redirigiendo con router.push...")
+                router.push("/dashboard")
               }, 1500)
             }
           } catch (contextError) {
@@ -243,7 +267,7 @@ export default function LoginForm() {
 
   // Una vez montado, renderizamos el formulario completo
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-64px)] w-full">
+    <div className="flex items-center justify-center min-h-screen w-full">
       <div className="w-full max-w-sm sm:max-w-md md:max-w-lg p-6 bg-white rounded-lg shadow-lg">
         <div className="flex justify-center mb-6">
           <Image src="/logo.png" alt="Logo" width={100} height={100} />

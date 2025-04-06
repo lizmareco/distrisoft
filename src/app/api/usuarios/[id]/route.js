@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcrypt"
 import { validatePasswordComplexity } from "../../../../utils/passwordUtils"
+import AuditoriaService from "@/src/backend/services/auditoria-service"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
+import AuthController from "@/src/backend/controllers/auth-controller"
 
 const prisma = new PrismaClient()
 
@@ -26,15 +29,30 @@ export async function GET(request, { params }) {
       throw new Error(`Usuario con ID ${id} no encontrado`)
     }
 
-    return NextResponse.json({ usuario }, { status: 200 })
+    return NextResponse.json({ usuario }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 404 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.notFound })
   }
 }
 
 // PUT /api/usuarios/[id] - Actualizar un usuario
 export async function PUT(request, { params }) {
   try {
+    const auditoriaService = new AuditoriaService()
+    const authController = new AuthController()
+
+    // Obtener el usuario autenticado para la auditoría
+    let idUsuario = 1 // Valor por defecto para desarrollo
+
+    // Verificar si hay un usuario autenticado
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userData = await authController.getUserFromToken(accessToken)
+      if (userData) {
+        idUsuario = userData.idUsuario
+      }
+    }
+
     // Asegurarse de que params.id esté disponible antes de usarlo
     const id = await params.id
 
@@ -46,6 +64,10 @@ export async function PUT(request, { params }) {
         idUsuario: Number.parseInt(id),
         deletedAt: null,
       },
+      include: {
+        persona: true,
+        rol: true,
+      },
     })
 
     if (!usuarioExistente) {
@@ -53,7 +75,7 @@ export async function PUT(request, { params }) {
     }
 
     // Si se está cambiando la persona, verificar límite de usuarios
-    if (datos.idPersona && datos.idPersona !== usuarioExistente.idPersona) {
+    if (datos.idPersona && Number.parseInt(datos.idPersona) !== usuarioExistente.idPersona) {
       // Verificar si la persona existe
       const persona = await prisma.persona.findUnique({
         where: {
@@ -67,7 +89,7 @@ export async function PUT(request, { params }) {
       }
 
       // Verificar si la persona ya tiene un usuario activo
-      const cantidadUsuarios = await prisma.usuario.count({
+      const usuariosExistentes = await prisma.usuario.findMany({
         where: {
           idPersona: Number.parseInt(datos.idPersona),
           estado: "ACTIVO",
@@ -75,8 +97,10 @@ export async function PUT(request, { params }) {
         },
       })
 
-      if (cantidadUsuarios >= 1) {
-        throw new Error(`La persona ya tiene un usuario activo y no puede tener más`)
+      if (usuariosExistentes.length > 0) {
+        throw new Error(
+          `La persona ya tiene un usuario activo (${usuariosExistentes[0].nombreUsuario}) y no puede tener más`,
+        )
       }
     }
 
@@ -85,6 +109,7 @@ export async function PUT(request, { params }) {
       nombreUsuario: datos.nombreUsuario,
       idRol: Number.parseInt(datos.idRol),
       estado: datos.estado,
+      updatedAt: new Date(),
     }
 
     // Solo actualizar la contraseña si se proporciona una nueva
@@ -100,6 +125,7 @@ export async function PUT(request, { params }) {
       // Encriptar la nueva contraseña
       const saltRounds = 10
       datosActualizados.contrasena = await bcrypt.hash(datos.contrasena, saltRounds)
+      datosActualizados.ultimoCambioContrasena = new Date() // Actualizar fecha de último cambio
       console.log("API: Contraseña actualizada y encriptada correctamente")
     }
 
@@ -108,7 +134,7 @@ export async function PUT(request, { params }) {
       datosActualizados.idPersona = Number.parseInt(datos.idPersona)
     }
 
-    const usuario = await prisma.usuario.update({
+    const usuarioActualizado = await prisma.usuario.update({
       where: { idUsuario: Number.parseInt(id) },
       data: datosActualizados,
       include: {
@@ -117,21 +143,46 @@ export async function PUT(request, { params }) {
       },
     })
 
+    // Registrar la acción en auditoría
+    await auditoriaService.registrarActualizacion(
+      "Usuario",
+      id,
+      usuarioExistente,
+      usuarioActualizado,
+      idUsuario,
+      request,
+    )
+
     return NextResponse.json(
       {
         mensaje: "Usuario actualizado exitosamente",
-        usuario,
+        usuario: usuarioActualizado,
       },
-      { status: 200 },
+      { status: HTTP_STATUS_CODES.ok },
     )
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
   }
 }
 
 // DELETE /api/usuarios/[id] - Eliminar un usuario
 export async function DELETE(request, { params }) {
   try {
+    const auditoriaService = new AuditoriaService()
+    const authController = new AuthController()
+
+    // Obtener el usuario autenticado para la auditoría
+    let idUsuario = 1 // Valor por defecto para desarrollo
+
+    // Verificar si hay un usuario autenticado
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userData = await authController.getUserFromToken(accessToken)
+      if (userData) {
+        idUsuario = userData.idUsuario
+      }
+    }
+
     // Asegurarse de que params.id esté disponible antes de usarlo
     const id = await params.id
 
@@ -140,6 +191,10 @@ export async function DELETE(request, { params }) {
       where: {
         idUsuario: Number.parseInt(id),
         deletedAt: null,
+      },
+      include: {
+        persona: true,
+        rol: true,
       },
     })
 
@@ -156,14 +211,17 @@ export async function DELETE(request, { params }) {
       },
     })
 
+    // Registrar la acción en auditoría
+    await auditoriaService.registrarEliminacion("Usuario", id, usuarioExistente, idUsuario, request)
+
     return NextResponse.json(
       {
         mensaje: "Usuario eliminado exitosamente",
       },
-      { status: 200 },
+      { status: HTTP_STATUS_CODES.ok },
     )
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
   }
 }
 

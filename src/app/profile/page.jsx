@@ -16,7 +16,7 @@ import {
   Card,
   CardContent,
 } from "@mui/material"
-import { Person, Email, Phone, LocationOn, Badge, CalendarToday, Security, Edit } from "@mui/icons-material"
+import { Person, Email, Phone, LocationOn, Badge, CalendarToday, Security } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
 
 export default function ProfilePage() {
@@ -29,24 +29,80 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       try {
         setLoading(true)
+        console.log("Profile: Intentando cargar perfil de usuario")
+
+        // Intentar obtener el token del localStorage
+        const accessToken = localStorage.getItem("accessToken")
+        console.log("Profile: Token en localStorage:", accessToken ? "Presente" : "No encontrado")
+
         const response = await fetch("/api/usuarios/profile", {
           method: "GET",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           },
         })
 
         if (!response.ok) {
+          console.log("Profile: Error en respuesta:", response.status)
           throw new Error(`Error al obtener perfil: ${response.status}`)
         }
 
         const data = await response.json()
+        console.log("Profile: Datos de perfil recibidos:", data)
         setProfile(data)
         setError(null)
       } catch (err) {
         console.error("Error al cargar perfil:", err)
-        setError(err.message || "Error al cargar los datos del perfil")
+
+        // Intentar cargar datos básicos del localStorage como respaldo
+        try {
+          const storedUser = localStorage.getItem("user")
+          if (storedUser) {
+            const userData = JSON.parse(storedUser)
+            console.log("Profile: Usando datos básicos del localStorage como respaldo")
+            setProfile({
+              nombreUsuario: userData.nombre,
+              persona: {
+                nombre: userData.nombre,
+                apellido: userData.apellido,
+              },
+              rol: userData.rol,
+              seguridad: {
+                diasRestantesContrasena: "N/A",
+                contrasenaVencida: false,
+              },
+            })
+            setError("No se pudieron cargar todos los datos del perfil. Se muestran datos básicos.")
+          } else {
+            // SOLUCIÓN ALTERNATIVA: Intentar cargar perfil directamente sin token
+            console.log("Profile: Intentando cargar perfil sin token como último recurso")
+            try {
+              const fallbackResponse = await fetch("/api/usuarios/profile", {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              })
+
+              if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json()
+                console.log("Profile: Datos de perfil recibidos sin token:", fallbackData)
+                setProfile(fallbackData)
+                setError("Datos cargados en modo alternativo. Algunas funciones pueden estar limitadas.")
+              } else {
+                setError(err.message || "Error al cargar los datos del perfil")
+              }
+            } catch (fallbackError) {
+              console.error("Error al cargar perfil sin token:", fallbackError)
+              setError(err.message || "Error al cargar los datos del perfil")
+            }
+          }
+        } catch (backupError) {
+          console.error("Error al cargar datos de respaldo:", backupError)
+          setError(err.message || "Error al cargar los datos del perfil")
+        }
       } finally {
         setLoading(false)
       }
@@ -292,30 +348,11 @@ export default function ProfilePage() {
                   )}
                 </Grid>
 
-                <Box sx={{ mt: 3 }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<Security />}
-                    onClick={() => router.push("/profile/change-password")}
-                  >
-                    Cambiar Contraseña
-                  </Button>
-                </Box>
               </CardContent>
             </Card>
           </Grid>
         </Grid>
 
-        <Box sx={{ mt: 3, display: "flex", justifyContent: "center" }}>
-          <Button
-            variant="outlined"
-            startIcon={<Edit />}
-            onClick={() => alert("Funcionalidad de edición de perfil no implementada")}
-          >
-            Editar Perfil
-          </Button>
-        </Box>
       </Paper>
     </Container>
   )
