@@ -352,7 +352,7 @@ export default function LoginForm() {
         </form>
 
         <div className="mt-4 text-center">
-          <a href="#" className="text-sm text-gray-700 hover:text-gray-800">
+          <a href="/auth/forgot-password" className="text-sm text-gray-700 hover:text-gray-800">
             ¿Olvidaste tu contraseña?
           </a>
         </div>
@@ -360,4 +360,3 @@ export default function LoginForm() {
     </div>
   )
 }
-

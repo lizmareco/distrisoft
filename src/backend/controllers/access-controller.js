@@ -73,4 +73,27 @@ export default class AccessTokenController extends BaseController {
       return false;
     }
   }
+  /**
+   * Invalida todos los tokens de acceso de un usuario
+   * @param {number} idUsuario - ID del usuario
+   * @returns {Object} Resultado de la operación
+   */
+  async invalidateAllForUser(idUsuario) {
+    try {
+      const result = await prisma.accessToken.updateMany({
+        where: {
+          idUsuario: idUsuario,
+          deletedAt: null
+        },
+        data: {
+          deletedAt: new Date()
+        }
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error al invalidar tokens de acceso:', error);
+      throw new CustomError('Error al invalidar tokens', HTTP_STATUS_CODES.internalServerError);
+    }
+  }
 }

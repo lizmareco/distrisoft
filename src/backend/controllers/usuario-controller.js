@@ -1,6 +1,7 @@
 import { usuarioDataSource } from "../datasources/usuarioDataSource"
 import { personaController } from "./personaController"
 
+
 export const usuarioController = {
   // Obtener todos los usuarios
   obtenerUsuarios: async (req, res) => {
@@ -116,5 +117,61 @@ export const usuarioController = {
       throw new Error(`Error al eliminar usuario: ${error.message}`)
     }
   },
+  /**
+   * Actualiza la contraseña de un usuario
+   * @param {number} idUsuario - ID del usuario
+   * @param {string} nuevaContrasena - Nueva contraseña (ya hasheada)
+   * @returns {Object} Usuario actualizado
+   */
+  actualizarContrasena: async (idUsuario, nuevaContrasena) => {
+    try {
+      // Verificar si el usuario existe
+      const usuarioExistente = await usuarioDataSource.obtenerUsuarioPorId(idUsuario)
+      if (!usuarioExistente) {
+        throw new Error(`Usuario con ID ${idUsuario} no encontrado`)
+      }
+
+      const usuario = await usuarioDataSource.actualizarUsuario(idUsuario, {
+        contrasena: nuevaContrasena,
+        updatedAt: new Date()
+      })
+
+      return {
+        mensaje: "Contraseña actualizada exitosamente",
+        usuario
+      }
+    } catch (error) {
+      console.error('Error al actualizar contraseña:', error)
+      throw new Error(`Error al actualizar contraseña: ${error.message}`)
+    }
+  },
+
+  /**
+   * Actualiza la fecha de último cambio de contraseña
+   * @param {number} idUsuario - ID del usuario
+   * @returns {Object} Usuario actualizado
+   */
+  actualizarUltimoCambioContrasena: async (idUsuario) => {
+    try {
+      // Verificar si el usuario existe
+      const usuarioExistente = await usuarioDataSource.obtenerUsuarioPorId(idUsuario)
+      if (!usuarioExistente) {
+        throw new Error(`Usuario con ID ${idUsuario} no encontrado`)
+      }
+
+      const usuario = await usuarioDataSource.actualizarUsuario(idUsuario, {
+        ultimoCambioContrasena: new Date(),
+        updatedAt: new Date()
+      })
+
+      return {
+        mensaje: "Fecha de cambio de contraseña actualizada",
+        usuario
+      }
+    } catch (error) {
+      console.error('Error al actualizar fecha de cambio de contraseña:', error)
+      throw new Error(`Error al actualizar fecha: ${error.message}`)
+    }
+  }
 }
 
