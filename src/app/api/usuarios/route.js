@@ -1,12 +1,16 @@
+// Modificar las importaciones para incluir el servicio de auditoría
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { validatePasswordComplexity } from "../../../utils/passwordUtils"
+import AuditoriaService from "@/src/backend/services/auditoria-service"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
+import AuthController from "@/src/backend/controllers/auth-controller"
 
 const prisma = new PrismaClient()
 
 // GET /api/usuarios - Obtener todos los usuarios
-export async function GET() {
+export async function GET(request) {
   try {
     console.log("API: Recibida solicitud para obtener usuarios")
     const usuarios = await prisma.usuario.findMany({
@@ -43,6 +47,21 @@ export async function GET() {
 // POST /api/usuarios - Crear un nuevo usuario
 export async function POST(request) {
   try {
+    const auditoriaService = new AuditoriaService()
+    const authController = new AuthController()
+
+    // Obtener el usuario autenticado para la auditoría
+    let idUsuario = 1 // Valor por defecto para desarrollo
+
+    // Verificar si hay un usuario autenticado
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userData = await authController.getUserFromToken(accessToken)
+      if (userData) {
+        idUsuario = userData.idUsuario
+      }
+    }
+
     const datos = await request.json()
     console.log("API: Recibida solicitud para crear usuario", datos)
 
@@ -72,7 +91,7 @@ export async function POST(request) {
     }
 
     // Verificar si la persona ya tiene un usuario activo
-    const cantidadUsuarios = await prisma.usuario.count({
+    const usuariosExistentes = await prisma.usuario.findMany({
       where: {
         idPersona: Number.parseInt(datos.idPersona),
         estado: "ACTIVO",
@@ -80,8 +99,10 @@ export async function POST(request) {
       },
     })
 
-    if (cantidadUsuarios >= 1) {
-      throw new Error(`La persona ya tiene un usuario activo y no puede tener más`)
+    if (usuariosExistentes.length > 0) {
+      throw new Error(
+        `La persona ya tiene un usuario activo (${usuariosExistentes[0].nombreUsuario}) y no puede tener más`,
+      )
     }
 
     // Encriptar la contraseña
@@ -97,6 +118,7 @@ export async function POST(request) {
         idRol: Number.parseInt(datos.idRol),
         idPersona: Number.parseInt(datos.idPersona),
         estado: datos.estado || "ACTIVO",
+        ultimoCambioContrasena: new Date(), // Establecer la fecha de último cambio de contraseña
       },
       include: {
         persona: true,
@@ -104,17 +126,20 @@ export async function POST(request) {
       },
     })
 
+    // Registrar la acción en auditoría
+    await auditoriaService.registrarCreacion("Usuario", usuario.idUsuario, usuario, idUsuario, request)
+
     console.log("API: Usuario creado correctamente", usuario)
     return NextResponse.json(
       {
         mensaje: "Usuario creado exitosamente",
         usuario,
       },
-      { status: 201 },
+      { status: HTTP_STATUS_CODES.created },
     )
   } catch (error) {
     console.error("API: Error al crear usuario:", error)
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
   }
 }
 

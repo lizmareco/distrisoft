@@ -335,4 +335,3 @@ export default function ChangePassword() {
     </Container>
   )
 }
-

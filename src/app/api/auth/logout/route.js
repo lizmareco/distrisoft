@@ -12,7 +12,8 @@ export async function POST(request) {
 
     // Invalidar tokens en la base de datos
     if (accessToken) {
-      await authController.invalidarAccessToken(accessToken)
+      // Usar el método logout que ya registra la auditoría
+      await authController.logout(request, accessToken)
     }
 
     if (refreshToken) {

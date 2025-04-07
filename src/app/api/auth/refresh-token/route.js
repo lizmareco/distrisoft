@@ -2,6 +2,9 @@ import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/settings"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
 
 export async function POST(request) {
   try {

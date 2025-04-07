@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/prisma/client"
-import bcrypt from "bcrypt"
-import { verifyJWT } from "@/src/lib/jwt"
+import { PrismaClient } from "@prisma/client"
 import { cookies } from "next/headers"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
+
+const prisma = new PrismaClient()
 
 export async function POST(request) {
   try {
     const body = await request.json()
     const { currentPassword, newPassword } = body
+    const authController = new AuthController()
 
     // Obtener el token de la cookie o del encabezado de autorización
     const authHeader = request.headers.get("authorization")
@@ -21,8 +24,7 @@ export async function POST(request) {
 
     // Si no hay token en el encabezado, intentar obtenerlo de las cookies
     if (!token) {
-      // En Next.js 15, cookies() debe ser esperado (awaited)
-      const cookieStore = await cookies()
+      const cookieStore = cookies()
       const accessToken = cookieStore.get("at")?.value
       if (accessToken) {
         token = accessToken
@@ -32,110 +34,75 @@ export async function POST(request) {
 
     // Si aún no hay token, verificar si hay un ID de usuario en el cuerpo de la solicitud
     if (!token && body.userId) {
-      // Asegurarse de que userId sea un número
+      // Modificar la parte donde se procesa el userId del cuerpo de la solicitud
       const userId = Number.parseInt(body.userId, 10)
       console.log("ID de usuario convertido a número:", userId)
 
-      // Verificar que userId sea un número válido
-      if (isNaN(userId)) {
-        console.error("ID de usuario inválido:", body.userId)
-        return NextResponse.json({ error: "ID de usuario inválido" }, { status: 400 })
+      try {
+        // Usar el método cambiarContrasena del controlador que ya registra la auditoría
+        const success = await authController.cambiarContrasena(userId, currentPassword, newPassword, request)
+
+        if (success) {
+          return NextResponse.json(
+            { message: "Contraseña actualizada correctamente" },
+            { status: HTTP_STATUS_CODES.ok },
+          )
+        } else {
+          return NextResponse.json(
+            { error: "Error al cambiar la contraseña" },
+            { status: HTTP_STATUS_CODES.internalServerError },
+          )
+        }
+      } catch (error) {
+        return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
       }
-
-      // Buscar el usuario en la base de datos
-      const user = await prisma.usuario.findUnique({
-        where: {
-          idUsuario: userId, // Ya convertido a número
-        },
-      })
-
-      if (!user) {
-        console.error("Usuario no encontrado:", userId)
-        return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 })
-      }
-
-      // Verificar la contraseña actual
-      const isPasswordValid = await bcrypt.compare(currentPassword, user.contrasena)
-
-      if (!isPasswordValid) {
-        return NextResponse.json({ error: "Contraseña actual incorrecta" }, { status: 400 })
-      }
-
-      // Hashear la nueva contraseña
-      const hashedPassword = await bcrypt.hash(newPassword, 10)
-
-      // Actualizar la contraseña y el estado del usuario
-      await prisma.usuario.update({
-        where: {
-          idUsuario: userId,
-        },
-        data: {
-          contrasena: hashedPassword,
-          estado: "ACTIVO",
-          ultimoCambioContrasena: new Date(),
-        },
-      })
-
-      return NextResponse.json({ message: "Contraseña actualizada correctamente" }, { status: 200 })
     }
 
     // Verificar que haya un token
     if (!token) {
       console.error("No se encontró token de acceso")
-      return NextResponse.json({ error: "No autorizado - Token no proporcionado" }, { status: 401 })
+      return NextResponse.json(
+        { error: "No autorizado - Token no proporcionado" },
+        { status: HTTP_STATUS_CODES.unauthorized },
+      )
     }
 
     // Verificar el token y obtener el ID de usuario
-    let decoded
+    let userData
     try {
-      decoded = verifyJWT(token)
-      console.log("Token decodificado:", decoded)
+      userData = await authController.getUserFromToken(token)
+      if (!userData) {
+        throw new Error("Token inválido")
+      }
     } catch (error) {
       console.error("Error al verificar el token:", error)
-      return NextResponse.json({ error: "No autorizado - Token inválido" }, { status: 401 })
+      return NextResponse.json({ error: "No autorizado - Token inválido" }, { status: HTTP_STATUS_CODES.unauthorized })
     }
 
-    const userId = decoded.idUsuario
+    const userId = userData.idUsuario
     console.log("ID de usuario:", userId)
 
-    // Buscar el usuario en la base de datos
-    const user = await prisma.usuario.findUnique({
-      where: {
-        idUsuario: userId,
-      },
-    })
+    try {
+      // Usar el método cambiarContrasena del controlador que ya registra la auditoría
+      const success = await authController.cambiarContrasena(userId, currentPassword, newPassword, request)
 
-    if (!user) {
-      console.error("Usuario no encontrado:", userId)
-      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 })
+      if (success) {
+        return NextResponse.json({ message: "Contraseña actualizada correctamente" }, { status: HTTP_STATUS_CODES.ok })
+      } else {
+        return NextResponse.json(
+          { error: "Error al cambiar la contraseña" },
+          { status: HTTP_STATUS_CODES.internalServerError },
+        )
+      }
+    } catch (error) {
+      return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
     }
-
-    // Verificar la contraseña actual
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.contrasena)
-
-    if (!isPasswordValid) {
-      return NextResponse.json({ error: "Contraseña actual incorrecta" }, { status: 400 })
-    }
-
-    // Hashear la nueva contraseña
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
-
-    // Actualizar la contraseña y el estado del usuario
-    await prisma.usuario.update({
-      where: {
-        idUsuario: userId,
-      },
-      data: {
-        contrasena: hashedPassword,
-        estado: "ACTIVO",
-        ultimoCambioContrasena: new Date(),
-      },
-    })
-
-    return NextResponse.json({ message: "Contraseña actualizada correctamente" }, { status: 200 })
   } catch (error) {
     console.error("Error al cambiar la contraseña:", error)
-    return NextResponse.json({ error: "Error al cambiar la contraseña: " + error.message }, { status: 500 })
+    return NextResponse.json(
+      { error: "Error al cambiar la contraseña: " + error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
 
