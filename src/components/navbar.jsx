@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import {
   AppBar,
   Toolbar,
@@ -35,6 +35,7 @@ import { useRootContext } from "@/src/app/context/root"
 
 export default function Navbar() {
   const router = useRouter()
+  const pathname = usePathname()
   const { session, setState } = useRootContext()
   const [userMenuAnchor, setUserMenuAnchor] = useState(null)
   const theme = useTheme()
@@ -43,6 +44,13 @@ export default function Navbar() {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+
+  const isAuthPage = pathname.includes("/auth/") || pathname === "/auth"
+
+  // Si estamos en una página de autenticación, no renderizar el Navbar
+  if (isAuthPage) {
+    return null
+  }
 
   // Load user profile data
   useEffect(() => {
