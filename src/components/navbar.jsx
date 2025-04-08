@@ -29,9 +29,14 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
-  // Verificar si estamos en una página de autenticación
-  const isAuthPage = pathname?.includes("/auth/") || pathname === "/auth" || pathname === "/profile/change-password"
+  const isAuthPage = pathname.includes("/auth/") || pathname === "/auth"
+
+  // Si estamos en una página de autenticación, no renderizar el Navbar
+  if (isAuthPage) {
+    return null
+  }
 
   // Efecto para marcar el componente como montado y cargar notificaciones
   useEffect(() => {
