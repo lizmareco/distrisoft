@@ -21,5 +21,17 @@ export const apis = {
     url: "/api/auth/desbloquear-cuenta",
     method: "POST",
   },
+  forgotPassword: {
+    url: "/api/auth/forgot-password",
+    method: "POST"
+  },
+  validateResetToken: {
+    url: "/api/auth/validate-reset-token",
+    method: "POST"
+  },
+  resetPassword: {
+    url: "/api/auth/reset-password",
+    method: "POST"
+  },
 }
 
