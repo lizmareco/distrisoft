@@ -1,5 +1,8 @@
+import MUIRegistry from "@/src/lib/mui-registry"
 import Navbar from "@/src/components/navbar"
 import { RootProvider } from "./context/root"
+import "./globals.css" // Si tienes estilos globales
+
 
 export default function RootLayout({ children }) {
   return (
@@ -7,10 +10,9 @@ export default function RootLayout({ children }) {
       <body>
         <RootProvider>
           <Navbar />
-          <main>{children}</main>
+          <MUIRegistry>{children}</MUIRegistry>
         </RootProvider>
       </body>
     </html>
   )
 }
-
