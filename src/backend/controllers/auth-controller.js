@@ -2,8 +2,8 @@
 import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcryptjs"
-// Eliminar esta línea:
-// import { auditarAutenticacion } from "@/src/middleware/auth-audit"
+import crypto from 'crypto';
+import { enviarCorreoRecuperacion } from '../services/email-service';
 
 // Importar el servicio de vencimiento de contraseñas
 import PasswordExpirationService from "../services/password-expiration-service"
@@ -56,6 +56,9 @@ class AuthController {
   // Método para obtener información del navegador
   obtenerInfoNavegador(request) {
     return this.auditoriaService.obtenerInfoNavegador(request)
+    this.solicitarRecuperacionContrasena = this.solicitarRecuperacionContrasena.bind(this);
+    this.validarTokenRecuperacion = this.validarTokenRecuperacion.bind(this);
+    this.establecerNuevaContrasena = this.establecerNuevaContrasena.bind(this);
   }
 
   // Mejorar el método hasAccessToken para manejar mejor los tokens
@@ -1121,6 +1124,231 @@ class AuthController {
       console.error("Error al restablecer contraseña:", error)
       throw error
     }
+  }
+  async solicitarRecuperacionContrasena(data) {
+    try {
+      console.log('=== INICIO RECUPERACIÓN CONTRASEÑA ===');
+      console.log('Correo recibido:', data.correo);
+      
+      // Validar que se proporcionó un correo
+      if (!data.correo) {
+        throw new Error('El correo es requerido');
+      }
+  
+      // Primero, busca solo la persona sin incluir usuario
+      console.log('Buscando persona...');
+      const soloPersona = await prisma.persona.findFirst({
+        where: {
+          correoPersona: data.correo,
+        },
+      });
+      
+      console.log('Resultado búsqueda persona:', soloPersona ? 'ENCONTRADO' : 'NO ENCONTRADO');
+      
+      if (soloPersona) {
+        console.log('Detalles de persona encontrada:', {
+          id: soloPersona.idPersona,
+          nombre: soloPersona.nombre,
+          correo: soloPersona.correoPersona
+        });
+        
+        // Ahora busca el usuario relacionado
+        console.log('Buscando usuario relacionado...');
+        const usuarios = await prisma.usuario.findMany({
+          where: {
+            idPersona: soloPersona.idPersona,
+          },
+        });
+        
+        console.log('Usuarios encontrados:', usuarios.length);
+        
+        if (usuarios.length > 0) {
+          console.log('Usuario encontrado con ID:', usuarios[0].idUsuario);
+          
+          // Continuar con el proceso normal...
+          const usuario = usuarios[0];
+          
+          // Generar token aleatorio
+          const token = crypto.randomBytes(32).toString('hex');
+          const expiracion = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+          
+          // Invalidar tokens anteriores
+       
+          await prisma.recuperacionContrasena.updateMany({
+           
+            where: {
+              idUsuario: usuario.idUsuario,
+              usado: false
+            },
+            data: {
+              usado: true,
+              updatedAt: new Date()
+            }
+          });
+          
+          // Crear nuevo token
+          const recoveryToken = await prisma.recuperacionContrasena.create({
+            data: {
+              token,
+              expiracion,
+              idUsuario: usuario.idUsuario,
+              usado: false
+            }
+          });
+          
+          // Enviar correo con el token
+          console.log('Enviando correo a:', soloPersona.correoPersona);
+          await enviarCorreoRecuperacion(
+            soloPersona.correoPersona, 
+            recoveryToken.token, 
+            soloPersona.nombre
+          );
+          
+          console.log('Correo enviado exitosamente');
+          return { 
+            success: true, 
+            message: "Se han enviado instrucciones de recuperación a tu correo" 
+          };
+        } else {
+          console.log('No se encontró usuario para la persona con ID:', soloPersona.idPersona);
+        }
+      }
+      
+      // Si llegamos aquí, no se encontró la persona o el usuario
+      console.log(`Solicitud de recuperación fallida para: ${data.correo}`);
+      return { 
+        success: true, 
+        message: "Si el correo existe, recibirás instrucciones para recuperar tu contraseña" 
+      };
+    } catch (error) {
+      console.error("Error al solicitar recuperación de contraseña:", error);
+      throw error;
+    }
+  }
+  // Método para validar token de recuperación
+  async validarTokenRecuperacion(token) {
+    try {
+      if (!token) {
+        throw new Error('Token no proporcionado');
+      }
+
+      const recoveryToken = await prisma.recuperacionContrasena.findFirst({
+        where: {
+          token,
+          usado: false,
+          expiracion: {
+            gt: new Date()
+          }
+        },
+        include: {
+          usuario: true
+        }
+      });
+
+      if (!recoveryToken) {
+        return { valid: false };
+      }
+
+      return { 
+        valid: true, 
+        usuario: {
+          idUsuario: recoveryToken.usuario.idUsuario,
+          nombreUsuario: recoveryToken.usuario.nombreUsuario
+        }
+      };
+    } catch (error) {
+      console.error("Error al validar token de recuperación:", error);
+      throw error;
+    }
+  }
+  // Método para establecer nueva contraseña
+  async establecerNuevaContrasena(token, data) {
+    try {
+      // Validar que se proporcionó un token y contraseña
+      if (!token) {
+        throw new Error('Token no proporcionado');
+      }
+
+      if (!data.nuevaContrasena) {
+        throw new Error('La nueva contraseña es requerida');
+      }
+
+      // Verificar que el token sea válido
+      const recoveryToken = await prisma.recuperacionContrasena.findFirst({
+        where: {
+          token,
+          usado: false,
+          expiracion: {
+            gt: new Date()
+          }
+        },
+        include: {
+          usuario: true
+        }
+      });
+
+      if (!recoveryToken) {
+        throw new Error("Token inválido o expirado");
+      }
+
+      // Hashear nueva contraseña
+      const hashedPassword = await bcrypt.hash(data.nuevaContrasena, 10);
+
+      // Actualizar contraseña del usuario
+      await prisma.usuario.update({
+        where: {
+          idUsuario: recoveryToken.usuario.idUsuario
+        },
+        data: {
+          contrasena: hashedPassword,
+          ultimoCambioContrasena: new Date(),
+          updatedAt: new Date(),
+          // Si el usuario estaba bloqueado o con contraseña vencida, activarlo
+          estado: ['BLOQUEADO', 'VENCIDO'].includes(recoveryToken.usuario.estado) ? 'ACTIVO' : recoveryToken.usuario.estado
+        }
+      });
+
+      // Invalidar el token de recuperación
+      await prisma.recuperacionContrasena.update({
+        where: {
+          idRecuperacion: recoveryToken.idRecuperacion
+        },
+        data: {
+          usado: true,
+          updatedAt: new Date()
+        }
+      });
+
+      // Invalidar todas las sesiones existentes del usuario
+      await prisma.accessToken.updateMany({
+        where: {
+          idUsuario: recoveryToken.usuario.idUsuario,
+          deletedAt: null
+        },
+        data: {
+          deletedAt: new Date()
+        }
+      });
+
+      await prisma.refreshToken.updateMany({
+        where: {
+          idUsuario: recoveryToken.usuario.idUsuario,
+          deletedAt: null
+        },
+        data: {
+          deletedAt: new Date()
+        }
+      });
+
+      return { 
+        success: true, 
+        message: "Contraseña actualizada correctamente" 
+      };
+    } catch (error) {
+      console.error("Error al establecer nueva contraseña:", error);
+      throw error;
+    }
+  }  
   }
 
   // Método para cerrar sesión
