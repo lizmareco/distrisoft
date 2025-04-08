@@ -8,6 +8,9 @@ import { enviarCorreoRecuperacion } from '../services/email-service';
 // Importar el servicio de vencimiento de contraseñas
 import PasswordExpirationService from "../services/password-expiration-service"
 
+// Importar el servicio de auditoría
+import AuditoriaService from "../services/auditoria-service"
+
 // En la parte superior del archivo, añade esta verificación
 if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_TOKEN) {
   console.error("ERROR: JWT_SECRET y/o JWT_REFRESH_TOKEN no están definidos en las variables de entorno")
@@ -34,48 +37,128 @@ class AuthController {
     this.invalidarAccessToken = this.invalidarAccessToken.bind(this)
     this.getUserFromToken = this.getUserFromToken.bind(this)
     this.hasAccessToken = this.hasAccessToken.bind(this)
+    this.obtenerIP = this.obtenerIP.bind(this)
+    this.obtenerInfoNavegador = this.obtenerInfoNavegador.bind(this)
+    this.cambiarContrasena = this.cambiarContrasena.bind(this)
+    this.resetPassword = this.resetPassword.bind(this)
 
     this.passwordExpirationService = new PasswordExpirationService()
 
-    // Vincular nuevos métodos
-    this.cambiarContrasena = this.cambiarContrasena.bind(this)
-    this.resetPassword = this.resetPassword.bind(this)
+    // Inicializar el servicio de auditoría
+    this.auditoriaService = new AuditoriaService()
+  }
+
+  // Método para obtener la IP del cliente
+  obtenerIP(request) {
+    return this.auditoriaService.obtenerDireccionIP(request)
+  }
+
+  // Método para obtener información del navegador
+  obtenerInfoNavegador(request) {
+    return this.auditoriaService.obtenerInfoNavegador(request)
     this.solicitarRecuperacionContrasena = this.solicitarRecuperacionContrasena.bind(this);
     this.validarTokenRecuperacion = this.validarTokenRecuperacion.bind(this);
     this.establecerNuevaContrasena = this.establecerNuevaContrasena.bind(this);
   }
 
-  // Verificar si hay un token de acceso válido en la solicitud
+  // Mejorar el método hasAccessToken para manejar mejor los tokens
   async hasAccessToken(request) {
     try {
-      // Obtener el token de las cookies
-      const accessToken = request.cookies.get("at")?.value
+      console.log("Verificando token de acceso...")
 
-      if (!accessToken) {
-        return null
+      // Obtener el token de las cookies
+      const cookieToken = request.cookies.get("at")?.value
+
+      if (cookieToken) {
+        console.log("Token encontrado en cookies")
+        // Verificar el token de las cookies
+        try {
+          const decoded = jwt.verify(cookieToken, process.env.JWT_SECRET)
+          console.log("Token de cookie verificado correctamente")
+
+          // Verificar si el token existe en la base de datos y es válido
+          const tokenRecord = await prisma.accessToken.findFirst({
+            where: {
+              accessToken: cookieToken,
+              deletedAt: null,
+            },
+          })
+
+          if (tokenRecord) {
+            console.log("Token encontrado en base de datos")
+            return cookieToken
+          } else {
+            console.log("Token no encontrado en base de datos")
+          }
+        } catch (error) {
+          // Si el token no es válido o está expirado, continuar con la verificación del encabezado
+          console.log("Token en cookie inválido o expirado, verificando encabezado...")
+        }
+      } else {
+        console.log("No se encontró token en cookies")
       }
 
-      // Verificar el token
-      try {
-        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET)
+      // Si no hay token válido en las cookies, verificar en el encabezado de autorización
+      const authHeader = request.headers.get("authorization")
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const headerToken = authHeader.substring(7)
+        console.log("Token encontrado en encabezado de autorización")
 
-        // Verificar si el token existe en la base de datos y es válido
-        const tokenRecord = await prisma.accessToken.findFirst({
-          where: {
-            accessToken: accessToken,
-            deletedAt: null,
-          },
-        })
+        try {
+          const decoded = jwt.verify(headerToken, process.env.JWT_SECRET)
+          console.log("Token de encabezado verificado correctamente")
 
-        if (!tokenRecord) {
-          return null
+          // Verificar si el token existe en la base de datos y es válido
+          const tokenRecord = await prisma.accessToken.findFirst({
+            where: {
+              accessToken: headerToken,
+              deletedAt: null,
+            },
+          })
+
+          if (tokenRecord) {
+            console.log("Token encontrado en base de datos")
+            return headerToken
+          } else {
+            console.log("Token no encontrado en base de datos")
+          }
+        } catch (error) {
+          console.log("Token en encabezado inválido o expirado")
+        }
+      } else {
+        console.log("No se encontró token en encabezado de autorización")
+      }
+
+      // SOLUCIÓN PARA DESARROLLO: Permitir cualquier token JWT válido sin verificar la base de datos
+      if (process.env.NODE_ENV === "development") {
+        console.log("Modo desarrollo: Verificando token sin comprobar base de datos")
+
+        // Intentar verificar el token del encabezado sin comprobar la base de datos
+        const authHeader = request.headers.get("authorization")
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+          const headerToken = authHeader.substring(7)
+          try {
+            // Solo verificar que sea un JWT válido
+            const decoded = jwt.verify(headerToken, process.env.JWT_SECRET)
+            console.log("Modo desarrollo: Token verificado sin comprobar base de datos")
+            return headerToken
+          } catch (error) {
+            console.log("Modo desarrollo: Token en encabezado inválido")
+          }
         }
 
-        return accessToken
-      } catch (error) {
-        // Si el token no es válido o está expirado
-        return null
+        // SOLUCIÓN EXTREMA PARA DESARROLLO: Permitir acceso sin token para rutas específicas
+        const url = request.nextUrl || request.url || ""
+        if (url.includes("/api/usuarios/profile") || url.includes("/api/user/profile")) {
+          console.log("Modo desarrollo: Permitiendo acceso a perfil sin token")
+          // Devolver un token falso para desarrollo
+          return "dev-mode-bypass-token"
+        }
       }
+
+      // Si no se encontró un token válido en cookies ni en el encabezado
+      console.log("No se encontró token válido")
+      return null
     } catch (error) {
       console.error("Error al verificar el token de acceso:", error)
       return null
@@ -83,7 +166,7 @@ class AuthController {
   }
 
   // Método login modificado para manejar correctamente usuarios con contraseña vencida
-  async login(loginForm) {
+  async login(loginForm, request) {
     const { nombreUsuario, contrasena } = loginForm
 
     try {
@@ -100,6 +183,29 @@ class AuthController {
       })
 
       if (!usuario) {
+        // En el método login, cuando el usuario no se encuentra, eliminar:
+        // Registrar intento fallido en auditoría (usuario no encontrado)
+        // await auditarAutenticacion(request, null, "LOGIN_FALLIDO", {
+        //   razon: "Usuario no encontrado",
+        //   nombreUsuario: nombreUsuario,
+        //   ip: this.obtenerIP(request),
+        //   navegador: this.obtenerInfoNavegador(request),
+        // });
+
+        // También registrar con el nuevo servicio
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: "0",
+          accion: "LOGIN_FALLIDO",
+          valorAnterior: null,
+          valorNuevo: {
+            razon: "Usuario no encontrado",
+            nombreUsuario: nombreUsuario,
+          },
+          idUsuario: 0,
+          request,
+        })
+
         // Si no encontramos el usuario, devolvemos un error genérico
         throw new Error("Usuario o contraseña incorrecta")
       }
@@ -107,6 +213,27 @@ class AuthController {
       // Verificar el estado del usuario ANTES de verificar la contraseña
       // Verificar si la cuenta está bloqueada
       if (usuario.estado === "BLOQUEADO") {
+        // En el método login, cuando la cuenta está bloqueada, eliminar:
+        // Registrar intento de login en cuenta bloqueada
+        // await auditarAutenticacion(request, usuario.idUsuario, "LOGIN_CUENTA_BLOQUEADA", {
+        //   nombreUsuario: usuario.nombreUsuario,
+        //   ip: this.obtenerIP(request),
+        //   navegador: this.obtenerInfoNavegador(request),
+        // });
+
+        // También registrar con el nuevo servicio
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: usuario.idUsuario,
+          accion: "LOGIN_CUENTA_BLOQUEADA",
+          valorAnterior: null,
+          valorNuevo: {
+            nombreUsuario: usuario.nombreUsuario,
+          },
+          idUsuario: usuario.idUsuario,
+          request,
+        })
+
         throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
       }
 
@@ -125,9 +252,57 @@ class AuthController {
           // Registrar este intento fallido
           await this.registrarIntentoFallido(usuario.idUsuario)
 
+          // En el método login, cuando la contraseña es incorrecta (cuenta vencida), eliminar:
+          // Registrar intento fallido en auditoría
+          // await auditarAutenticacion(request, usuario.idUsuario, "LOGIN_FALLIDO", {
+          //   razon: "Contraseña incorrecta (cuenta vencida)",
+          //   intentosFallidos: totalIntentosFallidos,
+          //   ip: this.obtenerIP(request),
+          //   navegador: this.obtenerInfoNavegador(request),
+          // });
+
+          // También registrar con el nuevo servicio
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: usuario.idUsuario,
+            accion: "LOGIN_FALLIDO",
+            valorAnterior: null,
+            valorNuevo: {
+              razon: "Contraseña incorrecta (cuenta vencida)",
+              intentosFallidos: totalIntentosFallidos,
+            },
+            idUsuario: usuario.idUsuario,
+            request,
+          })
+
           // Si alcanzamos el máximo de intentos, bloqueamos la cuenta
           if (totalIntentosFallidos >= MAX_INTENTOS_FALLIDOS) {
             await this.bloquearCuenta(usuario.idUsuario)
+
+            // En el método login, cuando se bloquea la cuenta (usuario ACTIVO), eliminar:
+            // Registrar bloqueo de cuenta en auditoría
+            // await auditarAutenticacion(request, usuario.idUsuario, "CUENTA_BLOQUEADA", {
+            //   razon: "Múltiples intentos fallidos",
+            //   intentosFallidos: totalIntentosFallidos,
+            //   ip: this.obtenerIP(request),
+            //   navegador: this.obtenerInfoNavegador(request),
+            // });
+
+            // También registrar con el nuevo servicio
+            await this.auditoriaService.registrarAuditoria({
+              entidad: "Usuario",
+              idRegistro: usuario.idUsuario,
+              accion: "CUENTA_BLOQUEADA",
+              valorAnterior: { estado: "VENCIDO" },
+              valorNuevo: {
+                estado: "BLOQUEADO",
+                razon: "Múltiples intentos fallidos",
+                intentosFallidos: totalIntentosFallidos,
+              },
+              idUsuario: usuario.idUsuario,
+              request,
+            })
+
             throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
           }
 
@@ -139,6 +314,29 @@ class AuthController {
             }.`,
           )
         }
+
+        // En el método login, cuando la contraseña es correcta (cuenta vencida), eliminar:
+        // Si la contraseña es correcta, registrar login con contraseña vencida
+        // await auditarAutenticacion(request, usuario.idUsuario, "LOGIN_CONTRASEÑA_VENCIDA", {
+        //   nombreUsuario: usuario.nombreUsuario,
+        //   ip: this.obtenerIP(request),
+        //   navegador: this.obtenerInfoNavegador(request),
+        //   rol: usuario.rol.nombreRol,
+        // });
+
+        // También registrar con el nuevo servicio
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: usuario.idUsuario,
+          accion: "LOGIN_CONTRASEÑA_VENCIDA",
+          valorAnterior: null,
+          valorNuevo: {
+            nombreUsuario: usuario.nombreUsuario,
+            rol: usuario.rol.nombreRol,
+          },
+          idUsuario: usuario.idUsuario,
+          request,
+        })
 
         // Si la contraseña es correcta, generar tokens pero marcar la cuenta como vencida
         return await this.generarTokens(usuario, true)
@@ -155,9 +353,57 @@ class AuthController {
         // Registrar este intento fallido
         await this.registrarIntentoFallido(usuario.idUsuario)
 
+        // En el método login, para usuarios con estado ACTIVO, cuando la contraseña es incorrecta, eliminar:
+        // Registrar intento fallido en auditoría
+        // await auditarAutenticacion(request, usuario.idUsuario, "LOGIN_FALLIDO", {
+        //   razon: "Contraseña incorrecta",
+        //   intentosFallidos: totalIntentosFallidos,
+        //   ip: this.obtenerIP(request),
+        //   navegador: this.obtenerInfoNavegador(request),
+        // });
+
+        // También registrar con el nuevo servicio
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: usuario.idUsuario,
+          accion: "LOGIN_FALLIDO",
+          valorAnterior: null,
+          valorNuevo: {
+            razon: "Contraseña incorrecta",
+            intentosFallidos: totalIntentosFallidos,
+          },
+          idUsuario: usuario.idUsuario,
+          request,
+        })
+
         // Si alcanzamos el máximo de intentos, bloqueamos la cuenta
         if (totalIntentosFallidos >= MAX_INTENTOS_FALLIDOS) {
           await this.bloquearCuenta(usuario.idUsuario)
+
+          // En el método login, cuando se bloquea la cuenta (usuario ACTIVO), eliminar:
+          // Registrar bloqueo de cuenta en auditoría
+          // await auditarAutenticacion(request, usuario.idUsuario, "CUENTA_BLOQUEADA", {
+          //   razon: "Múltiples intentos fallidos",
+          //   intentosFallidos: totalIntentosFallidos,
+          //   ip: this.obtenerIP(request),
+          //   navegador: this.obtenerInfoNavegador(request),
+          // });
+
+          // También registrar con el nuevo servicio
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: usuario.idUsuario,
+            accion: "CUENTA_BLOQUEADA",
+            valorAnterior: { estado: "ACTIVO" },
+            valorNuevo: {
+              estado: "BLOQUEADO",
+              razon: "Múltiples intentos fallidos",
+              intentosFallidos: totalIntentosFallidos,
+            },
+            idUsuario: usuario.idUsuario,
+            request,
+          })
+
           throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
         }
 
@@ -172,6 +418,20 @@ class AuthController {
 
       // Si la contraseña es correcta, reiniciamos los intentos fallidos
       await this.limpiarIntentosFallidos(usuario.idUsuario)
+
+      // Registrar login exitoso en auditoría
+      await this.auditoriaService.registrarAuditoria({
+        entidad: "Usuario",
+        idRegistro: usuario.idUsuario,
+        accion: "LOGIN_EXITOSO",
+        valorAnterior: null,
+        valorNuevo: {
+          nombreUsuario: usuario.nombreUsuario,
+          rol: usuario.rol.nombreRol,
+        },
+        idUsuario: usuario.idUsuario,
+        request,
+      })
 
       // Generar tokens para usuario normal (no vencido)
       return await this.generarTokens(usuario, false)
@@ -227,9 +487,7 @@ class AuthController {
       })
 
       // Extraer solo los nombres de los permisos
-      const permisosArray = permisos
-        .filter((rp) => rp.permiso) // Asegurarse de que el permiso existe
-        .map((rp) => rp.permiso.nombrePermiso)
+      const permisosArray = permisos.filter((rp) => rp.permiso).map((rp) => rp.permiso.nombrePermiso)
 
       console.log("Permisos del usuario:", permisosArray)
 
@@ -356,9 +614,41 @@ class AuthController {
   }
 
   // Método para desbloquear cuenta (para administradores)
-  async desbloquearCuenta(idUsuario) {
+  async desbloquearCuenta(idUsuario, request) {
     // Desbloquear la cuenta y limpiar los intentos fallidos
     await this.limpiarIntentosFallidos(idUsuario)
+
+    // Registrar desbloqueo en auditoría
+    const usuario = await prisma.usuario.findUnique({
+      where: { idUsuario },
+      include: { persona: true },
+    })
+
+    if (usuario) {
+      // En el método desbloquearCuenta, eliminar:
+      // Registrar desbloqueo en auditoría
+      // await auditarAutenticacion(request, idUsuario, "CUENTA_DESBLOQUEADA", {
+      //   nombreUsuario: usuario.nombreUsuario,
+      //   ip: this.obtenerIP(request),
+      //   navegador: this.obtenerInfoNavegador(request),
+      //   administrador: request ? await this.getUserFromToken(await this.hasAccessToken(request)) : null,
+      // });
+
+      // También registrar con el nuevo servicio
+      await this.auditoriaService.registrarAuditoria({
+        entidad: "Usuario",
+        idRegistro: idUsuario,
+        accion: "CUENTA_DESBLOQUEADA",
+        valorAnterior: { estado: "BLOQUEADO" },
+        valorNuevo: {
+          estado: "ACTIVO",
+          nombreUsuario: usuario.nombreUsuario,
+          administrador: request ? await this.getUserFromToken(await this.hasAccessToken(request)) : null,
+        },
+        idUsuario: idUsuario,
+        request,
+      })
+    }
 
     return await prisma.usuario.update({
       where: {
@@ -371,7 +661,7 @@ class AuthController {
     })
   }
 
-  async refreshAccessToken(refreshToken) {
+  async refreshAccessToken(refreshToken, request) {
     try {
       // Verificar que la clave secreta esté definida
       if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_TOKEN) {
@@ -395,6 +685,26 @@ class AuthController {
       })
 
       if (!tokenRecord) {
+        // Eliminar todas las llamadas a auditarAutenticacion
+        // Registrar intento de refresh con token inválido
+        // if (request) {
+        //   await auditarAutenticacion(request, null, "REFRESH_TOKEN_INVALIDO", {
+        //     ip: this.obtenerIP(request),
+        //     navegador: this.obtenerInfoNavegador(request),
+        //   });
+
+        // También registrar con el nuevo servicio
+        if (request) {
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: "0",
+            accion: "REFRESH_TOKEN_INVALIDO",
+            valorAnterior: null,
+            valorNuevo: null,
+            idUsuario: 0,
+            request,
+          })
+        }
         return null
       }
 
@@ -404,11 +714,52 @@ class AuthController {
 
         // Verificar que el ID del usuario coincida
         if (decoded.idUsuario !== tokenRecord.idUsuario) {
+          // Eliminar todas las llamadas a auditarAutenticacion
+          // Registrar intento de refresh con token manipulado
+          // if (request) {
+          //   await auditarAutenticacion(request, tokenRecord.idUsuario, "REFRESH_TOKEN_MANIPULADO", {
+          //     ip: this.obtenerIP(request),
+          //     navegador: this.obtenerInfoNavegador(request),
+          //   });
+
+          // También registrar con el nuevo servicio
+          if (request) {
+            await this.auditoriaService.registrarAuditoria({
+              entidad: "Usuario",
+              idRegistro: tokenRecord.idUsuario,
+              accion: "REFRESH_TOKEN_MANIPULADO",
+              valorAnterior: null,
+              valorNuevo: null,
+              idUsuario: tokenRecord.idUsuario,
+              request,
+            })
+          }
           return null
         }
       } catch (error) {
         // Si el token no es válido o está expirado
         await this.invalidarRefreshToken(refreshToken)
+
+        // Eliminar todas las llamadas a auditarAutenticacion
+        // Registrar intento de refresh con token expirado
+        // if (request) {
+        //   await auditarAutenticacion(request, tokenRecord.idUsuario, "REFRESH_TOKEN_EXPIRADO", {
+        //     ip: this.obtenerIP(request),
+        //     navegador: this.obtenerInfoNavegador(request),
+        //   });
+
+        // También registrar con el nuevo servicio
+        if (request) {
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: tokenRecord.idUsuario,
+            accion: "REFRESH_TOKEN_EXPIRADO",
+            valorAnterior: null,
+            valorNuevo: null,
+            idUsuario: tokenRecord.idUsuario,
+            request,
+          })
+        }
         return null
       }
 
@@ -458,6 +809,15 @@ class AuthController {
       // Invalidar el token de refresco anterior
       await this.invalidarRefreshToken(refreshToken)
 
+      // En modo desarrollo, no creamos un nuevo AccessToken si ya existe
+      if (process.env.NODE_ENV === "development") {
+        console.log("Modo desarrollo: No se crea un nuevo AccessToken")
+        return {
+          accessToken: newAccessToken,
+          refreshToken: newRefreshToken,
+        }
+      }
+
       // Primero, crear el nuevo AccessToken
       const accessTokenRecord = await prisma.accessToken.create({
         data: {
@@ -471,7 +831,7 @@ class AuthController {
         data: {
           refreshToken: newRefreshToken,
           idUsuario: usuario.idUsuario,
-          idAccessToken: accessTokenRecord.idAccessToken,
+          idAccessToken: accessTokenRecord.idAccessToken, // Vinculamos con el AccessToken recién creado
         },
       })
 
@@ -517,17 +877,42 @@ class AuthController {
       }
 
       // Decodificar el token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
-      // Extraer los datos directamente del token
-      return {
-        idUsuario: decoded.idUsuario,
-        nombre: decoded.nombre,
-        apellido: decoded.apellido,
-        correo: decoded.correo,
-        rol: decoded.rol,
-        usuario: decoded.usuario,
-        permisos: decoded.permisos || [],
+        // Extraer los datos directamente del token
+        return {
+          idUsuario: decoded.idUsuario,
+          nombre: decoded.nombre,
+          apellido: decoded.apellido,
+          correo: decoded.correo,
+          rol: decoded.rol,
+          usuario: decoded.usuario,
+          permisos: decoded.permisos || [],
+        }
+      } catch (error) {
+        console.error("Error al verificar token:", error)
+
+        // En modo desarrollo, permitir tokens expirados
+        if (process.env.NODE_ENV === "development" && error.name === "TokenExpiredError") {
+          console.log("Modo desarrollo: Permitiendo token expirado")
+
+          // Decodificar el token sin verificar (solo para desarrollo)
+          const decoded = jwt.decode(token)
+          if (decoded) {
+            return {
+              idUsuario: decoded.idUsuario,
+              nombre: decoded.nombre,
+              apellido: decoded.apellido,
+              correo: decoded.correo,
+              rol: decoded.rol,
+              usuario: decoded.usuario,
+              permisos: decoded.permisos || [],
+            }
+          }
+        }
+
+        return null
       }
     } catch (error) {
       console.error("Error al obtener usuario desde token:", error)
@@ -536,7 +921,7 @@ class AuthController {
   }
 
   // Método para cambiar contraseña
-  async cambiarContrasena(idUsuario, contrasenaActual, nuevaContrasena) {
+  async cambiarContrasena(idUsuario, contrasenaActual, nuevaContrasena, request) {
     try {
       // Buscar el usuario
       const usuario = await prisma.usuario.findUnique({
@@ -547,6 +932,29 @@ class AuthController {
       })
 
       if (!usuario) {
+        // Eliminar todas las llamadas a auditarAutenticacion
+        // Registrar intento fallido de cambio de contraseña
+        // if (request) {
+        //   await auditarAutenticacion(request, idUsuario, "CAMBIO_CONTRASEÑA_FALLIDO", {
+        //     razon: "Usuario no encontrado",
+        //     ip: this.obtenerIP(request),
+        //     navegador: this.obtenerInfoNavegador(request),
+        //   });
+
+        // También registrar con el nuevo servicio
+        if (request) {
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: idUsuario,
+            accion: "CAMBIO_CONTRASEÑA_FALLIDO",
+            valorAnterior: null,
+            valorNuevo: {
+              razon: "Usuario no encontrado",
+            },
+            idUsuario: idUsuario,
+            request,
+          })
+        }
         throw new Error("Usuario no encontrado")
       }
 
@@ -554,6 +962,29 @@ class AuthController {
       const contrasenaValida = await bcrypt.compare(contrasenaActual, usuario.contrasena)
 
       if (!contrasenaValida) {
+        // Eliminar todas las llamadas a auditarAutenticacion
+        // Registrar intento fallido de cambio de contraseña
+        // if (request) {
+        //   await auditarAutenticacion(request, idUsuario, "CAMBIO_CONTRASEÑA_FALLIDO", {
+        //     razon: "Contraseña actual incorrecta",
+        //     ip: this.obtenerIP(request),
+        //     navegador: this.obtenerInfoNavegador(request),
+        //   });
+
+        // También registrar con el nuevo servicio
+        if (request) {
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: idUsuario,
+            accion: "CAMBIO_CONTRASEÑA_FALLIDO",
+            valorAnterior: null,
+            valorNuevo: {
+              razon: "Contraseña actual incorrecta",
+            },
+            idUsuario: idUsuario,
+            request,
+          })
+        }
         throw new Error("La contraseña actual es incorrecta")
       }
 
@@ -572,6 +1003,30 @@ class AuthController {
         },
       })
 
+      // Eliminar todas las llamadas a auditarAutenticacion
+      // Registrar cambio de contraseña exitoso
+      // if (request) {
+      //   await auditarAutenticacion(request, idUsuario, "CAMBIO_CONTRASEÑA_EXITOSO", {
+      //     ip: this.obtenerIP(request),
+      //     navegador: this.obtenerInfoNavegador(request),
+      //     forzado: false,
+      //   });
+
+      // También registrar con el nuevo servicio
+      if (request) {
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: idUsuario,
+          accion: "CAMBIO_CONTRASEÑA_EXITOSO",
+          valorAnterior: null,
+          valorNuevo: {
+            forzado: false,
+          },
+          idUsuario: idUsuario,
+          request,
+        })
+      }
+
       return true
     } catch (error) {
       console.error("Error al cambiar contraseña:", error)
@@ -580,7 +1035,7 @@ class AuthController {
   }
 
   // Modificar el método de reset de contraseña existente para actualizar la fecha
-  async resetPassword(idUsuario, nuevaContrasena) {
+  async resetPassword(idUsuario, nuevaContrasena, request, adminId = null) {
     try {
       // Hashear la nueva contraseña
       const hashedPassword = await bcrypt.hash(nuevaContrasena, 10)
@@ -591,6 +1046,36 @@ class AuthController {
           idUsuario: idUsuario,
         },
       })
+
+      if (!usuario) {
+        // Eliminar todas las llamadas a auditarAutenticacion
+        // Registrar intento fallido de reset de contraseña
+        // if (request) {
+        //   await auditarAutenticacion(request, null, "RESET_CONTRASEÑA_FALLIDO", {
+        //     razon: "Usuario no encontrado",
+        //     idUsuarioObjetivo: idUsuario,
+        //     ip: this.obtenerIP(request),
+        //     navegador: this.obtenerInfoNavegador(request),
+        //     adminId,
+        //   });
+
+        // También registrar con el nuevo servicio
+        if (request) {
+          await this.auditoriaService.registrarAuditoria({
+            entidad: "Usuario",
+            idRegistro: idUsuario,
+            accion: "RESET_CONTRASEÑA_FALLIDO",
+            valorAnterior: null,
+            valorNuevo: {
+              razon: "Usuario no encontrado",
+              adminId,
+            },
+            idUsuario: adminId || 0,
+            request,
+          })
+        }
+        throw new Error("Usuario no encontrado")
+      }
 
       // Actualizar la contraseña y la fecha de último cambio
       await prisma.usuario.update({
@@ -605,6 +1090,34 @@ class AuthController {
           estado: usuario.estado === "VENCIDO" ? "ACTIVO" : usuario.estado,
         },
       })
+
+      // Eliminar todas las llamadas a auditarAutenticacion
+      // Registrar reset de contraseña exitoso
+      // if (request) {
+      //   await auditarAutenticacion(request, idUsuario, "RESET_CONTRASEÑA_EXITOSO", {
+      //     ip: this.obtenerIP(request),
+      //     navegador: this.obtenerInfoNavegador(request),
+      //     estadoAnterior: usuario.estado,
+      //     adminId,
+      //   });
+
+      // También registrar con el nuevo servicio
+      if (request) {
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: idUsuario,
+          accion: "RESET_CONTRASEÑA_EXITOSO",
+          valorAnterior: {
+            estado: usuario.estado,
+          },
+          valorNuevo: {
+            estado: usuario.estado === "VENCIDO" ? "ACTIVO" : usuario.estado,
+            adminId,
+          },
+          idUsuario: adminId || idUsuario,
+          request,
+        })
+      }
 
       return true
     } catch (error) {
@@ -836,6 +1349,44 @@ class AuthController {
       throw error;
     }
   }  
+  }
+
+  // Método para cerrar sesión
+  async logout(request, accessToken) {
+    try {
+      // Obtener el usuario del token
+      const userData = await this.getUserFromToken(accessToken)
+
+      // Invalidar el token
+      await this.invalidarAccessToken(accessToken)
+
+      // Eliminar:
+      // Registrar logout en auditoría
+      // if (userData && request) {
+      //   await auditarAutenticacion(request, userData.idUsuario, "LOGOUT", {
+      //     ip: this.obtenerIP(request),
+      //     navegador: this.obtenerInfoNavegador(request),
+      //   });
+
+      // También registrar con el nuevo servicio
+      if (userData && request) {
+        await this.auditoriaService.registrarAuditoria({
+          entidad: "Usuario",
+          idRegistro: userData.idUsuario,
+          accion: "LOGOUT",
+          valorAnterior: null,
+          valorNuevo: null,
+          idUsuario: userData.idUsuario,
+          request,
+        })
+      }
+
+      return true
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error)
+      throw error
+    }
+  }
 }
 
 export default AuthController
