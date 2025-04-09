@@ -1,10 +1,10 @@
-import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/settings"
+import { NextResponse } from "next/server"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
-import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/prisma/client"
 
-const prisma = new PrismaClient()
+// Importamos las constantes desde settings.js
+import { ACCESS_TOKEN_MAX_AGE, REFRESH_TOKEN_MAX_AGE } from "@/settings"
 
 export async function POST(request) {
   try {
@@ -17,13 +17,23 @@ export async function POST(request) {
       return NextResponse.json({ accessToken, message: "Ya has iniciado sesión" }, { status: HTTP_STATUS_CODES.ok })
     }
 
+    // Clonar la solicitud para poder leer el cuerpo múltiples veces
+    const requestClone = request.clone()
     const loginForm = await request.json()
     console.log("API login: Datos recibidos", { nombreUsuario: loginForm.nombreUsuario })
 
+    // Añadir logs para depuración de headers
+    console.log("Headers de la solicitud:", {
+      userAgent: request.headers.get("user-agent"),
+      forwardedFor: request.headers.get("x-forwarded-for"),
+      realIp: request.headers.get("x-real-ip"),
+      cfConnectingIp: request.headers.get("cf-connecting-ip"),
+    })
+
     try {
       console.log("API login: Intentando autenticar usuario")
-      // Asegurarse de pasar el objeto request al método login
-      const result = await authController.login(loginForm, request)
+      // Pasar la solicitud completa al método login
+      const result = await authController.login(loginForm, requestClone)
 
       if (!result || !result.accessToken) {
         console.log("API login: Autenticación fallida - No se generaron tokens")
@@ -33,27 +43,20 @@ export async function POST(request) {
         )
       }
 
-      // Extraer los tokens y la información de cuenta vencida
-      const { accessToken, refreshToken, cuentaVencida } = result
+      // Resto del código existente...
+      const { accessToken, refreshToken, cuentaVencida, user } = result
       console.log("API login: Autenticación exitosa", cuentaVencida ? "- Cuenta con contraseña vencida" : "")
 
       // Decodificar el token para obtener los datos del usuario
       const userData = await authController.getUserFromToken(accessToken)
       console.log("API login: Datos del usuario extraídos del token", userData)
 
-      // Nota: No es necesario registrar el login exitoso aquí, ya se registra en el controlador de autenticación
       const response = NextResponse.json(
         {
           accessToken,
-          refreshToken,
           cuentaVencida: cuentaVencida,
-          user: {
-            id: userData.idUsuario,
-            nombre: userData.nombre,
-            apellido: userData.apellido,
-            correo: userData.correo,
-            rol: userData.rol,
-          },
+          userId: result.userId || userData.idUsuario,
+          user: user || userData, // Incluir los datos del usuario completos
         },
         { status: HTTP_STATUS_CODES.ok },
       )
@@ -75,14 +78,17 @@ export async function POST(request) {
       console.log("API login: Cookies establecidas y respuesta preparada")
       return response
     } catch (error) {
+      // Código existente para manejar errores...
       console.error("API login: Error específico durante autenticación:", error)
-
-      // Capturar errores específicos del login
       const errorMessage = error.message || "Ha ocurrido un error"
       console.log("API login: Mensaje de error:", errorMessage)
 
-      // Verificar si es un error de cuenta bloqueada
+      // Resto del código de manejo de errores...
+      // [Código existente para manejar diferentes tipos de errores]
+
+      // Verificar si es un error de cuenta bloqueada - PRIORIDAD 1
       if (errorMessage.includes("bloqueada")) {
+        console.log("API login: Cuenta bloqueada detectada")
         return NextResponse.json(
           {
             message: errorMessage,
@@ -92,19 +98,57 @@ export async function POST(request) {
         )
       }
 
-      // Verificar si es un error de contraseña vencida
-      if (errorMessage.includes("contraseña ha vencido")) {
-        console.log("API login: Detectada cuenta con contraseña vencida")
+      // Verificar si es un error de cuenta inactiva - PRIORIDAD 2
+      if (errorMessage.includes("inactiva")) {
+        console.log("API login: Cuenta inactiva detectada")
         return NextResponse.json(
           {
             message: errorMessage,
-            cuentaVencida: true,
+            cuentaInactiva: true,
           },
           { status: HTTP_STATUS_CODES.forbidden },
         )
       }
 
-      // Verificar si es un error de intentos restantes
+      // Verificar si es un error de contraseña vencida - PRIORIDAD 3
+      if (errorMessage.includes("vencida") || errorMessage.includes("vencido")) {
+        console.log("API login: Cuenta con contraseña vencida detectada")
+
+        // Intentar obtener el ID del usuario si está disponible en el error
+        let userId = null
+        try {
+          // Intentar extraer el ID del usuario del mensaje de error o del contexto
+          if (loginForm && loginForm.nombreUsuario) {
+            const usuario = await prisma.usuario.findFirst({
+              where: {
+                nombreUsuario: loginForm.nombreUsuario,
+                deletedAt: null,
+              },
+              select: {
+                idUsuario: true,
+              },
+            })
+
+            if (usuario) {
+              userId = usuario.idUsuario
+              console.log("API login: ID de usuario recuperado:", userId)
+            }
+          }
+        } catch (idError) {
+          console.error("Error al obtener ID de usuario:", idError)
+        }
+
+        return NextResponse.json(
+          {
+            message: errorMessage,
+            cuentaVencida: true,
+            userId: userId, // Incluir el ID del usuario si está disponible
+          },
+          { status: HTTP_STATUS_CODES.forbidden },
+        )
+      }
+
+      // Verificar si es un error de intentos restantes - PRIORIDAD 4
       if (errorMessage.includes("Te quedan")) {
         // Extraer el número de intentos restantes del mensaje
         const intentosRestantes = Number.parseInt(errorMessage.match(/Te quedan (\d+)/)[1])
@@ -132,4 +176,3 @@ export async function POST(request) {
     }
   }
 }
-

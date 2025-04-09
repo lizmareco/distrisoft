@@ -33,6 +33,7 @@ import { useRootContext } from "@/src/app/context/root"
 export default function DashboardPage() {
   const router = useRouter()
   const { session } = useRootContext()
+  console.log ("DashboardPage session:", session)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userInfo, setUserInfo] = useState(null)

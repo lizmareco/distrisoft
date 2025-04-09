@@ -31,18 +31,17 @@ export default function Navbar() {
   const [loading, setLoading] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
-  const isAuthPage = pathname.includes("/auth/") || pathname === "/auth"
-
-  // Si estamos en una página de autenticación, no renderizar el Navbar
-  if (isAuthPage) {
-    return null
-  }
+  // Verificar si estamos en una página de autenticación
+  const isAuthPage = pathname?.includes("/auth/") || pathname === "/auth" || pathname === "/profile/change-password"
 
   // Efecto para marcar el componente como montado y cargar notificaciones
   useEffect(() => {
     setMounted(true)
 
-    // Solo cargar notificaciones si no estamos en una página de autenticació
+    // Solo cargar notificaciones si no estamos en una página de autenticación y el componente está montado
+    if (!isAuthPage && mounted) {
+      fetchNotifications()
+    }
   }, [isAuthPage, mounted])
 
   // Función para cargar notificaciones
@@ -122,13 +121,8 @@ export default function Navbar() {
   // Calcular notificaciones no leídas
   const unreadCount = notifications.filter((n) => !n.leido).length
 
-  // No renderizar durante la hidratación
-  if (!mounted) {
-    return null
-  }
-
-  // No renderizar en páginas de autenticación
-  if (isAuthPage) {
+  // No renderizar durante la hidratación o en páginas de autenticación
+  if (!mounted || isAuthPage) {
     return null
   }
 

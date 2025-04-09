@@ -25,6 +25,7 @@ export function RootProvider({ children }) {
 
         if (storedUser && accessToken) {
           const userData = JSON.parse(storedUser)
+          console.log("User data loaded from localStorage:", userData)
           setSession({
             ...userData,
             token: accessToken,

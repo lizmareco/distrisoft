@@ -165,9 +165,43 @@ class AuthController {
     }
   }
 
+  /**
+   * Extrae el nombre del navegador de la cadena user-agent
+   */
+  obtenerNombreNavegador(userAgent) {
+    if (!userAgent) return "Desconocido"
+
+    // Detectar navegadores comunes
+    if (userAgent.includes("Chrome") && !userAgent.includes("Edg") && !userAgent.includes("OPR")) {
+      return "Chrome"
+    } else if (userAgent.includes("Firefox")) {
+      return "Firefox"
+    } else if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
+      return "Safari"
+    } else if (userAgent.includes("Edg")) {
+      return "Edge"
+    } else if (userAgent.includes("OPR") || userAgent.includes("Opera")) {
+      return "Opera"
+    } else if (userAgent.includes("MSIE") || userAgent.includes("Trident/")) {
+      return "Internet Explorer"
+    } else {
+      return "Otro"
+    }
+  }
+
   // Método login modificado para manejar correctamente usuarios con contraseña vencida
   async login(loginForm, request) {
     const { nombreUsuario, contrasena } = loginForm
+
+    // Extraer información de IP y navegador usando el servicio de auditoría
+    const ip = this.auditoriaService.obtenerDireccionIP(request)
+    const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
+    console.log("Información de solicitud:", {
+      navegador,
+      ip,
+      headers: Object.fromEntries([...request.headers.entries()]),
+    })
 
     try {
       // Buscar el usuario directamente por nombreUsuario
@@ -203,7 +237,8 @@ class AuthController {
             nombreUsuario: nombreUsuario,
           },
           idUsuario: 0,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
 
         // Si no encontramos el usuario, devolvemos un error genérico
@@ -231,7 +266,8 @@ class AuthController {
             nombreUsuario: usuario.nombreUsuario,
           },
           idUsuario: usuario.idUsuario,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
 
         throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
@@ -272,7 +308,8 @@ class AuthController {
               intentosFallidos: totalIntentosFallidos,
             },
             idUsuario: usuario.idUsuario,
-            request,
+            direccionIP: ip,
+            navegador: navegador,
           })
 
           // Si alcanzamos el máximo de intentos, bloqueamos la cuenta
@@ -300,7 +337,8 @@ class AuthController {
                 intentosFallidos: totalIntentosFallidos,
               },
               idUsuario: usuario.idUsuario,
-              request,
+              direccionIP: ip,
+              navegador: navegador,
             })
 
             throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
@@ -335,7 +373,8 @@ class AuthController {
             rol: usuario.rol.nombreRol,
           },
           idUsuario: usuario.idUsuario,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
 
         // Si la contraseña es correcta, generar tokens pero marcar la cuenta como vencida
@@ -373,7 +412,8 @@ class AuthController {
             intentosFallidos: totalIntentosFallidos,
           },
           idUsuario: usuario.idUsuario,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
 
         // Si alcanzamos el máximo de intentos, bloqueamos la cuenta
@@ -401,7 +441,8 @@ class AuthController {
               intentosFallidos: totalIntentosFallidos,
             },
             idUsuario: usuario.idUsuario,
-            request,
+            direccionIP: ip,
+            navegador: navegador,
           })
 
           throw new Error("Tu cuenta ha sido bloqueada por múltiples intentos fallidos. Contacta al administrador.")
@@ -430,7 +471,8 @@ class AuthController {
           rol: usuario.rol.nombreRol,
         },
         idUsuario: usuario.idUsuario,
-        request,
+        direccionIP: ip,
+        navegador: navegador,
       })
 
       // Generar tokens para usuario normal (no vencido)
@@ -646,7 +688,8 @@ class AuthController {
           administrador: request ? await this.getUserFromToken(await this.hasAccessToken(request)) : null,
         },
         idUsuario: idUsuario,
-        request,
+        direccionIP: ip,
+        navegador: navegador,
       })
     }
 
@@ -952,7 +995,8 @@ class AuthController {
               razon: "Usuario no encontrado",
             },
             idUsuario: idUsuario,
-            request,
+            direccionIP: ip,
+            navegador: navegador,
           })
         }
         throw new Error("Usuario no encontrado")
@@ -982,7 +1026,8 @@ class AuthController {
               razon: "Contraseña actual incorrecta",
             },
             idUsuario: idUsuario,
-            request,
+            direccionIP: ip,
+            navegador: navegador,
           })
         }
         throw new Error("La contraseña actual es incorrecta")
@@ -1023,7 +1068,8 @@ class AuthController {
             forzado: false,
           },
           idUsuario: idUsuario,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
       }
 
@@ -1071,7 +1117,8 @@ class AuthController {
               adminId,
             },
             idUsuario: adminId || 0,
-            request,
+            direccionIP: ip,
+            navegador: navegador,
           })
         }
         throw new Error("Usuario no encontrado")
@@ -1115,7 +1162,8 @@ class AuthController {
             adminId,
           },
           idUsuario: adminId || idUsuario,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
       }
 
@@ -1375,7 +1423,8 @@ class AuthController {
           valorAnterior: null,
           valorNuevo: null,
           idUsuario: userData.idUsuario,
-          request,
+          direccionIP: ip,
+          navegador: navegador,
         })
       }
 
@@ -1388,4 +1437,3 @@ class AuthController {
 }
 
 export default AuthController
-
