@@ -1348,9 +1348,7 @@ class AuthController {
       console.error("Error al establecer nueva contraseña:", error);
       throw error;
     }
-  }  
   }
-
   // Método para cerrar sesión
   async logout(request, accessToken) {
     try {

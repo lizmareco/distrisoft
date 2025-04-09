@@ -42,10 +42,7 @@ export default function Navbar() {
   useEffect(() => {
     setMounted(true)
 
-    // Solo cargar notificaciones si no estamos en una página de autenticación
-    if (!isAuthPage && mounted) {
-      fetchNotifications()
-    }
+    // Solo cargar notificaciones si no estamos en una página de autenticació
   }, [isAuthPage, mounted])
 
   // Función para cargar notificaciones
