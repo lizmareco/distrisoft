@@ -17,10 +17,11 @@ import {
   CircularProgress,
   Alert,
   Autocomplete,
-  FormHelperText,
   Divider,
-  Switch,
+  Radio,
+  RadioGroup,
   FormControlLabel,
+  FormLabel,
 } from "@mui/material"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import SaveIcon from "@mui/icons-material/Save"
@@ -31,20 +32,23 @@ import Link from "next/link"
 export default function NuevoClientePage() {
   const router = useRouter()
 
+  // Estado para controlar el tipo de cliente (persona o empresa)
+  const [tipoCliente, setTipoCliente] = useState("persona")
+
   const [formData, setFormData] = useState({
     idPersona: "",
+    idEmpresa: "",
     idSectorCliente: "",
     idCondicionPago: "",
-    idEmpresa: null,
   })
 
   const [personas, setPersonas] = useState([])
+  const [empresas, setEmpresas] = useState([])
   const [sectoresCliente, setSectoresCliente] = useState([])
   const [condicionesPago, setCondicionesPago] = useState([])
-  const [empresas, setEmpresas] = useState([])
 
   const [selectedPersona, setSelectedPersona] = useState(null)
-  const [asociarEmpresa, setAsociarEmpresa] = useState(false)
+  const [selectedEmpresa, setSelectedEmpresa] = useState(null)
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -55,33 +59,33 @@ export default function NuevoClientePage() {
       try {
         console.log("Cargando datos para nuevo cliente...")
         // Cargar datos relacionados
-        const [personasRes, sectoresRes, condicionesRes, empresasRes] = await Promise.all([
-          fetch("/api/personas"),
+        const [personasRes, empresasRes, sectoresRes, condicionesRes] = await Promise.all([
+          fetch("/api/personas/disponibles"),
+          fetch("/api/empresas/disponibles"),
           fetch("/api/sectores-cliente"),
           fetch("/api/condiciones-pago"),
-          fetch("/api/empresas"),
         ])
 
-        if (!personasRes.ok || !sectoresRes.ok || !condicionesRes.ok || !empresasRes.ok) {
+        if (!personasRes.ok || !empresasRes.ok || !sectoresRes.ok || !condicionesRes.ok) {
           throw new Error("Error al cargar datos de referencia")
         }
 
-        const [personasData, sectoresData, condicionesData, empresasData] = await Promise.all([
+        const [personasData, empresasData, sectoresData, condicionesData] = await Promise.all([
           personasRes.json(),
+          empresasRes.json(),
           sectoresRes.json(),
           condicionesRes.json(),
-          empresasRes.json(),
         ])
 
-        console.log("Personas cargadas:", personasData.length)
+        console.log("Personas disponibles cargadas:", personasData.length)
+        console.log("Empresas disponibles cargadas:", empresasData.length)
         console.log("Sectores cargados:", sectoresData.length)
         console.log("Condiciones cargadas:", condicionesData.length)
-        console.log("Empresas cargadas:", empresasData.length)
 
         setPersonas(personasData)
+        setEmpresas(empresasData)
         setSectoresCliente(sectoresData)
         setCondicionesPago(condicionesData)
-        setEmpresas(empresasData)
       } catch (error) {
         console.error("Error al cargar datos:", error)
         setError(error.message)
@@ -101,6 +105,21 @@ export default function NuevoClientePage() {
     }))
   }
 
+  const handleTipoClienteChange = (event) => {
+    const newTipoCliente = event.target.value
+    setTipoCliente(newTipoCliente)
+
+    // Resetear los valores relacionados con el tipo de cliente anterior
+    setFormData((prev) => ({
+      ...prev,
+      idPersona: "",
+      idEmpresa: "",
+    }))
+
+    setSelectedPersona(null)
+    setSelectedEmpresa(null)
+  }
+
   const handlePersonaChange = (event, newValue) => {
     setSelectedPersona(newValue)
     if (newValue) {
@@ -116,12 +135,20 @@ export default function NuevoClientePage() {
     }
   }
 
-  const handleAsociarEmpresaChange = (event) => {
-    setAsociarEmpresa(event.target.checked)
-    if (!event.target.checked) {
+  const handleEmpresaChange = (event, newValue) => {
+    setSelectedEmpresa(newValue)
+    if (newValue) {
       setFormData((prev) => ({
         ...prev,
-        idEmpresa: null,
+        idEmpresa: newValue.idEmpresa.toString(),
+        // Si seleccionamos una empresa, también establecemos la persona de contacto como idPersona
+        idPersona: newValue.personaContacto ? newValue.personaContacto.toString() : "",
+      }))
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        idEmpresa: "",
+        idPersona: "",
       }))
     }
   }
@@ -129,9 +156,24 @@ export default function NuevoClientePage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validar que se haya seleccionado una persona
-    if (!formData.idPersona) {
+    // Validar según el tipo de cliente
+    if (tipoCliente === "persona" && !formData.idPersona) {
       setError("Debe seleccionar una persona para el cliente")
+      return
+    }
+
+    if (tipoCliente === "empresa" && !formData.idEmpresa) {
+      setError("Debe seleccionar una empresa para el cliente")
+      return
+    }
+
+    if (!formData.idSectorCliente) {
+      setError("Debe seleccionar un sector para el cliente")
+      return
+    }
+
+    if (!formData.idCondicionPago) {
+      setError("Debe seleccionar una condición de pago para el cliente")
       return
     }
 
@@ -139,12 +181,24 @@ export default function NuevoClientePage() {
     setError(null)
 
     try {
+      // Preparar datos para enviar
+      const clienteData = {
+        idPersona: formData.idPersona,
+        idSectorCliente: formData.idSectorCliente,
+        idCondicionPago: formData.idCondicionPago,
+      }
+
+      // Si es una empresa, añadir el idEmpresa
+      if (tipoCliente === "empresa" && formData.idEmpresa) {
+        clienteData.idEmpresa = formData.idEmpresa
+      }
+
       const response = await fetch("/api/clientes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(clienteData),
       })
 
       if (!response.ok) {
@@ -205,69 +259,166 @@ export default function NuevoClientePage() {
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
-              <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
-                <PersonIcon sx={{ mr: 1 }} /> Información Personal
-              </Typography>
-              <Divider sx={{ mb: 2 }} />
+              <FormControl component="fieldset">
+                <FormLabel component="legend">Tipo de Cliente</FormLabel>
+                <RadioGroup row name="tipoCliente" value={tipoCliente} onChange={handleTipoClienteChange}>
+                  <FormControlLabel value="persona" control={<Radio />} label="Persona" />
+                  <FormControlLabel value="empresa" control={<Radio />} label="Empresa" />
+                </RadioGroup>
+              </FormControl>
             </Grid>
 
-            <Grid item xs={12}>
-              <Autocomplete
-                id="persona-select"
-                options={personas}
-                getOptionLabel={(option) => `${option.nombre} ${option.apellido} - ${option.nroDocumento}`}
-                value={selectedPersona}
-                onChange={handlePersonaChange}
-                isOptionEqualToValue={(option, value) => option.idPersona === value.idPersona}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Seleccionar Persona"
-                    required
-                    error={!formData.idPersona && submitting}
-                    helperText={!formData.idPersona && submitting ? "Debe seleccionar una persona" : ""}
-                  />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <Box sx={{ display: "flex", flexDirection: "column" }}>
-                      <Typography variant="body1">{`${option.nombre} ${option.apellido}`}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {`${option.tipoDocumento?.descTipoDocumento || "Doc"}: ${option.nroDocumento} | ${option.correoPersona}`}
-                      </Typography>
-                    </Box>
-                  </li>
-                )}
-              />
-            </Grid>
+            {tipoCliente === "persona" && (
+              <>
+                <Grid item xs={12}>
+                  <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
+                    <PersonIcon sx={{ mr: 1 }} /> Información Personal
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                </Grid>
 
-            {selectedPersona && (
-              <Grid item xs={12} container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Documento"
-                    value={`${selectedPersona.tipoDocumento?.descTipoDocumento || "Doc"}: ${selectedPersona.nroDocumento}`}
-                    InputProps={{ readOnly: true }}
+                <Grid item xs={12}>
+                  <Autocomplete
+                    id="persona-select"
+                    options={personas}
+                    getOptionLabel={(option) => `${option.nombre} ${option.apellido} - ${option.nroDocumento}`}
+                    value={selectedPersona}
+                    onChange={handlePersonaChange}
+                    isOptionEqualToValue={(option, value) => option.idPersona === value.idPersona}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Seleccionar Persona"
+                        required
+                        error={!formData.idPersona && submitting}
+                        helperText={!formData.idPersona && submitting ? "Debe seleccionar una persona" : ""}
+                      />
+                    )}
+                    renderOption={(props, option) => {
+                      const { key, ...otherProps } = props
+                      return (
+                        <li key={option.idPersona} {...otherProps}>
+                          <Box sx={{ display: "flex", flexDirection: "column" }}>
+                            <Typography variant="body1">{`${option.nombre} ${option.apellido}`}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {`${option.tipoDocumento?.descTipoDocumento || "Doc"}: ${option.nroDocumento} | ${option.correoPersona}`}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )
+                    }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Teléfono"
-                    value={selectedPersona.nroTelefono}
-                    InputProps={{ readOnly: true }}
+
+                {selectedPersona && (
+                  <Grid item xs={12} container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Documento"
+                        value={`${selectedPersona.tipoDocumento?.descTipoDocumento || "Doc"}: ${selectedPersona.nroDocumento}`}
+                        InputProps={{ readOnly: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Teléfono"
+                        value={selectedPersona.nroTelefono}
+                        InputProps={{ readOnly: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Correo"
+                        value={selectedPersona.correoPersona}
+                        InputProps={{ readOnly: true }}
+                      />
+                    </Grid>
+                  </Grid>
+                )}
+              </>
+            )}
+
+            {tipoCliente === "empresa" && (
+              <>
+                <Grid item xs={12}>
+                  <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
+                    <BusinessIcon sx={{ mr: 1 }} /> Información Empresarial
+                  </Typography>
+                  <Divider sx={{ mb: 2 }} />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Autocomplete
+                    id="empresa-select"
+                    options={empresas}
+                    getOptionLabel={(option) => `${option.razonSocial} - ${option.ruc}`}
+                    value={selectedEmpresa}
+                    onChange={handleEmpresaChange}
+                    isOptionEqualToValue={(option, value) => option.idEmpresa === value.idEmpresa}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Seleccionar Empresa"
+                        required
+                        error={!formData.idEmpresa && submitting}
+                        helperText={!formData.idEmpresa && submitting ? "Debe seleccionar una empresa" : ""}
+                      />
+                    )}
+                    renderOption={(props, option) => {
+                      const { key, ...otherProps } = props
+                      return (
+                        <li key={option.idEmpresa} {...otherProps}>
+                          <Box sx={{ display: "flex", flexDirection: "column" }}>
+                            <Typography variant="body1">{option.razonSocial}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {`RUC: ${option.ruc} | ${option.correoEmpresa}`}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )
+                    }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Correo"
-                    value={selectedPersona.correoPersona}
-                    InputProps={{ readOnly: true }}
-                  />
-                </Grid>
-              </Grid>
+
+                {selectedEmpresa && (
+                  <Grid item xs={12} container spacing={2}>
+                    <Grid item xs={12} md={4}>
+                      <TextField fullWidth label="RUC" value={selectedEmpresa.ruc} InputProps={{ readOnly: true }} />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Teléfono"
+                        value={selectedEmpresa.telefono}
+                        InputProps={{ readOnly: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Correo"
+                        value={selectedEmpresa.correoEmpresa}
+                        InputProps={{ readOnly: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Persona de Contacto"
+                        value={
+                          selectedEmpresa.persona
+                            ? `${selectedEmpresa.persona.nombre} ${selectedEmpresa.persona.apellido}`
+                            : "No especificado"
+                        }
+                        InputProps={{ readOnly: true }}
+                      />
+                    </Grid>
+                  </Grid>
+                )}
+              </>
             )}
 
             <Grid item xs={12} sx={{ mt: 2 }}>
@@ -313,41 +464,6 @@ export default function NuevoClientePage() {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} sx={{ mt: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center" }}>
-                <Typography variant="h6" sx={{ mb: 0, display: "flex", alignItems: "center", flexGrow: 1 }}>
-                  <BusinessIcon sx={{ mr: 1 }} /> Información Empresarial
-                </Typography>
-                <FormControlLabel
-                  control={<Switch checked={asociarEmpresa} onChange={handleAsociarEmpresaChange} color="primary" />}
-                  label="Asociar a una empresa"
-                />
-              </Box>
-              <Divider sx={{ mb: 2, mt: 1 }} />
-            </Grid>
-
-            {asociarEmpresa && (
-              <Grid item xs={12}>
-                <FormControl fullWidth required={asociarEmpresa}>
-                  <InputLabel>Empresa</InputLabel>
-                  <Select
-                    name="idEmpresa"
-                    value={formData.idEmpresa || ""}
-                    onChange={handleChange}
-                    label="Empresa"
-                    disabled={!asociarEmpresa}
-                  >
-                    {empresas.map((empresa) => (
-                      <MenuItem key={empresa.idEmpresa} value={empresa.idEmpresa.toString()}>
-                        {empresa.razonSocial}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <FormHelperText>Seleccione la empresa a la que pertenece este cliente</FormHelperText>
-                </FormControl>
-              </Grid>
-            )}
-
             <Grid item xs={12}>
               <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
                 <Button
@@ -367,4 +483,3 @@ export default function NuevoClientePage() {
     </Container>
   )
 }
-

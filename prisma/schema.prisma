@@ -744,7 +744,7 @@ model Usuario {
   rol                    Rol                      @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_usuario_fk")
 }
 
-model RecuperacionContrasena {
+/*model RecuperacionContrasena {
   idRecuperacion Int      @id @default(autoincrement()) @map("id_recuperacion")
   token          String   @unique
   expiracion     DateTime
@@ -757,7 +757,7 @@ model RecuperacionContrasena {
   usuario        Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_recuperacion_fk")
 
   @@map("RecuperacionContrasena")
-}
+}*/
 
 model AccessToken {
   idAccessToken Int           @id @default(autoincrement()) @map("id_access_token")
