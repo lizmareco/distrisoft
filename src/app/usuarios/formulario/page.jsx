@@ -16,7 +16,6 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
-  Autocomplete,
   List,
   ListItem,
   ListItemIcon,
@@ -26,6 +25,9 @@ import {
   Container,
   InputAdornment,
   IconButton,
+  Card,
+  CardContent,
+  Divider,
 } from "@mui/material"
 import {
   CheckCircle as CheckCircleIcon,
@@ -33,6 +35,11 @@ import {
   ArrowBack,
   Visibility,
   VisibilityOff,
+  Person as PersonIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon,
+  Home as HomeIcon,
+  Badge as BadgeIcon,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { validatePasswordComplexity } from "@/src/utils/passwordUtils"
@@ -52,7 +59,6 @@ export default function FormularioUsuarioPage() {
     idPersona: "",
   })
 
-  const [personas, setPersonas] = useState([])
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
@@ -93,6 +99,8 @@ export default function FormularioUsuarioPage() {
   const [guardando, setGuardando] = useState(false)
   const [errores, setErrores] = useState({})
   const [showPassword, setShowPassword] = useState(false)
+  const [documentoInput, setDocumentoInput] = useState("")
+  const [personaEncontrada, setPersonaEncontrada] = useState(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -108,20 +116,6 @@ export default function FormularioUsuarioPage() {
         }
         const rolesData = await rolesResponse.json()
         setRoles(Array.isArray(rolesData) ? rolesData : rolesData.roles || [])
-
-        // Cargar personas
-        const personasResponse = await fetch("/api/personas")
-        if (!personasResponse.ok) {
-          showAlert("Error al cargar personas", "error")
-          setLoadingData(false)
-          return
-        }
-        const personasData = await personasResponse.json()
-        const listaPersonas = personasData.map((persona) => ({
-          id: persona.idPersona,
-          label: `${persona.nombre} ${persona.apellido} (${persona.nroDocumento})`,
-        }))
-        setPersonas(listaPersonas)
 
         // Si hay un ID, cargar los datos del usuario
         if (id) {
@@ -142,10 +136,8 @@ export default function FormularioUsuarioPage() {
           })
 
           if (usuario.persona) {
-            setPersonaSeleccionada({
-              id: usuario.persona.idPersona,
-              label: `${usuario.persona.nombre} ${usuario.persona.apellido} (${usuario.persona.nroDocumento})`,
-            })
+            setPersonaEncontrada(usuario.persona)
+            setDocumentoInput(usuario.persona.nroDocumento || "")
           }
         }
       } catch (error) {
@@ -188,42 +180,59 @@ export default function FormularioUsuarioPage() {
     }
   }
 
-  // Función para validar la complejidad de la contraseña
-  const validatePasswordComplexity = (password) => {
-    const validations = {
-      length: password.length >= 8,
-      uppercase: /[A-Z]/.test(password),
-      lowercase: /[a-z]/.test(password),
-      number: /[0-9]/.test(password),
-      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  // Función para buscar personas por número de documento
+  const buscarPersonasPorDocumento = async () => {
+    if (!documentoInput || documentoInput.length < 3) {
+      showAlert("Ingrese al menos 3 dígitos del documento", "error")
+      return
     }
 
-    const isValid = Object.values(validations).every(Boolean)
-    const errors = []
+    // Verificar que el input solo contenga números
+    if (!/^\d+$/.test(documentoInput)) {
+      showAlert("Por favor, ingrese solo números para el documento", "error")
+      return
+    }
 
-    if (!validations.length) errors.push("La contraseña debe tener al menos 8 caracteres")
-    if (!validations.uppercase) errors.push("La contraseña debe contener al menos una letra mayúscula")
-    if (!validations.lowercase) errors.push("La contraseña debe contener al menos una letra minúscula")
-    if (!validations.number) errors.push("La contraseña debe contener al menos un número")
-    if (!validations.special) errors.push("La contraseña debe contener al menos un carácter especial (!@#$%^&*)")
-    return { isValid, validations, errors }
-  }
+    setBuscandoPersonas(true)
+    try {
+      const response = await fetch(`/api/personas/buscar?termino=${documentoInput}`)
+      if (!response.ok) {
+        throw new Error("Error al buscar personas")
+      }
 
-  // Manejar selección de persona
-  const handlePersonaChange = (event, newValue) => {
-    console.log("Persona seleccionada:", newValue)
-    setPersonaSeleccionada(newValue)
-    setFormulario({
-      ...formulario,
-      idPersona: newValue ? newValue.id : "",
-    })
+      const data = await response.json()
 
-    // Limpiar error del campo
-    if (fieldErrors.idPersona) {
-      setFieldErrors({
-        ...fieldErrors,
-        idPersona: null,
-      })
+      if (data.length === 0) {
+        showAlert("No se encontró ninguna persona con ese número de documento", "error")
+        setPersonaEncontrada(null)
+        setFormulario((prev) => ({
+          ...prev,
+          idPersona: "",
+        }))
+        return
+      }
+
+      // Tomar la primera persona encontrada
+      const persona = data[0]
+      setPersonaEncontrada(persona)
+
+      // Actualizar el formulario con el ID de la persona
+      setFormulario((prev) => ({
+        ...prev,
+        idPersona: persona.idPersona,
+      }))
+
+      showAlert("Persona encontrada correctamente", "success")
+    } catch (error) {
+      console.error("Error al buscar personas:", error)
+      showAlert("Error al buscar personas por documento", "error")
+      setPersonaEncontrada(null)
+      setFormulario((prev) => ({
+        ...prev,
+        idPersona: "",
+      }))
+    } finally {
+      setBuscandoPersonas(false)
     }
   }
 
@@ -427,46 +436,98 @@ export default function FormularioUsuarioPage() {
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <Autocomplete
-                id="persona-select"
-                options={personas}
-                loading={buscandoPersonas}
-                value={personaSeleccionada}
-                onChange={handlePersonaChange}
-                onInputChange={(event, newInputValue) => {
-                  if (newInputValue.length > 2) {
-                    // Aquí podrías implementar la búsqueda de personas por término
-                    setBuscandoPersonas(true)
-                    // Simular búsqueda
-                    setTimeout(() => {
-                      setBuscandoPersonas(false)
-                    }, 500)
+              {/* Campo para buscar por número de documento */}
+              <Box sx={{ display: "flex", alignItems: "flex-start", mb: 2 }}>
+                <TextField
+                  fullWidth
+                  label="Buscar persona por número de documento"
+                  placeholder="Ingrese el número de documento"
+                  value={documentoInput}
+                  onChange={(e) => setDocumentoInput(e.target.value)}
+                  margin="normal"
+                  helperText="Ingrese el número de documento sin puntos ni guiones"
+                  error={!!fieldErrors.idPersona}
+                  disabled={buscandoPersonas}
+                  sx={{ mr: 2 }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={buscarPersonasPorDocumento}
+                  disabled={
+                    !documentoInput || documentoInput.length < 3 || !/^\d+$/.test(documentoInput) || buscandoPersonas
                   }
-                }}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Persona"
-                    margin="normal"
-                    error={!!fieldErrors.idPersona}
-                    helperText={fieldErrors.idPersona}
-                    required
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {buscandoPersonas ? <CircularProgress color="inherit" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-              />
-              <Typography variant="caption" color="textSecondary">
-                Nota: Una persona no puede tener más de 1 usuario activo
-              </Typography>
+                  sx={{ mt: 2, height: 56 }}
+                >
+                  {buscandoPersonas ? <CircularProgress size={24} /> : "Buscar"}
+                </Button>
+              </Box>
+
+              {/* Mostrar datos de la persona encontrada */}
+              {personaEncontrada && (
+                <Card variant="outlined" sx={{ mb: 3, mt: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                      Datos de la Persona
+                    </Typography>
+                    <Divider sx={{ mb: 2 }} />
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                          <BadgeIcon sx={{ mr: 1, color: "primary.main" }} />
+                          <Typography variant="body2">
+                            <strong>Documento:</strong> {personaEncontrada.nroDocumento}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                          <PersonIcon sx={{ mr: 1, color: "primary.main" }} />
+                          <Typography variant="body2">
+                            <strong>Nombre:</strong> {personaEncontrada.nombre} {personaEncontrada.apellido}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                          <EmailIcon sx={{ mr: 1, color: "primary.main" }} />
+                          <Typography variant="body2">
+                            <strong>Email:</strong> {personaEncontrada.correoPersona}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                          <PhoneIcon sx={{ mr: 1, color: "primary.main" }} />
+                          <Typography variant="body2">
+                            <strong>Teléfono:</strong> {personaEncontrada.nroTelefono}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                          <HomeIcon sx={{ mr: 1, color: "primary.main" }} />
+                          <Typography variant="body2">
+                            <strong>Dirección:</strong> {personaEncontrada.direccion}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!personaEncontrada && formulario.idPersona && (
+                <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
+                  Se ha seleccionado una persona pero no se pueden mostrar sus datos. Por favor, busque la persona
+                  nuevamente.
+                </Alert>
+              )}
+
+              {fieldErrors.idPersona && !personaEncontrada && (
+                <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
+                  {fieldErrors.idPersona}
+                </Alert>
+              )}
             </Grid>
 
             <Grid item xs={12}>
@@ -631,7 +692,9 @@ export default function FormularioUsuarioPage() {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={guardando || (formulario.contrasena && !passwordValidation.isValid && !esEdicion)}
+              disabled={
+                guardando || (formulario.contrasena && !passwordValidation.isValid && !esEdicion) || !personaEncontrada
+              }
             >
               {guardando ? (
                 <>
@@ -658,4 +721,3 @@ export default function FormularioUsuarioPage() {
     </Container>
   )
 }
-
