@@ -12,13 +12,6 @@ export async function GET() {
         deletedAt: null,
       },
       include: {
-        unidadMedida: {
-          select: {
-            idUnidadMedida: true,
-            descUnidadMedida: true,
-            abreviatura: true,
-          },
-        },
         estadoMateriaPrima: {
           select: {
             idEstadoMateriaPrima: true,
@@ -68,14 +61,10 @@ export async function POST(request) {
       data: {
         nombreMateriaPrima: data.nombreMateriaPrima,
         descMateriaPrima: data.descMateriaPrima,
-        stockActual: Number.parseFloat(data.stockActual),
-        stockMinimo: Number.parseFloat(data.stockMinimo),
-        idUnidadMedida: Number.parseInt(data.idUnidadMedida),
         idEstadoMateriaPrima: Number.parseInt(data.idEstadoMateriaPrima),
         createdAt: new Date(),
       },
       include: {
-        unidadMedida: true,
         estadoMateriaPrima: true,
       },
     })

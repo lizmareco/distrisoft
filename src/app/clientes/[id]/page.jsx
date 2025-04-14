@@ -37,14 +37,12 @@ export default function ClienteFormPage({ params }) {
   const [formData, setFormData] = useState({
     idPersona: "",
     idSectorCliente: "",
-    idCondicionPago: "",
     idEmpresa: null,
   })
 
   const [cliente, setCliente] = useState(null)
   const [personas, setPersonas] = useState([])
   const [sectoresCliente, setSectoresCliente] = useState([])
-  const [condicionesPago, setCondicionesPago] = useState([])
   const [empresas, setEmpresas] = useState([])
 
   const [asociarEmpresa, setAsociarEmpresa] = useState(false)
@@ -58,11 +56,10 @@ export default function ClienteFormPage({ params }) {
       try {
         console.log(`Cargando datos para cliente ID: ${id}...`)
         // Cargar datos relacionados
-        const [clienteRes, personasRes, sectoresRes, condicionesRes, empresasRes] = await Promise.all([
+        const [clienteRes, personasRes, sectoresRes, empresasRes] = await Promise.all([
           fetch(`/api/clientes/${id}`),
           fetch("/api/personas"),
           fetch("/api/sectores-cliente"),
-          fetch("/api/condiciones-pago"),
           fetch("/api/empresas"),
         ])
 
@@ -70,29 +67,26 @@ export default function ClienteFormPage({ params }) {
           throw new Error("No se pudo cargar el cliente")
         }
 
-        if (!personasRes.ok || !sectoresRes.ok || !condicionesRes.ok || !empresasRes.ok) {
+        if (!personasRes.ok || !sectoresRes.ok || !empresasRes.ok) {
           throw new Error("Error al cargar datos de referencia")
         }
 
-        const [clienteData, personasData, sectoresData, condicionesData, empresasData] = await Promise.all([
+        const [clienteData, personasData, sectoresData, empresasData] = await Promise.all([
           clienteRes.json(),
           personasRes.json(),
           sectoresRes.json(),
-          condicionesRes.json(),
           empresasRes.json(),
         ])
 
         setCliente(clienteData)
         setPersonas(personasData)
         setSectoresCliente(sectoresData)
-        setCondicionesPago(condicionesData)
         setEmpresas(empresasData)
 
         // Configurar el formulario con los datos del cliente
         setFormData({
           idPersona: clienteData.idPersona.toString(),
           idSectorCliente: clienteData.idSectorCliente.toString(),
-          idCondicionPago: clienteData.idCondicionPago.toString(),
           idEmpresa: clienteData.idEmpresa ? clienteData.idEmpresa.toString() : null,
         })
 
@@ -283,30 +277,6 @@ export default function ClienteFormPage({ params }) {
               </FormControl>
             </Grid>
 
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Condición de Pago</InputLabel>
-                <Select
-                  name="idCondicionPago"
-                  value={formData.idCondicionPago}
-                  onChange={handleChange}
-                  label="Condición de Pago"
-                >
-                  {condicionesPago.length > 0 ? (
-                    condicionesPago.map((condicion) => (
-                      <MenuItem key={condicion.idCondicionPago} value={condicion.idCondicionPago.toString()}>
-                        {condicion.descCondicionPago}
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem disabled value="">
-                      <em>Cargando condiciones de pago...</em>
-                    </MenuItem>
-                  )}
-                </Select>
-                <FormHelperText>Seleccione de la lista de condiciones disponibles</FormHelperText>
-              </FormControl>
-            </Grid>
 
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center" }}>

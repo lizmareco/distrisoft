@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Container,
   Typography,
   Button,
   Paper,
+  TextField,
   Grid,
   FormControl,
   InputLabel,
@@ -15,31 +16,26 @@ import {
   Box,
   CircularProgress,
   Alert,
-  TextField,
-  FormHelperText,
   Divider,
+  InputAdornment,
 } from "@mui/material"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import SaveIcon from "@mui/icons-material/Save"
 import BusinessIcon from "@mui/icons-material/Business"
-import PaymentIcon from "@mui/icons-material/Payment"
-import InfoIcon from "@mui/icons-material/Info"
+import CommentIcon from "@mui/icons-material/Comment"
 import Link from "next/link"
 
 export default function EditarProveedorPage({ params }) {
-  // Usar React.use para acceder a los parámetros
-  const unwrappedParams = use(params)
-  const { id } = unwrappedParams
+  const { id } = params
   const router = useRouter()
 
   const [formData, setFormData] = useState({
     idEmpresa: "",
-    idCondicionPago: "",
+    comentario: "", // Incluir el campo comentario
   })
 
   const [proveedor, setProveedor] = useState(null)
   const [empresas, setEmpresas] = useState([])
-  const [condicionesPago, setCondicionesPago] = useState([])
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -50,34 +46,25 @@ export default function EditarProveedorPage({ params }) {
       try {
         console.log(`Cargando datos para proveedor ID: ${id}...`)
         // Cargar datos relacionados
-        const [proveedorRes, empresasRes, condicionesRes] = await Promise.all([
-          fetch(`/api/proveedores/${id}`),
-          fetch("/api/empresas"),
-          fetch("/api/condiciones-pago"),
-        ])
+        const [proveedorRes, empresasRes] = await Promise.all([fetch(`/api/proveedores/${id}`), fetch("/api/empresas")])
 
         if (!proveedorRes.ok) {
           throw new Error("No se pudo cargar el proveedor")
         }
 
-        if (!empresasRes.ok || !condicionesRes.ok) {
+        if (!empresasRes.ok) {
           throw new Error("Error al cargar datos de referencia")
         }
 
-        const [proveedorData, empresasData, condicionesData] = await Promise.all([
-          proveedorRes.json(),
-          empresasRes.json(),
-          condicionesRes.json(),
-        ])
+        const [proveedorData, empresasData] = await Promise.all([proveedorRes.json(), empresasRes.json()])
 
         setProveedor(proveedorData)
         setEmpresas(empresasData)
-        setCondicionesPago(condicionesData)
 
         // Configurar el formulario con los datos del proveedor
         setFormData({
           idEmpresa: proveedorData.idEmpresa.toString(),
-          idCondicionPago: proveedorData.idCondicionPago.toString(),
+          comentario: proveedorData.comentario || "", // Cargar el comentario existente
         })
       } catch (error) {
         console.error("Error al cargar datos:", error)
@@ -104,11 +91,6 @@ export default function EditarProveedorPage({ params }) {
     // Validar que se hayan completado todos los campos requeridos
     if (!formData.idEmpresa) {
       setError("Debe seleccionar una empresa para el proveedor")
-      return
-    }
-
-    if (!formData.idCondicionPago) {
-      setError("Debe seleccionar una condición de pago para el proveedor")
       return
     }
 
@@ -217,44 +199,32 @@ export default function EditarProveedorPage({ params }) {
               </Grid>
             )}
 
-            <Grid item xs={12} sx={{ mt: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
-                <PaymentIcon sx={{ mr: 1 }} /> Condiciones Comerciales
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, mt: 2, display: "flex", alignItems: "center" }}>
+                <CommentIcon sx={{ mr: 1 }} /> Información del Proveedor
               </Typography>
-              <Alert severity="info" sx={{ mb: 2 }} icon={<InfoIcon />}>
-                Las condiciones de pago ya están cargadas en el sistema. Seleccione la condición correspondiente de la
-                lista desplegable.
-              </Alert>
               <Divider sx={{ mb: 2 }} />
             </Grid>
 
+            {/* Campo de comentarios */}
             <Grid item xs={12}>
-              <FormControl fullWidth required error={!formData.idCondicionPago && submitting}>
-                <InputLabel>Condición de Pago</InputLabel>
-                <Select
-                  name="idCondicionPago"
-                  value={formData.idCondicionPago}
-                  onChange={handleChange}
-                  label="Condición de Pago"
-                >
-                  {condicionesPago.length > 0 ? (
-                    condicionesPago.map((condicion) => (
-                      <MenuItem key={condicion.idCondicionPago} value={condicion.idCondicionPago.toString()}>
-                        {condicion.descCondicionPago}
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem disabled value="">
-                      <em>Cargando condiciones de pago...</em>
-                    </MenuItem>
-                  )}
-                </Select>
-                <FormHelperText>
-                  {!formData.idCondicionPago && submitting
-                    ? "Debe seleccionar una condición de pago"
-                    : "Seleccione la condición de pago acordada con el proveedor"}
-                </FormHelperText>
-              </FormControl>
+              <TextField
+                fullWidth
+                label="Comentarios"
+                name="comentario"
+                value={formData.comentario}
+                onChange={handleChange}
+                multiline
+                rows={4}
+                placeholder="Agregar comentarios como condición comercial, datos bancarios, etc."
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <CommentIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             </Grid>
 
             <Grid item xs={12}>
@@ -283,4 +253,3 @@ export default function EditarProveedorPage({ params }) {
     </Container>
   )
 }
-

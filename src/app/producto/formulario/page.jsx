@@ -14,11 +14,10 @@ import {
   Paper,
   Snackbar,
   AlertTitle,
+  Chip,
 } from "@mui/material"
 import { useRouter, useSearchParams } from "next/navigation"
-
-// Añadir estas importaciones al inicio del archivo
-import { ArrowBack } from "@mui/icons-material"
+import { ArrowBack, CheckCircle, Cancel } from "@mui/icons-material"
 import Link from "next/link"
 
 export default function FormularioProductoPage() {
@@ -32,13 +31,13 @@ export default function FormularioProductoPage() {
     idTipoProducto: "",
     pesoUnidad: "",
     precioUnitario: "",
-    idEstadoProducto: "",
     idUnidadMedida: "",
+    idEstadoProducto: "1", // Por defecto, estado activo (1)
   })
 
   const [unidadesMedida, setUnidadesMedida] = useState([])
-  const [estadosProducto, setEstadosProducto] = useState([])
   const [tiposProducto, setTiposProducto] = useState([])
+  const [estadosProducto, setEstadosProducto] = useState([])
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [loadingData, setLoadingData] = useState(true)
@@ -48,6 +47,7 @@ export default function FormularioProductoPage() {
     severity: "error",
   })
 
+  // Asegurarnos de que el formulario muestre correctamente los tipos de producto
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -63,6 +63,17 @@ export default function FormularioProductoPage() {
         const unidadesData = await unidadesResponse.json()
         setUnidadesMedida(unidadesData)
 
+        // Cargar tipos de producto
+        const tiposResponse = await fetch("/api/tipoproducto")
+        if (!tiposResponse.ok) {
+          showAlert("Error al cargar tipos de producto", "error")
+          setLoadingData(false)
+          return
+        }
+        const tiposData = await tiposResponse.json()
+        console.log("Tipos de producto cargados:", tiposData) // Depuración
+        setTiposProducto(tiposData)
+
         // Cargar estados de producto
         const estadosResponse = await fetch("/api/estadoproducto")
         if (!estadosResponse.ok) {
@@ -73,16 +84,6 @@ export default function FormularioProductoPage() {
         const estadosData = await estadosResponse.json()
         setEstadosProducto(estadosData)
 
-        // Cargar tipos de producto
-        const tiposResponse = await fetch("/api/tipoproducto")
-        if (!tiposResponse.ok) {
-          showAlert("Error al cargar tipos de producto", "error")
-          setLoadingData(false)
-          return
-        }
-        const tiposData = await tiposResponse.json()
-        setTiposProducto(tiposData)
-
         // Si hay un ID, cargar los datos del producto
         if (id) {
           const productoResponse = await fetch(`/api/productos/${id}`)
@@ -92,15 +93,16 @@ export default function FormularioProductoPage() {
             return
           }
           const producto = await productoResponse.json()
+          console.log("Producto cargado:", producto) // Depuración
 
           setFormData({
             nombreProducto: producto.nombreProducto || "",
             descripcion: producto.descripcion || "",
-            idTipoProducto: producto.idTipoProducto || "",
-            pesoUnidad: producto.pesoUnidad || "",
-            precioUnitario: producto.precioUnitario || "",
-            idEstadoProducto: producto.idEstadoProducto || "",
-            idUnidadMedida: producto.idUnidadMedida || "",
+            idTipoProducto: producto.idTipoProducto?.toString() || "",
+            pesoUnidad: producto.pesoUnidad?.toString() || "",
+            precioUnitario: producto.precioUnitario?.toString() || "",
+            idUnidadMedida: producto.idUnidadMedida?.toString() || "",
+            idEstadoProducto: producto.idEstadoProducto?.toString() || "1",
           })
         }
       } catch (error) {
@@ -153,17 +155,25 @@ export default function FormularioProductoPage() {
     if (!formData.pesoUnidad) {
       errors.pesoUnidad = "El peso por unidad es requerido"
       isValid = false
-    } else if (isNaN(formData.pesoUnidad) || Number.parseFloat(formData.pesoUnidad) <= 0) {
-      errors.pesoUnidad = "El peso debe ser un número positivo"
-      isValid = false
+    } else {
+      // Limpiar el valor para validación
+      const pesoLimpio = formData.pesoUnidad.toString().replace(/\./g, "").replace(",", ".")
+      if (isNaN(pesoLimpio) || Number.parseFloat(pesoLimpio) <= 0) {
+        errors.pesoUnidad = "El peso debe ser un número positivo"
+        isValid = false
+      }
     }
 
     if (!formData.precioUnitario) {
       errors.precioUnitario = "El precio unitario es requerido"
       isValid = false
-    } else if (isNaN(formData.precioUnitario) || Number.parseFloat(formData.precioUnitario) <= 0) {
-      errors.precioUnitario = "El precio debe ser un número positivo"
-      isValid = false
+    } else {
+      // Limpiar el valor para validación
+      const precioLimpio = formData.precioUnitario.toString().replace(/\./g, "").replace(",", ".")
+      if (isNaN(precioLimpio) || Number.parseFloat(precioLimpio) <= 0) {
+        errors.precioUnitario = "El precio debe ser un número positivo"
+        isValid = false
+      }
     }
 
     if (!formData.idUnidadMedida) {
@@ -172,7 +182,7 @@ export default function FormularioProductoPage() {
     }
 
     if (!formData.idEstadoProducto) {
-      errors.idEstadoProducto = "El estado es requerido"
+      errors.idEstadoProducto = "El estado del producto es requerido"
       isValid = false
     }
 
@@ -211,13 +221,17 @@ export default function FormularioProductoPage() {
       const method = id ? "PUT" : "POST"
 
       // Asegurarse de que los valores numéricos sean números
+      // Eliminar posibles puntos de miles antes de convertir a número
+      const pesoUnidadLimpio = formData.pesoUnidad.toString().replace(/\./g, "").replace(",", ".")
+      const precioUnitarioLimpio = formData.precioUnitario.toString().replace(/\./g, "").replace(",", ".")
+
       const dataToSend = {
         ...formData,
-        pesoUnidad: Number.parseFloat(formData.pesoUnidad),
-        precioUnitario: Number.parseFloat(formData.precioUnitario),
+        pesoUnidad: Number.parseFloat(pesoUnidadLimpio),
+        precioUnitario: Number.parseFloat(precioUnitarioLimpio),
         idTipoProducto: Number.parseInt(formData.idTipoProducto),
-        idEstadoProducto: Number.parseInt(formData.idEstadoProducto),
         idUnidadMedida: Number.parseInt(formData.idUnidadMedida),
+        idEstadoProducto: Number.parseInt(formData.idEstadoProducto),
       }
 
       const response = await fetch(url, {
@@ -270,6 +284,11 @@ export default function FormularioProductoPage() {
     )
   }
 
+  // Encontrar el estado actual del producto para mostrar el chip
+  const estadoActual = estadosProducto.find(
+    (estado) => estado.idEstadoProducto.toString() === formData.idEstadoProducto,
+  )
+
   return (
     <Container maxWidth="md">
       {/* Botón de Volver */}
@@ -292,9 +311,20 @@ export default function FormularioProductoPage() {
       </Snackbar>
 
       <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          {id ? "Editar Producto" : "Nuevo Producto"}
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h4" component="h1">
+            {id ? "Editar Producto" : "Nuevo Producto"}
+          </Typography>
+
+          {id && estadoActual && (
+            <Chip
+              icon={estadoActual.descEstadoProducto === "Activo" ? <CheckCircle /> : <Cancel />}
+              label={estadoActual.descEstadoProducto}
+              color={estadoActual.descEstadoProducto === "Activo" ? "success" : "default"}
+              variant="outlined"
+            />
+          )}
+        </Box>
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
@@ -340,7 +370,7 @@ export default function FormularioProductoPage() {
                 helperText={fieldErrors.idTipoProducto}
               >
                 {tiposProducto.map((tipo) => (
-                  <MenuItem key={tipo.idTipoProducto} value={tipo.idTipoProducto}>
+                  <MenuItem key={tipo.idTipoProducto} value={tipo.idTipoProducto.toString()}>
                     {tipo.nombreTipoProducto}
                   </MenuItem>
                 ))}
@@ -351,15 +381,28 @@ export default function FormularioProductoPage() {
               <TextField
                 name="pesoUnidad"
                 label="Peso por Unidad"
-                type="number"
+                type="text"
                 value={formData.pesoUnidad}
-                onChange={handleChange}
+                onChange={(e) => {
+                  // Permitir solo números, comas y puntos
+                  const value = e.target.value.replace(/[^\d.,]/g, "")
+                  setFormData((prev) => ({
+                    ...prev,
+                    pesoUnidad: value,
+                  }))
+                }}
                 fullWidth
                 required
                 margin="normal"
-                inputProps={{ step: "0.01", min: "0" }}
                 error={!!fieldErrors.pesoUnidad}
-                helperText={fieldErrors.pesoUnidad}
+                helperText={
+                  fieldErrors.pesoUnidad || "Ingrese el peso con punto como separador de miles (ej: 1.000,50)"
+                }
+                InputProps={{
+                  inputProps: {
+                    inputMode: "decimal",
+                  },
+                }}
               />
             </Grid>
 
@@ -367,15 +410,28 @@ export default function FormularioProductoPage() {
               <TextField
                 name="precioUnitario"
                 label="Precio Unitario"
-                type="number"
+                type="text"
                 value={formData.precioUnitario}
-                onChange={handleChange}
+                onChange={(e) => {
+                  // Permitir solo números, comas y puntos
+                  const value = e.target.value.replace(/[^\d.,]/g, "")
+                  setFormData((prev) => ({
+                    ...prev,
+                    precioUnitario: value,
+                  }))
+                }}
                 fullWidth
                 required
                 margin="normal"
-                inputProps={{ step: "0.01", min: "0" }}
                 error={!!fieldErrors.precioUnitario}
-                helperText={fieldErrors.precioUnitario}
+                helperText={
+                  fieldErrors.precioUnitario || "Ingrese el precio con punto como separador de miles (ej: 1.000,50)"
+                }
+                InputProps={{
+                  inputProps: {
+                    inputMode: "decimal",
+                  },
+                }}
               />
             </Grid>
 
@@ -393,7 +449,7 @@ export default function FormularioProductoPage() {
                 helperText={fieldErrors.idUnidadMedida}
               >
                 {unidadesMedida.map((unidad) => (
-                  <MenuItem key={unidad.idUnidadMedida} value={unidad.idUnidadMedida}>
+                  <MenuItem key={unidad.idUnidadMedida} value={unidad.idUnidadMedida.toString()}>
                     {unidad.descUnidadMedida} ({unidad.abreviatura})
                   </MenuItem>
                 ))}
@@ -403,7 +459,7 @@ export default function FormularioProductoPage() {
             <Grid item xs={12} sm={6}>
               <TextField
                 name="idEstadoProducto"
-                label="Estado"
+                label="Estado del Producto"
                 select
                 value={formData.idEstadoProducto}
                 onChange={handleChange}
@@ -414,8 +470,8 @@ export default function FormularioProductoPage() {
                 helperText={fieldErrors.idEstadoProducto}
               >
                 {estadosProducto.map((estado) => (
-                  <MenuItem key={estado.idEstadoProducto} value={estado.idEstadoProducto}>
-                    {estado.nombreEstadoProducto}
+                  <MenuItem key={estado.idEstadoProducto} value={estado.idEstadoProducto.toString()}>
+                    {estado.descEstadoProducto}
                   </MenuItem>
                 ))}
               </TextField>
@@ -437,4 +493,3 @@ export default function FormularioProductoPage() {
     </Container>
   )
 }
-

@@ -14,13 +14,6 @@ export async function GET(request, { params }) {
         deletedAt: null,
       },
       include: {
-        unidadMedida: {
-          select: {
-            idUnidadMedida: true,
-            descUnidadMedida: true,
-            abreviatura: true,
-          },
-        },
         estadoMateriaPrima: {
           select: {
             idEstadoMateriaPrima: true,
@@ -60,7 +53,6 @@ export async function PUT(request, { params }) {
     const materiaPrimaAnterior = await prisma.materiaPrima.findUnique({
       where: { idMateriaPrima: id },
       include: {
-        unidadMedida: true,
         estadoMateriaPrima: true,
       },
     })
@@ -96,14 +88,10 @@ export async function PUT(request, { params }) {
       data: {
         nombreMateriaPrima: data.nombreMateriaPrima,
         descMateriaPrima: data.descMateriaPrima,
-        stockActual: Number.parseFloat(data.stockActual),
-        stockMinimo: Number.parseFloat(data.stockMinimo),
-        idUnidadMedida: Number.parseInt(data.idUnidadMedida),
         idEstadoMateriaPrima: Number.parseInt(data.idEstadoMateriaPrima),
         updatedAt: new Date(),
       },
       include: {
-        unidadMedida: true,
         estadoMateriaPrima: true,
       },
     })
@@ -140,7 +128,6 @@ export async function DELETE(request, { params }) {
     const materiaPrimaAnterior = await prisma.materiaPrima.findUnique({
       where: { idMateriaPrima: id },
       include: {
-        unidadMedida: true,
         estadoMateriaPrima: true,
       },
     })

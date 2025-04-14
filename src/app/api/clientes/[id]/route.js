@@ -16,7 +16,6 @@ export async function GET(request, { params }) {
       include: {
         persona: true,
         sectorCliente: true,
-        condicionPago: true,
         empresa: true,
       },
     })
@@ -51,7 +50,6 @@ export async function PUT(request, { params }) {
       include: {
         persona: true,
         sectorCliente: true,
-        condicionPago: true,
         empresa: true,
       },
     })
@@ -68,14 +66,12 @@ export async function PUT(request, { params }) {
       data: {
         idPersona: data.idPersona ? Number.parseInt(data.idPersona) : undefined,
         idSectorCliente: data.idSectorCliente ? Number.parseInt(data.idSectorCliente) : undefined,
-        idCondicionPago: data.idCondicionPago ? Number.parseInt(data.idCondicionPago) : undefined,
         idEmpresa: data.idEmpresa ? Number.parseInt(data.idEmpresa) : null,
         updatedAt: new Date(),
       },
       include: {
         persona: true,
         sectorCliente: true,
-        condicionPago: true,
         empresa: true,
       },
     })
@@ -107,7 +103,6 @@ export async function DELETE(request, { params }) {
       include: {
         persona: true,
         sectorCliente: true,
-        condicionPago: true,
         empresa: true,
       },
     })

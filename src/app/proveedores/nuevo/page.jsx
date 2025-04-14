@@ -7,6 +7,7 @@ import {
   Typography,
   Button,
   Paper,
+  TextField,
   Grid,
   FormControl,
   InputLabel,
@@ -15,29 +16,44 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Autocomplete,
-  TextField,
-  FormHelperText,
   Divider,
+  Card,
+  CardContent,
+  InputAdornment,
 } from "@mui/material"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import SaveIcon from "@mui/icons-material/Save"
 import BusinessIcon from "@mui/icons-material/Business"
-import PaymentIcon from "@mui/icons-material/Payment"
-import InfoIcon from "@mui/icons-material/Info"
+import SearchIcon from "@mui/icons-material/Search"
+import CheckCircleIcon from "@mui/icons-material/CheckCircle"
+import CommentIcon from "@mui/icons-material/Comment"
 import Link from "next/link"
 
 export default function NuevoProveedorPage() {
   const router = useRouter()
 
+  // Estado para el formulario
   const [formData, setFormData] = useState({
     idEmpresa: "",
-    idCondicionPago: "",
+    comentario: "", // Nuevo campo para comentarios
   })
 
-  const [empresas, setEmpresas] = useState([])
-  const [condicionesPago, setCondicionesPago] = useState([])
+  // Estado para los datos de búsqueda
+  const [busquedaEmpresa, setBusquedaEmpresa] = useState({
+    tipoDocumento: "",
+    numeroDocumento: "",
+  })
 
+  // Estado para los resultados de búsqueda
+  const [empresasEncontradas, setEmpresasEncontradas] = useState([])
+
+  // Estado para indicar si se está buscando
+  const [buscandoEmpresa, setBuscandoEmpresa] = useState(false)
+
+  // Estado para indicar si ya se realizó una búsqueda
+  const [busquedaEmpresaRealizada, setBusquedaEmpresaRealizada] = useState(false)
+
+  const [tiposDocumento, setTiposDocumento] = useState([])
   const [selectedEmpresa, setSelectedEmpresa] = useState(null)
 
   const [loading, setLoading] = useState(true)
@@ -48,23 +64,16 @@ export default function NuevoProveedorPage() {
     const fetchData = async () => {
       try {
         console.log("Cargando datos para nuevo proveedor...")
-        // Cargar datos relacionados
-        const [empresasRes, condicionesRes] = await Promise.all([
-          fetch("/api/empresas"),
-          fetch("/api/condiciones-pago"),
-        ])
+        // Cargar tipos de documento
+        const tiposDocRes = await fetch("/api/tipos-documento")
 
-        if (!empresasRes.ok || !condicionesRes.ok) {
-          throw new Error("Error al cargar datos de referencia")
+        if (!tiposDocRes.ok) {
+          throw new Error("Error al cargar tipos de documento")
         }
 
-        const [empresasData, condicionesData] = await Promise.all([empresasRes.json(), condicionesRes.json()])
-
-        console.log("Empresas cargadas:", empresasData.length)
-        console.log("Condiciones cargadas:", condicionesData.length)
-
-        setEmpresas(empresasData)
-        setCondicionesPago(condicionesData)
+        const tiposDocData = await tiposDocRes.json()
+        console.log("Tipos de documento cargados:", tiposDocData.length)
+        setTiposDocumento(tiposDocData)
       } catch (error) {
         console.error("Error al cargar datos:", error)
         setError(error.message)
@@ -84,32 +93,62 @@ export default function NuevoProveedorPage() {
     }))
   }
 
-  const handleEmpresaChange = (event, newValue) => {
-    setSelectedEmpresa(newValue)
-    if (newValue) {
-      setFormData((prev) => ({
-        ...prev,
-        idEmpresa: newValue.idEmpresa.toString(),
-      }))
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        idEmpresa: "",
-      }))
+  const handleBusquedaEmpresaChange = (e) => {
+    const { name, value } = e.target
+    setBusquedaEmpresa((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  const handleBuscarEmpresa = async (e) => {
+    e.preventDefault()
+
+    // Validar que se hayan ingresado ambos campos
+    if (!busquedaEmpresa.tipoDocumento || !busquedaEmpresa.numeroDocumento) {
+      setError("Debe seleccionar un tipo de documento e ingresar un número de documento")
+      return
     }
+
+    setBuscandoEmpresa(true)
+    setError(null)
+    setBusquedaEmpresaRealizada(true)
+    setSelectedEmpresa(null)
+    setFormData((prev) => ({ ...prev, idEmpresa: "" }))
+
+    try {
+      const response = await fetch(
+        `/api/empresas/disponibles?tipoDocumento=${busquedaEmpresa.tipoDocumento}&numeroDocumento=${busquedaEmpresa.numeroDocumento}`,
+      )
+
+      if (!response.ok) {
+        throw new Error("Error al buscar empresas")
+      }
+
+      const data = await response.json()
+      setEmpresasEncontradas(data)
+    } catch (error) {
+      console.error("Error:", error)
+      setError(error.message)
+    } finally {
+      setBuscandoEmpresa(false)
+    }
+  }
+
+  const handleSelectEmpresa = (empresa) => {
+    setSelectedEmpresa(empresa)
+    setFormData((prev) => ({
+      ...prev,
+      idEmpresa: empresa.idEmpresa.toString(),
+    }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validar que se hayan completado todos los campos requeridos
+    // Validar que se haya seleccionado una empresa
     if (!formData.idEmpresa) {
       setError("Debe seleccionar una empresa para el proveedor")
-      return
-    }
-
-    if (!formData.idCondicionPago) {
-      setError("Debe seleccionar una condición de pago para el proveedor")
       return
     }
 
@@ -169,138 +208,234 @@ export default function NuevoProveedorPage() {
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <Box component="div">
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
-                <BusinessIcon sx={{ mr: 1 }} /> Información de la Empresa
+                <BusinessIcon sx={{ mr: 1 }} /> Buscar Empresa
               </Typography>
               <Divider sx={{ mb: 2 }} />
             </Grid>
 
             <Grid item xs={12}>
-              <Autocomplete
-                id="empresa-select"
-                options={empresas}
-                getOptionLabel={(option) => `${option.razonSocial} - ${option.ruc}`}
-                value={selectedEmpresa}
-                onChange={handleEmpresaChange}
-                isOptionEqualToValue={(option, value) => option.idEmpresa === value.idEmpresa}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Seleccionar Empresa"
-                    required
-                    error={!formData.idEmpresa && submitting}
-                    helperText={!formData.idEmpresa && submitting ? "Debe seleccionar una empresa" : ""}
-                  />
-                )}
-                renderOption={(props, option) => {
-                  // Extraer la key del objeto props y el resto de propiedades
-                  const { key, ...otherProps } = props
+              <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                <form onSubmit={handleBuscarEmpresa}>
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={4}>
+                      <FormControl fullWidth disabled={loading}>
+                        <InputLabel id="tipo-documento-empresa-label">Tipo de Documento</InputLabel>
+                        <Select
+                          labelId="tipo-documento-empresa-label"
+                          id="tipoDocumento"
+                          name="tipoDocumento"
+                          value={busquedaEmpresa.tipoDocumento}
+                          onChange={handleBusquedaEmpresaChange}
+                          label="Tipo de Documento"
+                          required
+                        >
+                          {tiposDocumento.map((tipo) => (
+                            <MenuItem key={tipo.idTipoDocumento} value={tipo.idTipoDocumento}>
+                              {tipo.descTipoDocumento}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} md={5}>
+                      <TextField
+                        fullWidth
+                        label="Número de Documento"
+                        id="numeroDocumento"
+                        name="numeroDocumento"
+                        value={busquedaEmpresa.numeroDocumento}
+                        onChange={handleBusquedaEmpresaChange}
+                        required
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <SearchIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        color="primary"
+                        fullWidth
+                        disabled={buscandoEmpresa}
+                        sx={{ height: "56px" }}
+                      >
+                        {buscandoEmpresa ? <CircularProgress size={24} /> : "Buscar Empresa"}
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </form>
+              </Paper>
 
-                  return (
-                    <li key={option.idEmpresa} {...otherProps}>
-                      <Box sx={{ display: "flex", flexDirection: "column" }}>
-                        <Typography variant="body1">{option.razonSocial}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {`RUC: ${option.ruc} | ${option.ciudad?.descCiudad || "Ciudad no especificada"}`}
-                        </Typography>
-                      </Box>
-                    </li>
-                  )
-                }}
-              />
+              {/* Resultados de búsqueda de empresas */}
+              {busquedaEmpresaRealizada && !buscandoEmpresa && (
+                <Box sx={{ mt: 2 }}>
+                  {empresasEncontradas.length > 0 ? (
+                    <Grid container spacing={2}>
+                      {empresasEncontradas.map((empresa) => (
+                        <Grid item xs={12} key={empresa.idEmpresa}>
+                          <Card
+                            variant="outlined"
+                            sx={{
+                              cursor: "pointer",
+                              border:
+                                selectedEmpresa?.idEmpresa === empresa.idEmpresa
+                                  ? "2px solid #1976d2"
+                                  : "1px solid rgba(0, 0, 0, 0.12)",
+                              position: "relative",
+                            }}
+                            onClick={() => handleSelectEmpresa(empresa)}
+                          >
+                            {selectedEmpresa?.idEmpresa === empresa.idEmpresa && (
+                              <CheckCircleIcon
+                                color="primary"
+                                sx={{
+                                  position: "absolute",
+                                  top: 10,
+                                  right: 10,
+                                  backgroundColor: "white",
+                                  borderRadius: "50%",
+                                }}
+                              />
+                            )}
+                            <CardContent>
+                              <Grid container spacing={2}>
+                                <Grid item xs={12} md={4}>
+                                  <Typography variant="subtitle1" fontWeight="bold">
+                                    {empresa.razonSocial}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    {`${empresa.tipoDocumento?.descTipoDocumento || "Doc"}: ${empresa.ruc}`}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={4}>
+                                  <Typography variant="body2">
+                                    <strong>Teléfono:</strong> {empresa.telefono || "No especificado"}
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    <strong>Correo:</strong> {empresa.correoEmpresa || "No especificado"}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={4}>
+                                  <Typography variant="body2">
+                                    <strong>Ciudad:</strong> {empresa.ciudad?.descCiudad || "No especificada"}
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    <strong>Categoría:</strong>{" "}
+                                    {empresa.categoriaEmpresa?.descCategoriaEmpresa || "No especificada"}
+                                  </Typography>
+                                </Grid>
+                              </Grid>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Alert severity="info">No se encontraron empresas disponibles con los criterios de búsqueda</Alert>
+                  )}
+                </Box>
+              )}
+              {buscandoEmpresa && (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 3, mb: 3 }}>
+                  <CircularProgress />
+                </Box>
+              )}
             </Grid>
-
-            {selectedEmpresa && (
-              <Grid item xs={12} container spacing={2}>
-                <Grid item xs={12} md={4}>
-                  <TextField fullWidth label="RUC" value={selectedEmpresa.ruc} InputProps={{ readOnly: true }} />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Dirección"
-                    value={selectedEmpresa.direccionEmpresa}
-                    InputProps={{ readOnly: true }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Correo"
-                    value={selectedEmpresa.correoEmpresa}
-                    InputProps={{ readOnly: true }}
-                  />
-                </Grid>
-              </Grid>
-            )}
 
             <Grid item xs={12} sx={{ mt: 2 }}>
               <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
-                <PaymentIcon sx={{ mr: 1 }} /> Condiciones Comerciales
+                <CommentIcon sx={{ mr: 1 }} /> Información del Proveedor
               </Typography>
-              <Alert severity="info" sx={{ mb: 2 }} icon={<InfoIcon />}>
-                Las condiciones de pago ya están cargadas en el sistema. Seleccione la condición correspondiente de la
-                lista desplegable.
-              </Alert>
               <Divider sx={{ mb: 2 }} />
             </Grid>
 
             <Grid item xs={12}>
-              <FormControl fullWidth required error={!formData.idCondicionPago && submitting}>
-                <InputLabel>Condición de Pago</InputLabel>
-                <Select
-                  name="idCondicionPago"
-                  value={formData.idCondicionPago}
-                  onChange={handleChange}
-                  label="Condición de Pago"
-                >
-                  {condicionesPago.length > 0 ? (
-                    condicionesPago.map((condicion) => (
-                      <MenuItem key={condicion.idCondicionPago} value={condicion.idCondicionPago.toString()}>
-                        {condicion.descCondicionPago}
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem disabled value="">
-                      <em>Cargando condiciones de pago...</em>
-                    </MenuItem>
-                  )}
-                </Select>
-                <FormHelperText>
-                  {!formData.idCondicionPago && submitting
-                    ? "Debe seleccionar una condición de pago"
-                    : "Seleccione la condición de pago acordada con el proveedor"}
-                </FormHelperText>
-              </FormControl>
-            </Grid>
+              <form onSubmit={handleSubmit}>
+                {selectedEmpresa && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Empresa seleccionada:
+                    </Typography>
+                    <Paper variant="outlined" sx={{ p: 2 }}>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={4}>
+                          <Typography variant="body1" fontWeight="medium">
+                            {selectedEmpresa.razonSocial}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {`${selectedEmpresa.tipoDocumento?.descTipoDocumento}: ${selectedEmpresa.ruc}`}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Typography variant="body2">
+                            <strong>Dirección:</strong> {selectedEmpresa.direccionEmpresa}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Typography variant="body2">
+                            <strong>Contacto:</strong>{" "}
+                            {selectedEmpresa.persona
+                              ? `${selectedEmpresa.persona.nombre} ${selectedEmpresa.persona.apellido}`
+                              : "No especificado"}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  </Box>
+                )}
 
-            <Grid item xs={12}>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  color="primary"
-                  startIcon={<SaveIcon />}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <>
-                      <CircularProgress size={24} sx={{ mr: 1, color: "white" }} />
-                      Guardando...
-                    </>
-                  ) : (
-                    "Registrar Proveedor"
-                  )}
-                </Button>
-              </Box>
+                {/* Campo de comentarios */}
+                <TextField
+                  fullWidth
+                  label="Comentarios"
+                  name="comentario"
+                  value={formData.comentario}
+                  onChange={handleChange}
+                  multiline
+                  rows={4}
+                  placeholder="Agregar comentarios como condición comercial, datos bancarios, etc."
+                  sx={{ mb: 3 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <CommentIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    startIcon={<SaveIcon />}
+                    disabled={submitting || !selectedEmpresa}
+                  >
+                    {submitting ? (
+                      <>
+                        <CircularProgress size={24} sx={{ mr: 1, color: "white" }} />
+                        Guardando...
+                      </>
+                    ) : (
+                      "Registrar Proveedor"
+                    )}
+                  </Button>
+                </Box>
+              </form>
             </Grid>
           </Grid>
-        </form>
+        </Box>
       </Paper>
     </Container>
   )
 }
-

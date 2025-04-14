@@ -61,12 +61,10 @@ model Cliente {
   idCliente             Int                     @id @default(autoincrement()) @map("id_cliente")
   idPersona             Int                     @map("id_persona")
   idSectorCliente       Int                     @map("id_sector_cliente")
-  idCondicionPago       Int                     @map("id_condicion_pago")
   idEmpresa             Int?                    @map("id_empresa")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
-  condicionPago         CondicionPago           @relation(fields: [idCondicionPago], references: [idCondicionPago], onDelete: NoAction, onUpdate: NoAction, map: "condicion_pago_cliente_fk")
   empresa               Empresa?                @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_cliente_fk")
   persona               Persona                 @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_cliente_fk")
   sectorCliente         SectorCliente           @relation(fields: [idSectorCliente], references: [idSectorCliente], onDelete: NoAction, onUpdate: NoAction, map: "sector_cliente_cliente_fk")
@@ -82,8 +80,6 @@ model CondicionPago {
   createdAt         DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime?   @default(now()) @map("updated_at")
   deletedAt         DateTime?   @map("deleted_at")
-  cliente           Cliente[]
-  proveedor         Proveedor[]
 }
 
 model CotizacionCliente {
@@ -186,14 +182,13 @@ model Empresa {
   idCiudad           Int              @map("id_ciudad")
   correoEmpresa      String           @map("correo_empresa") @db.VarChar
   telefono           String           @map("telefono") @db.VarChar
-  personaContacto    Int              @map("persona_contacto")
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime?        @default(now()) @map("updated_at")
   deletedAt          DateTime?        @map("deleted_at")
+  contacto           String           @map("contacto") @db.VarChar
   cliente            Cliente[]
   categoriaEmpresa   CategoriaEmpresa @relation(fields: [idCategoriaEmpresa], references: [idCategoriaEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "categoria_empresa_empresa_fk")
   ciudad             Ciudad           @relation(fields: [idCiudad], references: [idCiudad], onDelete: NoAction, onUpdate: NoAction, map: "ciudad_empresa_fk")
-  persona            Persona          @relation(fields: [personaContacto], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_empresa_fk")
   tipoDocumento      TipoDocumento    @relation(fields: [idTipoDocumento], references: [idTipoDocumento], onDelete: NoAction, onUpdate: NoAction, map: "tipo_documento_empresa_fk")
   proveedor          Proveedor[]
 }
@@ -297,7 +292,7 @@ model EstadoProducto {
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime?  @default(now()) @map("updated_at")
   deletedAt          DateTime?  @map("deleted_at")
-  producto           Producto[]
+  productos          Producto[] 
 }
 
 model FacturaClienteContado {
@@ -418,16 +413,12 @@ model MateriaPrima {
   idMateriaPrima        Int                     @id(map: "materia_prima_pk") @default(autoincrement()) @map("id_materia_prima")
   nombreMateriaPrima    String                  @map("nombre_materia_prima") @db.VarChar
   descMateriaPrima      String                  @map("desc_materia_prima") @db.VarChar
-  stockActual           Float                   @map("stock_actual")
-  stockMinimo           Float                   @map("stock_minimo")
-  idUnidadMedida        Int                     @map("id_unidad_medida")
   idEstadoMateriaPrima  Int                     @map("id_estado_materia_prima")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
   detalleCotizacionProv DetalleCotizacionProv[]
   estadoMateriaPrima    EstadoMateriaPrima      @relation(fields: [idEstadoMateriaPrima], references: [idEstadoMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "estado_materia_prima_materia_prima_fk")
-  unidadMedida          UnidadMedida            @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_materia_prima_fk")
 }
 
 model MetodoPago {
@@ -564,43 +555,41 @@ model Persona {
   updatedAt       DateTime?     @default(now()) @map("updated_at")
   deletedAt       DateTime?     @map("deleted_at")
   cliente         Cliente[]
-  empresa         Empresa[]
   ciudad          Ciudad        @relation(fields: [idCiudad], references: [idCiudad], onDelete: NoAction, onUpdate: NoAction, map: "ciudad_persona_fk")
   tipoDocumento   TipoDocumento @relation(fields: [idTipoDocumento], references: [idTipoDocumento], onDelete: NoAction, onUpdate: NoAction, map: "tipo_documento_persona_fk")
   usuario         Usuario[]
 }
 
 model Producto {
-  idProducto               Int                        @id(map: "producto_pk") @default(autoincrement()) @map("id_producto")
-  nombreProducto           String                     @map("nombre_producto") @db.VarChar
-  descripcion              String                     @map("descripcion") @db.VarChar
-  idTipoProducto           Int                        @map("id_tipo_producto")
-  pesoUnidad               Float                      @map("peso_unidad")
-  precioUnitario           Float                      @map("precio_unitario")
-  idEstadoProducto         Int                        @map("id_estado_producto")
-  idUnidadMedida           Int                        @map("id_unidad_medida")
-  createdAt                DateTime                   @default(now()) @map("created_at")
-  updatedAt                DateTime?                  @default(now()) @map("updated_at")
-  deletedAt                DateTime?                  @map("deleted_at")
+  idProducto                Int                        @id(map: "producto_pk") @default(autoincrement()) @map("id_producto")
+  nombreProducto            String                     @map("nombre_producto") @db.VarChar
+  descripcion               String                     @map("descripcion") @db.VarChar
+  idTipoProducto            Int                        @map("id_tipo_producto")
+  pesoUnidad                Float                      @map("peso_unidad")
+  precioUnitario            Float                      @map("precio_unitario")
+  idUnidadMedida            Int                        @map("id_unidad_medida")
+  idEstadoProducto          Int                        @map("id_estado_producto") 
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  updatedAt                 DateTime?                  @default(now()) @map("updated_at")
+  deletedAt                 DateTime?                  @map("deleted_at")
   detalleCotizacionCliente DetalleCotizacionCliente[]
-  pedidoDetalle            PedidoDetalle[]
-  estadoProducto           EstadoProducto             @relation(fields: [idEstadoProducto], references: [idEstadoProducto], onDelete: NoAction, onUpdate: NoAction, map: "estado_producto_producto_fk")
-  tipoProducto             TipoProducto               @relation(fields: [idTipoProducto], references: [idTipoProducto], onDelete: NoAction, onUpdate: NoAction, map: "tipo_producto_producto_fk")
-  unidadMedida             UnidadMedida               @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_producto_fk")
+  pedidoDetalle             PedidoDetalle[]
+  tipoProducto              TipoProducto               @relation(fields: [idTipoProducto], references: [idTipoProducto], onDelete: NoAction, onUpdate: NoAction, map: "tipo_producto_producto_fk")
+  unidadMedida              UnidadMedida               @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_producto_fk")
+  estadoProducto            EstadoProducto             @relation(fields: [idEstadoProducto], references: [idEstadoProducto], onDelete: NoAction, onUpdate: NoAction, map: "estado_producto_producto_fk") // 👈 Relación
 }
 
 model Proveedor {
-  idProveedor         Int                   @id(map: "proveedor_pk") @default(autoincrement()) @map("id_proveedor")
-  idEmpresa           Int                   @map("id_empresa")
-  idCondicionPago     Int                   @map("id_condicion_pago")
-  createdAt           DateTime              @default(now()) @map("created_at")
-  updatedAt           DateTime?             @default(now()) @map("updated_at")
-  deletedAt           DateTime?             @map("deleted_at")
-  cotizacionProveedor CotizacionProveedor[]
-  facturaContadoProv  FacturaContadoProv[]
-  facturaCreditoProv  FacturaCreditoProv[]
-  condicionPago       CondicionPago         @relation(fields: [idCondicionPago], references: [idCondicionPago], onDelete: NoAction, onUpdate: NoAction, map: "condicion_pago_proveedor_fk")
-  empresa             Empresa               @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_proveedor_fk")
+  idProveedor          Int                   @id(map: "proveedor_pk") @default(autoincrement()) @map("id_proveedor")
+  idEmpresa            Int                   @map("id_empresa")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime?             @default(now()) @map("updated_at")
+  deletedAt            DateTime?             @map("deleted_at")
+  comentario           String                @default("") @map("comentario")
+  cotizacionProveedor  CotizacionProveedor[]
+  facturaContadoProv   FacturaContadoProv[]
+  facturaCreditoProv   FacturaCreditoProv[]
+  empresa              Empresa               @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_proveedor_fk")
 }
 
 model Rol {
@@ -609,6 +598,7 @@ model Rol {
   createdAt  DateTime     @default(now()) @map("created_at")
   updatedAt  DateTime?    @default(now()) @map("updated_at")
   deletedAt  DateTime?    @map("deleted_at")
+  estadoRol  String       @map("estado_rol") @db.VarChar
   rolPermiso RolPermiso[]
   usuario    Usuario[]
 }
@@ -713,7 +703,6 @@ model UnidadMedida {
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime?      @default(now()) @map("updated_at")
   deletedAt        DateTime?      @map("deleted_at")
-  materiaPrima     MateriaPrima[]
   producto         Producto[]
 }
 

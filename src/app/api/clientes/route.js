@@ -6,23 +6,49 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 
 export async function GET(request) {
   try {
-    console.log("Obteniendo clientes...")
+    // Obtener parámetros de búsqueda de la URL
+    const { searchParams } = new URL(request.url)
+    const tipoDocumento = searchParams.get("tipoDocumento")
+    const numeroDocumento = searchParams.get("numeroDocumento")
+
+    console.log("Buscando clientes con parámetros:", { tipoDocumento, numeroDocumento })
+
+    // Si no se proporcionan parámetros de búsqueda, devolver un array vacío
+    // en lugar de todos los clientes
+    if (!tipoDocumento || !numeroDocumento) {
+      console.log("No se proporcionaron parámetros de búsqueda completos")
+      return NextResponse.json([], { status: HTTP_STATUS_CODES.ok })
+    }
+
+    // Buscar clientes por tipo y número de documento
     const clientes = await prisma.cliente.findMany({
-      include: {
-        persona: true,
-        sectorCliente: true,
-        condicionPago: true,
-        empresa: true,
-      },
       where: {
         deletedAt: null,
+        persona: {
+          idTipoDocumento: Number(tipoDocumento),
+          nroDocumento: {
+            contains: numeroDocumento,
+            mode: "insensitive", // Búsqueda insensible a mayúsculas/minúsculas
+          },
+          deletedAt: null,
+        },
+      },
+      include: {
+        persona: {
+          include: {
+            tipoDocumento: true,
+          },
+        },
+        sectorCliente: true,
+        empresa: true,
       },
     })
-    console.log(`Se encontraron ${clientes.length} clientes`)
+
+    console.log(`Se encontraron ${clientes.length} clientes con los criterios de búsqueda`)
     return NextResponse.json(clientes, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("Error al obtener clientes:", error)
-    return NextResponse.json({ error: "Error al obtener clientes" }, { status: HTTP_STATUS_CODES.internalServerError })
+    console.error("Error al buscar clientes:", error)
+    return NextResponse.json({ error: "Error al buscar clientes" }, { status: HTTP_STATUS_CODES.internalServerError })
   }
 }
 
@@ -46,10 +72,10 @@ export async function POST(request) {
     }
 
     // Validar datos requeridos
-    if (!data.idPersona || !data.idSectorCliente || !data.idCondicionPago) {
+    if (!data.idPersona || !data.idSectorCliente) {
       console.error("Datos incompletos:", data)
       return NextResponse.json(
-        { error: "Faltan datos requeridos (persona, sector o condición de pago)" },
+        { error: "Faltan datos requeridos (persona, o sector)" },
         { status: HTTP_STATUS_CODES.badRequest },
       )
     }
@@ -59,13 +85,11 @@ export async function POST(request) {
       data: {
         idPersona: Number.parseInt(data.idPersona),
         idSectorCliente: Number.parseInt(data.idSectorCliente),
-        idCondicionPago: Number.parseInt(data.idCondicionPago),
         idEmpresa: data.idEmpresa ? Number.parseInt(data.idEmpresa) : null,
       },
       include: {
         persona: true,
         sectorCliente: true,
-        condicionPago: true,
         empresa: true,
       },
     })

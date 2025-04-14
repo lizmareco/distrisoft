@@ -115,9 +115,6 @@ export default function ListaMateriaPrima() {
                 <TableCell>ID</TableCell>
                 <TableCell>Nombre</TableCell>
                 <TableCell>Descripción</TableCell>
-                <TableCell>Stock Actual</TableCell>
-                <TableCell>Stock Mínimo</TableCell>
-                <TableCell>Unidad de Medida</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell>Acciones</TableCell>
               </TableRow>
@@ -129,13 +126,6 @@ export default function ListaMateriaPrima() {
                     <TableCell>{materiaPrima.idMateriaPrima}</TableCell>
                     <TableCell>{materiaPrima.nombreMateriaPrima}</TableCell>
                     <TableCell>{materiaPrima.descMateriaPrima}</TableCell>
-                    <TableCell>{materiaPrima.stockActual}</TableCell>
-                    <TableCell>{materiaPrima.stockMinimo}</TableCell>
-                    <TableCell>
-                      {materiaPrima.unidadMedida
-                        ? `${materiaPrima.unidadMedida.descUnidadMedida} (${materiaPrima.unidadMedida.abreviatura})`
-                        : "N/A"}
-                    </TableCell>
                     <TableCell>
                       {materiaPrima.estadoMateriaPrima ? materiaPrima.estadoMateriaPrima.descEstadoMateriaPrima : "N/A"}
                     </TableCell>
