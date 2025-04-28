@@ -100,18 +100,17 @@ model CotizacionCliente {
 }
 
 model CotizacionProveedor {
-  idCotizacionProveedor    Int                    @id @default(autoincrement()) @map("id_cotizacion_proveedor")
-  idProveedor              Int                    @map("id_proveedor")
-  fechaCotizacionProveedor DateTime               @map("fecha_cotizacion_proveedor") @db.Timestamp(6)
-  validez                  Int                    @map("validez")
-  montoTotal               Float                  @map("monto_total")
-  idEstadoCotizacionProv   Int                    @map("id_estado_cotizacion_prov")
-  createdAt                DateTime               @default(now()) @map("created_at")
-  updatedAt                DateTime?              @default(now()) @map("updated_at")
-  deletedAt                DateTime?              @map("deleted_at")
-  estadoCotizacionProv     EstadoCotizacionProv   @relation(fields: [idEstadoCotizacionProv], references: [idEstadoCotizacionProv], onDelete: NoAction, onUpdate: NoAction, map: "estado_cotizacion_prov_cotizacion_proveedor_fk")
-  proveedor                Proveedor              @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_cotizacion_proveedor_fk")
-  detalleCotizacionProv    DetalleCotizacionProv?
+  idCotizacionProveedor    Int                     @id @default(autoincrement()) @map("id_cotizacion_proveedor")
+  idProveedor              Int                     @map("id_proveedor")
+  fechaCotizacionProveedor DateTime                @map("fecha_cotizacion_proveedor") @db.Timestamp(6)
+  validez                  Int                     @map("validez")
+  montoTotal               Float                   @map("monto_total")
+  createdAt                DateTime                @default(now()) @map("created_at")
+  updatedAt                DateTime?               @default(now()) @map("updated_at")
+  deletedAt                DateTime?               @map("deleted_at")
+  estado                   String                  @map("estado") @db.VarChar
+  proveedor                Proveedor               @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_cotizacion_proveedor_fk")
+  detallesCotizacionProv   DetalleCotizacionProv[] // Cambiado a plural y array para indicar relación uno a muchos
   ordenCompra              OrdenCompra[]
 }
 
@@ -130,16 +129,17 @@ model DetalleCotizacionCliente {
 }
 
 model DetalleCotizacionProv {
-  idCotizacionProveedor Int                 @id(map: "detalle_cotizacion_prov_pk") @map("id_cotizacion_proveedor")
-  cantidad              Int                 @map("cantidad")
-  precioUnitario        Float               @map("precio_unitario")
-  subtotal              Float               @map("subtotal")
-  idMateriaPrima        Int                 @map("id_materia_prima")
-  createdAt             DateTime            @default(now()) @map("created_at")
-  updatedAt             DateTime?           @default(now()) @map("updated_at")
-  deletedAt             DateTime?           @map("deleted_at")
-  cotizacionProveedor   CotizacionProveedor @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_detalle_cotizacion_prov_fk")
-  materiaPrima          MateriaPrima        @relation(fields: [idMateriaPrima], references: [idMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "materia_prima_detalle_cotizacion_prov_fk")
+  idDetalleCotizacionProv Int                 @id @default(autoincrement()) @map("id_detalle_cotizacion_prov") // Nueva clave primaria
+  idCotizacionProveedor   Int                 @map("id_cotizacion_proveedor")
+  cantidad                Int                 @map("cantidad")
+  precioUnitario          Float               @map("precio_unitario")
+  subtotal                Float               @map("subtotal")
+  idMateriaPrima          Int                 @map("id_materia_prima")
+  createdAt               DateTime            @default(now()) @map("created_at")
+  updatedAt               DateTime?           @default(now()) @map("updated_at")
+  deletedAt               DateTime?           @map("deleted_at")
+  cotizacionProveedor     CotizacionProveedor @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_detalle_cotizacion_prov_fk")
+  materiaPrima            MateriaPrima        @relation(fields: [idMateriaPrima], references: [idMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "materia_prima_detalle_cotizacion_prov_fk")
 }
 
 model DetallePagoFacCliente {
@@ -218,7 +218,6 @@ model EstadoCotizacionProv {
   createdAt                DateTime              @default(now()) @map("created_at")
   updatedAt                DateTime?             @default(now()) @map("updated_at")
   deletedAt                DateTime?             @map("deleted_at")
-  cotizacionProveedor      CotizacionProveedor[]
 }
 
 model EstadoFactuCliente {
@@ -431,7 +430,6 @@ model MetodoPago {
   detallePagoFacProv    DetallePagoFacProv[]
   facturaClienteContado FacturaClienteContado[]
   facturaContadoProv    FacturaContadoProv[]
-  pedidoCliente         PedidoCliente[]
 }
 
 model Nota {
@@ -503,7 +501,6 @@ model PedidoCliente {
   montoTotal            Float                   @map("monto_total")
   vendedor              Int                     @map("vendedor")
   observacion           String                  @map("observacion") @db.VarChar
-  idMetodoPago          Int                     @map("id_metodo_pago")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
@@ -512,7 +509,6 @@ model PedidoCliente {
   ordenProduccion       OrdenProduccion[]
   cliente               Cliente                 @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction, map: "cliente_pedido_cliente_fk")
   estadoPedido          EstadoPedido            @relation(fields: [idEstadoPedido], references: [idEstadoPedido], onDelete: NoAction, onUpdate: NoAction, map: "estado_pedido_pedido_cliente_fk")
-  metodoPago            MetodoPago              @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_pedido_cliente_fk")
   usuario               Usuario                 @relation(fields: [vendedor], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_pedido_cliente_fk")
   pedidoDetalle         PedidoDetalle[]
 }
@@ -576,7 +572,7 @@ model Producto {
   pedidoDetalle             PedidoDetalle[]
   tipoProducto              TipoProducto               @relation(fields: [idTipoProducto], references: [idTipoProducto], onDelete: NoAction, onUpdate: NoAction, map: "tipo_producto_producto_fk")
   unidadMedida              UnidadMedida               @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_producto_fk")
-  estadoProducto            EstadoProducto             @relation(fields: [idEstadoProducto], references: [idEstadoProducto], onDelete: NoAction, onUpdate: NoAction, map: "estado_producto_producto_fk") // 👈 Relación
+  estadoProducto            EstadoProducto             @relation(fields: [idEstadoProducto], references: [idEstadoProducto], onDelete: NoAction, onUpdate: NoAction, map: "estado_producto_producto_fk")
 }
 
 model Proveedor {
