@@ -14,6 +14,12 @@ import {
   Tooltip,
   Badge,
   Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  CircularProgress,
 } from "@mui/material"
 import { Logout, Dashboard, Notifications, NotificationsActive } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
@@ -30,6 +36,7 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   // Verificar si estamos en una página de autenticación
   const isAuthPage = pathname?.includes("/auth/") || pathname === "/auth" || pathname === "/profile/change-password"
@@ -63,27 +70,56 @@ export default function Navbar() {
     }
   }
 
+  // Función para abrir el diálogo de confirmación de cierre de sesión
+  const confirmLogout = () => {
+    setUserMenuAnchor(null)
+    setLogoutDialogOpen(true)
+  }
+
   // Función para cerrar sesión
   const handleLogout = async () => {
-    setUserMenuAnchor(null)
+    setLoggingOut(true)
 
     try {
-      await fetch("/api/auth/logout", {
+      // Obtener el token actual para enviarlo en la solicitud
+      const token = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken")
+
+      const response = await fetch("/api/auth/logout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
         },
         credentials: "include",
       })
 
+      // Limpiar datos de sesión del almacenamiento local
+      localStorage.removeItem("accessToken")
+      localStorage.removeItem("refreshToken")
+      localStorage.removeItem("user")
+      sessionStorage.removeItem("accessToken")
+      sessionStorage.removeItem("refreshToken")
+      sessionStorage.removeItem("user")
+
+      // Limpiar cookies (aunque esto ya lo hace el backend)
+      document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+      document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+      document.cookie = "at=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+      document.cookie = "rt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+
+      // Actualizar el estado global
       if (setState && setState.setSession) {
         setState.setSession(null)
       }
 
+      // Redirigir al login
       router.push("/auth/login")
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
-      alert("Error al cerrar sesión")
+      alert("Error al cerrar sesión. Por favor, inténtelo de nuevo.")
+    } finally {
+      setLoggingOut(false)
+      setLogoutDialogOpen(false)
     }
   }
 
@@ -216,13 +252,35 @@ export default function Navbar() {
             >
               Cambiar Contraseña
             </MenuItem>
-            <MenuItem onClick={handleLogout}>
+            <MenuItem onClick={confirmLogout}>
               <Logout fontSize="small" sx={{ mr: 1 }} />
               Cerrar Sesión
             </MenuItem>
           </Menu>
         </Box>
       </Toolbar>
+
+      {/* Diálogo de confirmación de cierre de sesión */}
+      <Dialog open={logoutDialogOpen} onClose={() => !loggingOut && setLogoutDialogOpen(false)}>
+        <DialogTitle>Cerrar Sesión</DialogTitle>
+        <DialogContent>
+          <DialogContentText>¿Está seguro de que desea cerrar la sesión?</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLogoutDialogOpen(false)} color="primary" disabled={loggingOut}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleLogout}
+            color="error"
+            variant="contained"
+            disabled={loggingOut}
+            startIcon={loggingOut ? <CircularProgress size={20} color="inherit" /> : <Logout />}
+          >
+            {loggingOut ? "Cerrando sesión..." : "Cerrar Sesión"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppBar>
   )
 }
