@@ -24,7 +24,6 @@ import EditIcon from "@mui/icons-material/Edit"
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 import PersonIcon from "@mui/icons-material/Person"
 import InventoryIcon from "@mui/icons-material/Inventory"
-import { format } from "date-fns"
 
 export default function DetallePedido({ id }) {
   const router = useRouter()
@@ -44,6 +43,7 @@ export default function DetallePedido({ id }) {
         }
 
         const datos = await respuesta.json()
+        console.log("Datos del pedido recibidos:", datos) // Verificar estructura de datos
         setPedido(datos)
       } catch (error) {
         console.error("Error:", error)
@@ -68,12 +68,30 @@ export default function DetallePedido({ id }) {
     router.push(`/pedidos/editar/${id}`)
   }
 
-  // Formatear fecha
-  const formatearFecha = (fecha) => {
+  // Reemplazar la función formatearFecha con esta versión corregida:
+  // Formatear fecha específicamente para el formato ISO
+  const formatearFecha = (fechaStr) => {
     try {
-      return format(new Date(fecha), "dd/MM/yyyy")
+      if (!fechaStr) return "No definida"
+
+      // Crear un objeto Date a partir del string de fecha
+      const fecha = new Date(fechaStr)
+
+      // Verificar si la fecha es válida
+      if (isNaN(fecha.getTime())) {
+        console.error("Fecha inválida:", fechaStr)
+        return "Formato inválido"
+      }
+
+      // Formatear la fecha en formato dd/mm/yyyy
+      const dia = fecha.getDate().toString().padStart(2, "0")
+      const mes = (fecha.getMonth() + 1).toString().padStart(2, "0")
+      const año = fecha.getFullYear()
+
+      return `${dia}/${mes}/${año}`
     } catch (error) {
-      return "Fecha inválida"
+      console.error("Error al formatear fecha:", error, fechaStr)
+      return "Error de formato"
     }
   }
 
@@ -146,9 +164,16 @@ export default function DetallePedido({ id }) {
           </Grid>
 
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Fecha</Typography>
+            <Typography variant="subtitle2">Fecha de Pedido</Typography>
             <Typography variant="body1" gutterBottom>
               {formatearFecha(pedido.fechaPedido)}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Typography variant="subtitle2">Fecha de Entrega</Typography>
+            <Typography variant="body1" gutterBottom>
+              {formatearFecha(pedido.fechaEntrega)}
             </Typography>
           </Grid>
 
@@ -164,7 +189,7 @@ export default function DetallePedido({ id }) {
           <Grid item xs={12} md={6}>
             <Typography variant="subtitle2">Total</Typography>
             <Typography variant="body1" gutterBottom>
-              ${pedido.montoTotal?.toFixed(2) || "0.00"}
+              ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
             </Typography>
           </Grid>
 
@@ -257,9 +282,11 @@ export default function DetallePedido({ id }) {
                     <TableCell>
                       {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
                     </TableCell>
-                    <TableCell align="right">${detalle.precioUnitario.toFixed(2)}</TableCell>
+                    <TableCell align="right">₲ {detalle.precioUnitario.toLocaleString("es-PY")}</TableCell>
                     <TableCell align="right">{detalle.cantidad}</TableCell>
-                    <TableCell align="right">${(detalle.cantidad * detalle.precioUnitario).toFixed(2)}</TableCell>
+                    <TableCell align="right">
+                      ₲ {Math.round(detalle.cantidad * detalle.precioUnitario).toLocaleString("es-PY")}
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
@@ -279,7 +306,7 @@ export default function DetallePedido({ id }) {
           <Grid container justifyContent="flex-end">
             <Grid item xs={12} md={4}>
               <Typography variant="h6" align="right">
-                Total: ${pedido.montoTotal?.toFixed(2) || "0.00"}
+                Total: ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
               </Typography>
             </Grid>
           </Grid>

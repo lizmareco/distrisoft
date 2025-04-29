@@ -25,13 +25,13 @@ import {
   CircularProgress,
   TextField,
   InputAdornment,
+  Tooltip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import VisibilityIcon from "@mui/icons-material/Visibility"
 import SearchIcon from "@mui/icons-material/Search"
-import { format } from "date-fns"
 
 export default function ListaPedidos() {
   const router = useRouter()
@@ -59,6 +59,7 @@ export default function ListaPedidos() {
         }
 
         const datos = await respuesta.json()
+        console.log("Datos de pedidos recibidos:", datos) // Verificar estructura de datos
         setPedidos(datos || [])
       } catch (error) {
         console.error("Error:", error)
@@ -157,12 +158,30 @@ export default function ListaPedidos() {
     return "default"
   }
 
-  // Formatear fecha
-  const formatearFecha = (fecha) => {
+  // Reemplazar la función formatearFecha con esta versión corregida:
+  // Formatear fecha específicamente para el formato ISO
+  const formatearFecha = (fechaStr) => {
     try {
-      return format(new Date(fecha), "dd/MM/yyyy")
+      if (!fechaStr) return "No definida"
+
+      // Crear un objeto Date a partir del string de fecha
+      const fecha = new Date(fechaStr)
+
+      // Verificar si la fecha es válida
+      if (isNaN(fecha.getTime())) {
+        console.error("Fecha inválida:", fechaStr)
+        return "Formato inválido"
+      }
+
+      // Formatear la fecha en formato dd/mm/yyyy
+      const dia = fecha.getDate().toString().padStart(2, "0")
+      const mes = (fecha.getMonth() + 1).toString().padStart(2, "0")
+      const año = fecha.getFullYear()
+
+      return `${dia}/${mes}/${año}`
     } catch (error) {
-      return "Fecha inválida"
+      console.error("Error al formatear fecha:", error, fechaStr)
+      return "Error de formato"
     }
   }
 
@@ -211,9 +230,11 @@ export default function ListaPedidos() {
           <TableHead>
             <TableRow>
               <TableCell>ID</TableCell>
-              <TableCell>Fecha</TableCell>
+              <TableCell>Fecha Pedido</TableCell>
+              <TableCell>Fecha Entrega</TableCell>
               <TableCell>Cliente</TableCell>
               <TableCell>Estado</TableCell>
+              <TableCell>Observación</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Acciones</TableCell>
             </TableRow>
@@ -221,7 +242,7 @@ export default function ListaPedidos() {
           <TableBody>
             {pedidosFiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={8} align="center">
                   No hay pedidos registrados
                 </TableCell>
               </TableRow>
@@ -230,6 +251,7 @@ export default function ListaPedidos() {
                 <TableRow key={pedido.idPedido}>
                   <TableCell>{pedido.idPedido}</TableCell>
                   <TableCell>{formatearFecha(pedido.fechaPedido)}</TableCell>
+                  <TableCell>{formatearFecha(pedido.fechaEntrega)}</TableCell>
                   <TableCell>
                     {pedido.cliente ? (
                       pedido.cliente.persona ? (
@@ -245,12 +267,25 @@ export default function ListaPedidos() {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"} // Usar descEstadoPedido en lugar de nombre
+                      label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
                       color={getEstadoColor(pedido.estadoPedido)}
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>${pedido.montoTotal?.toFixed(2) || "0.00"}</TableCell>
+                  <TableCell>
+                    {pedido.observacion ? (
+                      <Tooltip title={pedido.observacion}>
+                        <Typography noWrap sx={{ maxWidth: 150 }}>
+                          {pedido.observacion}
+                        </Typography>
+                      </Tooltip>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Sin observaciones
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}</TableCell>
                   <TableCell>
                     <IconButton color="info" onClick={() => irAVerPedido(pedido.idPedido)} title="Ver detalles">
                       <VisibilityIcon />

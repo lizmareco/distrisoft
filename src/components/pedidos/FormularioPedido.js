@@ -544,7 +544,7 @@ export default function FormularioPedido() {
               fullWidth
               margin="normal"
               InputProps={{
-                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                startAdornment: <InputAdornment position="start">₲</InputAdornment>,
                 inputProps: { min: 0, step: 0.01 },
               }}
             />
@@ -594,9 +594,9 @@ export default function FormularioPedido() {
                 detalles.map((detalle, index) => (
                   <TableRow key={index}>
                     <TableCell>{detalle.nombreProducto}</TableCell>
-                    <TableCell align="right">${detalle.precioUnitario.toFixed(2)}</TableCell>
+                    <TableCell align="right">₲ {detalle.precioUnitario.toLocaleString("es-PY")}</TableCell>
                     <TableCell align="right">{detalle.cantidad}</TableCell>
-                    <TableCell align="right">${detalle.subtotal.toFixed(2)}</TableCell>
+                    <TableCell align="right">₲ {Math.round(detalle.subtotal).toLocaleString("es-PY")}</TableCell>
                     <TableCell align="center">
                       <IconButton color="error" size="small" onClick={() => eliminarProducto(index)} title="Eliminar">
                         <DeleteIcon />
@@ -615,7 +615,7 @@ export default function FormularioPedido() {
           <Grid container justifyContent="flex-end">
             <Grid item xs={12} md={4}>
               <Typography variant="h6" align="right">
-                Total: ${calcularTotal().toFixed(2)}
+                Total: ₲ {Math.round(calcularTotal()).toLocaleString("es-PY")}
               </Typography>
             </Grid>
           </Grid>

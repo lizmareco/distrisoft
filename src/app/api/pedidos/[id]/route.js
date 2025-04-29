@@ -77,8 +77,24 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: `Pedido con ID ${id} no encontrado` }, { status: 404 })
     }
 
+    // Convertir fechas a formato string para evitar problemas de serialización
+    const pedidoConFechasFormateadas = {
+      ...pedido,
+      fechaPedido: pedido.fechaPedido ? pedido.fechaPedido.toISOString() : null,
+      fechaEntrega: pedido.fechaEntrega ? pedido.fechaEntrega.toISOString() : null,
+      createdAt: pedido.createdAt ? pedido.createdAt.toISOString() : null,
+      updatedAt: pedido.updatedAt ? pedido.updatedAt.toISOString() : null,
+      deletedAt: pedido.deletedAt ? pedido.deletedAt.toISOString() : null,
+    }
+
+    // Imprimir fechas para depuración
+    console.log(`API: Fechas del pedido ${id}:`, {
+      fechaPedido: pedidoConFechasFormateadas.fechaPedido,
+      fechaEntrega: pedidoConFechasFormateadas.fechaEntrega,
+    })
+
     console.log(`API: Pedido con ID ${id} obtenido correctamente`)
-    return NextResponse.json(pedido)
+    return NextResponse.json(pedidoConFechasFormateadas)
   } catch (error) {
     console.error(`API: Error al obtener pedido con ID ${params.id}:`, error)
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -53,8 +53,30 @@ export async function GET() {
       },
     })
 
+    // Convertir fechas a formato string para evitar problemas de serialización
+    const pedidosConFechasFormateadas = pedidos.map((pedido) => {
+      // Convertir fechas a strings en formato ISO
+      return {
+        ...pedido,
+        fechaPedido: pedido.fechaPedido ? pedido.fechaPedido.toISOString() : null,
+        fechaEntrega: pedido.fechaEntrega ? pedido.fechaEntrega.toISOString() : null,
+        createdAt: pedido.createdAt ? pedido.createdAt.toISOString() : null,
+        updatedAt: pedido.updatedAt ? pedido.updatedAt.toISOString() : null,
+        deletedAt: pedido.deletedAt ? pedido.deletedAt.toISOString() : null,
+      }
+    })
+
+    // Imprimir un ejemplo de pedido para depuración
+    if (pedidosConFechasFormateadas.length > 0) {
+      console.log("API: Ejemplo de pedido:", {
+        idPedido: pedidosConFechasFormateadas[0].idPedido,
+        fechaPedido: pedidosConFechasFormateadas[0].fechaPedido,
+        fechaEntrega: pedidosConFechasFormateadas[0].fechaEntrega,
+      })
+    }
+
     console.log(`API: Se encontraron ${pedidos.length} pedidos`)
-    return NextResponse.json(pedidos)
+    return NextResponse.json(pedidosConFechasFormateadas)
   } catch (error) {
     console.error("API: Error al obtener pedidos:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
