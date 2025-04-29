@@ -440,7 +440,6 @@ model MetodoPago {
   detallePagoFacProv    DetallePagoFacProv[]
   facturaClienteContado FacturaClienteContado[]
   facturaContadoProv    FacturaContadoProv[]
-  pedidoCliente         PedidoCliente[]
 }
 
 model Nota {
@@ -512,7 +511,6 @@ model PedidoCliente {
   montoTotal            Float                   @map("monto_total")
   vendedor              Int                     @map("vendedor")
   observacion           String                  @map("observacion") @db.VarChar
-  idMetodoPago          Int                     @map("id_metodo_pago")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
@@ -521,7 +519,6 @@ model PedidoCliente {
   ordenProduccion       OrdenProduccion[]
   cliente               Cliente                 @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction, map: "cliente_pedido_cliente_fk")
   estadoPedido          EstadoPedido            @relation(fields: [idEstadoPedido], references: [idEstadoPedido], onDelete: NoAction, onUpdate: NoAction, map: "estado_pedido_pedido_cliente_fk")
-  metodoPago            MetodoPago              @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_pedido_cliente_fk")
   usuario               Usuario                 @relation(fields: [vendedor], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_pedido_cliente_fk")
   pedidoDetalle         PedidoDetalle[]
 }
