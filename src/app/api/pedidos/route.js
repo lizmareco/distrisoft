@@ -53,13 +53,24 @@ export async function GET() {
       },
     })
 
-    // Convertir fechas a formato string para evitar problemas de serialización
-    const pedidosConFechasFormateadas = pedidos.map((pedido) => {
-      // Convertir fechas a strings en formato ISO
+    // Convertir las fechas a strings simples sin procesar
+    const pedidosFormateados = pedidos.map((pedido) => {
+      // Función para convertir fecha a string en formato YYYY-MM-DD
+      const formatearFechaSimple = (fecha) => {
+        if (!fecha) return null
+        // Convertir directamente a string y tomar solo la parte de la fecha
+        return fecha.toISOString().split("T")[0]
+      }
+
+      // Imprimir la fecha original para depuración
+      console.log("Fecha original:", pedido.fechaPedido)
+
       return {
         ...pedido,
-        fechaPedido: pedido.fechaPedido ? pedido.fechaPedido.toISOString() : null,
-        fechaEntrega: pedido.fechaEntrega ? pedido.fechaEntrega.toISOString() : null,
+        // Convertir fechas a strings simples
+        fechaPedido: formatearFechaSimple(pedido.fechaPedido),
+        fechaEntrega: formatearFechaSimple(pedido.fechaEntrega),
+        // Otras fechas como ISO strings
         createdAt: pedido.createdAt ? pedido.createdAt.toISOString() : null,
         updatedAt: pedido.updatedAt ? pedido.updatedAt.toISOString() : null,
         deletedAt: pedido.deletedAt ? pedido.deletedAt.toISOString() : null,
@@ -67,16 +78,16 @@ export async function GET() {
     })
 
     // Imprimir un ejemplo de pedido para depuración
-    if (pedidosConFechasFormateadas.length > 0) {
-      console.log("API: Ejemplo de pedido:", {
-        idPedido: pedidosConFechasFormateadas[0].idPedido,
-        fechaPedido: pedidosConFechasFormateadas[0].fechaPedido,
-        fechaEntrega: pedidosConFechasFormateadas[0].fechaEntrega,
+    if (pedidosFormateados.length > 0) {
+      console.log("API: Ejemplo de pedido formateado:", {
+        idPedido: pedidosFormateados[0].idPedido,
+        fechaPedido: pedidosFormateados[0].fechaPedido,
+        fechaEntrega: pedidosFormateados[0].fechaEntrega,
       })
     }
 
     console.log(`API: Se encontraron ${pedidos.length} pedidos`)
-    return NextResponse.json(pedidosConFechasFormateadas)
+    return NextResponse.json(pedidosFormateados)
   } catch (error) {
     console.error("API: Error al obtener pedidos:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

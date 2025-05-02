@@ -68,30 +68,36 @@ export default function DetallePedido({ id }) {
     router.push(`/pedidos/editar/${id}`)
   }
 
-  // Reemplazar la función formatearFecha con esta versión corregida:
-  // Formatear fecha específicamente para el formato ISO
+  // Reemplazar la función formatearFecha con una versión más simple y directa
   const formatearFecha = (fechaStr) => {
     try {
       if (!fechaStr) return "No definida"
 
-      // Crear un objeto Date a partir del string de fecha
-      const fecha = new Date(fechaStr)
+      // Imprimir el formato exacto para depuración
+      console.log("Formato de fecha recibido:", fechaStr)
 
-      // Verificar si la fecha es válida
-      if (isNaN(fecha.getTime())) {
-        console.error("Fecha inválida:", fechaStr)
-        return "Formato inválido"
+      // Si la fecha ya viene en formato YYYY-MM-DD, simplemente invertir el orden
+      if (typeof fechaStr === "string" && fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [año, mes, dia] = fechaStr.split("-")
+        return `${dia}/${mes}/${año}`
       }
 
-      // Formatear la fecha en formato dd/mm/yyyy
-      const dia = fecha.getDate().toString().padStart(2, "0")
-      const mes = (fecha.getMonth() + 1).toString().padStart(2, "0")
-      const año = fecha.getFullYear()
+      // Para otros formatos, intentar extraer con regex
+      const regex = /(\d{4})-(\d{2})-(\d{2})/
+      const match = String(fechaStr).match(regex)
 
-      return `${dia}/${mes}/${año}`
+      if (match) {
+        const año = match[1]
+        const mes = match[2]
+        const dia = match[3]
+        return `${dia}/${mes}/${año}`
+      }
+
+      // Si todo falla, mostrar el string original
+      return String(fechaStr)
     } catch (error) {
       console.error("Error al formatear fecha:", error, fechaStr)
-      return "Error de formato"
+      return String(fechaStr)
     }
   }
 

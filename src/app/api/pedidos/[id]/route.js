@@ -77,24 +77,35 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: `Pedido con ID ${id} no encontrado` }, { status: 404 })
     }
 
-    // Convertir fechas a formato string para evitar problemas de serialización
-    const pedidoConFechasFormateadas = {
+    // Función para convertir fecha a string en formato YYYY-MM-DD
+    const formatearFechaSimple = (fecha) => {
+      if (!fecha) return null
+      // Convertir directamente a string y tomar solo la parte de la fecha
+      return fecha.toISOString().split("T")[0]
+    }
+
+    // Imprimir la fecha original para depuración
+    console.log("Fecha original:", pedido.fechaPedido)
+
+    const pedidoFormateado = {
       ...pedido,
-      fechaPedido: pedido.fechaPedido ? pedido.fechaPedido.toISOString() : null,
-      fechaEntrega: pedido.fechaEntrega ? pedido.fechaEntrega.toISOString() : null,
+      // Convertir fechas a strings simples
+      fechaPedido: formatearFechaSimple(pedido.fechaPedido),
+      fechaEntrega: formatearFechaSimple(pedido.fechaEntrega),
+      // Otras fechas como ISO strings
       createdAt: pedido.createdAt ? pedido.createdAt.toISOString() : null,
       updatedAt: pedido.updatedAt ? pedido.updatedAt.toISOString() : null,
       deletedAt: pedido.deletedAt ? pedido.deletedAt.toISOString() : null,
     }
 
     // Imprimir fechas para depuración
-    console.log(`API: Fechas del pedido ${id}:`, {
-      fechaPedido: pedidoConFechasFormateadas.fechaPedido,
-      fechaEntrega: pedidoConFechasFormateadas.fechaEntrega,
+    console.log(`API: Fechas del pedido ${id} formateadas:`, {
+      fechaPedido: pedidoFormateado.fechaPedido,
+      fechaEntrega: pedidoFormateado.fechaEntrega,
     })
 
     console.log(`API: Pedido con ID ${id} obtenido correctamente`)
-    return NextResponse.json(pedidoConFechasFormateadas)
+    return NextResponse.json(pedidoFormateado)
   } catch (error) {
     console.error(`API: Error al obtener pedido con ID ${params.id}:`, error)
     return NextResponse.json({ error: error.message }, { status: 500 })
