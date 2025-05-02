@@ -109,10 +109,26 @@ export async function POST(request) {
 
     // Crear transacción para asegurar que se guarden tanto el pedido como sus detalles
     const resultado = await prisma.$transaction(async (prisma) => {
+      // Usar la fecha actual si no se proporciona una fecha válida
+      const fechaPedido = new Date()
+      console.log("API: Usando fecha actual para el pedido:", fechaPedido.toISOString())
+
+      // Procesar la fecha de entrega si existe
+      let fechaEntrega = null
+      if (datos.pedido.fechaEntrega) {
+        try {
+          fechaEntrega = new Date(datos.pedido.fechaEntrega)
+          console.log("API: Fecha de entrega procesada:", fechaEntrega.toISOString())
+        } catch (error) {
+          console.warn("API: Error al procesar fecha de entrega, se usará null:", error.message)
+        }
+      }
+
       // Crear el pedido sin incluir idMetodoPago
       const pedido = await prisma.pedidoCliente.create({
         data: {
-          fechaPedido: new Date(datos.pedido.fechaPedido),
+          fechaPedido: fechaPedido,
+          fechaEntrega: fechaEntrega, // Incluir fecha de entrega si existe
           idCliente: datos.pedido.idCliente,
           idEstadoPedido: datos.pedido.idEstadoPedido,
           observacion: datos.pedido.observacion || "",
@@ -122,19 +138,34 @@ export async function POST(request) {
         },
       })
 
-      // Crear los detalles del pedido
-      const detallesPromises = datos.detalles.map((detalle) =>
-        prisma.pedidoDetalle.create({
-          data: {
-            idPedidoCliente: pedido.idPedido, // Usar idPedido en lugar de idPedidoCliente
-            idProducto: detalle.idProducto,
-            cantidad: detalle.cantidad,
-            precioUnitario: detalle.precioUnitario,
-          },
-        }),
-      )
+      console.log("API: Pedido creado:", pedido)
 
-      const detallesCreados = await Promise.all(detallesPromises)
+      // Crear los detalles del pedido
+      const detallesCreados = []
+
+      for (const detalle of datos.detalles) {
+        // Calcular el subtotal para cada detalle
+        const subtotal = detalle.cantidad * detalle.precioUnitario
+
+        try {
+          // Crear el detalle del pedido usando solo los campos que existen en el modelo
+          const detalleCreado = await prisma.pedidoDetalle.create({
+            data: {
+              idPedido: pedido.idPedido,
+              idProducto: detalle.idProducto,
+              cantidad: detalle.cantidad,
+              subtotal: subtotal,
+              // No incluir precioUnitario ya que no existe en el modelo
+            },
+          })
+
+          console.log("API: Detalle creado:", detalleCreado)
+          detallesCreados.push(detalleCreado)
+        } catch (error) {
+          console.error("API: Error al crear detalle:", error)
+          throw error
+        }
+      }
 
       return { pedido, detalles: detallesCreados }
     })

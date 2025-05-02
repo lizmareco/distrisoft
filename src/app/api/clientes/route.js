@@ -1,64 +1,86 @@
-import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
+import { prisma } from "@/prisma/client"
 
-export async function GET() {
+// GET /api/clientes - Obtener todos los clientes
+export async function GET(request) {
   try {
     console.log("Obteniendo clientes...")
-    const clientes = await prisma.cliente.findMany({
-      include: {
-        persona: true,
-        sectorCliente: true,
-        condicionPago: true,
-        empresa: true,
-      },
-      where: {
-        deletedAt: null,
-      },
-    })
-    console.log(`Se encontraron ${clientes.length} clientes`)
-    return NextResponse.json(clientes)
+
+    // Verificar si el modelo Cliente (con C mayúscula) existe
+    if (prisma.Cliente) {
+      const clientes = await prisma.Cliente.findMany({
+        where: {
+          deletedAt: null,
+        },
+        include: {
+          persona: true,
+        },
+        orderBy: {
+          // Ordenar por la relación persona.apellido
+          persona: {
+            apellido: "asc",
+          },
+        },
+      })
+
+      console.log(`Se encontraron ${clientes.length} clientes usando el modelo Cliente`)
+
+      // Transformar los datos para tener una estructura más plana
+      const clientesTransformados = clientes.map((cliente) => ({
+        idCliente: cliente.idCliente,
+        idPersona: cliente.idPersona,
+        idSectorCliente: cliente.idSectorCliente,
+        idEmpresa: cliente.idEmpresa,
+        nombre: cliente.persona?.nombre || "",
+        apellido: cliente.persona?.apellido || "",
+        nroDocumento: cliente.persona?.nroDocumento || "",
+      }))
+
+      return NextResponse.json({ clientes: clientesTransformados }, { status: 200 })
+    } else {
+      // Si el modelo Cliente no existe, intentar con una consulta SQL directa
+      console.log("El modelo Cliente no existe, intentando con SQL directo...")
+
+      // Obtener parámetros de búsqueda
+      const { searchParams } = new URL(request.url)
+      const tipoDocumento = searchParams.get("tipoDocumento")
+      const numeroDocumento = searchParams.get("numeroDocumento")
+
+      console.log("Buscando clientes con parámetros:", { tipoDocumento, numeroDocumento })
+
+      // Si se proporcionan parámetros de búsqueda específicos
+      if (tipoDocumento && numeroDocumento) {
+        // Implementar lógica de búsqueda específica
+        // ...
+      } else {
+        console.log("No se proporcionaron parámetros de búsqueda completos")
+
+        // Usar una consulta SQL directa con el nombre correcto de la tabla
+        const clientes = await prisma.$queryRaw`
+          SELECT 
+            c."idCliente" as "idCliente", 
+            c."idPersona" as "idPersona",
+            c."idSectorCliente" as "idSectorCliente",
+            c."idEmpresa" as "idEmpresa",
+            p.nombre, 
+            p.apellido, 
+            p."nroDocumento" as "nroDocumento"
+          FROM 
+            "Cliente" c
+          JOIN 
+            persona p ON c."idPersona" = p."idPersona"
+          WHERE 
+            c."deletedAt" IS NULL
+          ORDER BY 
+            p.apellido ASC
+        `
+
+        console.log(`Se encontraron ${clientes.length} clientes usando SQL directo`)
+        return NextResponse.json({ clientes }, { status: 200 })
+      }
+    }
   } catch (error) {
     console.error("Error al obtener clientes:", error)
-    return NextResponse.json({ error: "Error al obtener clientes" }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
-
-export async function POST(request) {
-  try {
-    console.log("Creando nuevo cliente...")
-    const data = await request.json()
-    console.log("Datos recibidos:", data)
-
-    // Validar datos requeridos
-    if (!data.idPersona || !data.idSectorCliente || !data.idCondicionPago) {
-      console.error("Datos incompletos:", data)
-      return NextResponse.json(
-        { error: "Faltan datos requeridos (persona, sector o condición de pago)" },
-        { status: 400 },
-      )
-    }
-
-    const cliente = await prisma.cliente.create({
-      data: {
-        idPersona: Number.parseInt(data.idPersona),
-        idSectorCliente: Number.parseInt(data.idSectorCliente),
-        idCondicionPago: Number.parseInt(data.idCondicionPago),
-        idEmpresa: data.idEmpresa ? Number.parseInt(data.idEmpresa) : null,
-      },
-      include: {
-        persona: true,
-        sectorCliente: true,
-        condicionPago: true,
-        empresa: true,
-      },
-    })
-
-    console.log("Cliente creado con ID:", cliente.idCliente)
-    return NextResponse.json(cliente)
-  } catch (error) {
-    console.error("Error al crear cliente:", error)
-    return NextResponse.json({ error: `Error al crear cliente: ${error.message}` }, { status: 500 })
-  }
-}
-
-

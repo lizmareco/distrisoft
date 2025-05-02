@@ -10,10 +10,6 @@ import {
   TextField,
   Button,
   Autocomplete,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Divider,
   Table,
   TableBody,
@@ -35,7 +31,7 @@ import SaveIcon from "@mui/icons-material/Save"
 import PersonIcon from "@mui/icons-material/Person"
 import InventoryIcon from "@mui/icons-material/Inventory"
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
-import { format } from "date-fns"
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday"
 
 export default function FormularioPedido() {
   const router = useRouter()
@@ -49,20 +45,20 @@ export default function FormularioPedido() {
 
   // Estados para los datos del formulario
   const [pedido, setPedido] = useState({
-    fechaPedido: format(new Date(), "yyyy-MM-dd"),
+    // No incluimos fechaPedido ya que se usará la fecha actual
+    fechaEntrega: "", // Nuevo campo para fecha de entrega
     idCliente: "",
-    idUsuario: "",
-    idEstadoPedido: 1, // Por defecto, estado "Pendiente"
-    observacion: "", // Cambiado de "observaciones" a "observacion" según el modelo
+    idUsuario: 1, // Usuario fijo con ID 1
+    idEstadoPedido: 1, // Estado "Pendiente" por defecto
+    observacion: "",
   })
 
   // Estados para los catálogos
   const [clientes, setClientes] = useState([])
-  const [usuarios, setUsuarios] = useState([])
-  const [estadosPedido, setEstadosPedido] = useState([])
   const [productos, setProductos] = useState([])
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState(null)
+  const [cargandoClientes, setCargandoClientes] = useState(false)
+  const [cargandoProductos, setCargandoProductos] = useState(false)
 
   // Estado para el detalle del pedido
   const [detalles, setDetalles] = useState([])
@@ -78,12 +74,12 @@ export default function FormularioPedido() {
     const cargarDatos = async () => {
       try {
         setCargando(true)
-        await Promise.all([cargarClientes(), cargarUsuarios(), cargarEstadosPedido(), cargarProductos()])
+        await Promise.all([cargarClientes(), cargarProductos()])
       } catch (error) {
         console.error("Error al cargar datos iniciales:", error)
         setSnackbar({
           abierto: true,
-          mensaje: "Error al cargar datos iniciales",
+          mensaje: "Error al cargar datos iniciales: " + error.message,
           tipo: "error",
         })
       } finally {
@@ -96,59 +92,139 @@ export default function FormularioPedido() {
 
   // Cargar clientes
   const cargarClientes = async () => {
+    setCargandoClientes(true)
     try {
+      // Intentar con el endpoint principal
+      console.log("Intentando cargar clientes desde /api/clientes...")
       const respuesta = await fetch("/api/clientes")
-      if (!respuesta.ok) throw new Error("Error al cargar clientes")
-      const datos = await respuesta.json()
-      setClientes(datos || [])
-    } catch (error) {
-      console.error("Error:", error)
-      throw error
-    }
-  }
 
-  // Cargar usuarios
-  const cargarUsuarios = async () => {
-    try {
-      const respuesta = await fetch("/api/usuarios")
-      if (!respuesta.ok) throw new Error("Error al cargar usuarios")
-      const datos = await respuesta.json()
-      setUsuarios(datos.usuarios || [])
-    } catch (error) {
-      console.error("Error:", error)
-      throw error
-    }
-  }
+      if (respuesta.ok) {
+        const datos = await respuesta.json()
+        console.log("Respuesta de clientes:", datos)
 
-  // Cargar estados de pedido
-  const cargarEstadosPedido = async () => {
-    try {
-      const respuesta = await fetch("/api/estados-pedido")
-      if (!respuesta.ok) throw new Error("Error al cargar estados de pedido")
-      const datos = await respuesta.json()
-      setEstadosPedido(datos.estadosPedido || [])
+        if (datos.clientes && Array.isArray(datos.clientes)) {
+          console.log(`Se cargaron ${datos.clientes.length} clientes`)
+          setClientes(datos.clientes)
+          return
+        } else if (Array.isArray(datos)) {
+          console.log(`Se cargaron ${datos.length} clientes (formato array)`)
+          setClientes(datos)
+          return
+        } else {
+          console.warn("Formato de respuesta inesperado para clientes:", datos)
+        }
+      } else {
+        console.error("Error al cargar clientes desde /api/clientes:", await respuesta.text())
+      }
+
+      // Si el endpoint principal falla, intentar con /api/clientes/debug
+      console.log("Intentando cargar clientes desde /api/clientes/debug...")
+      const respuestaDebug = await fetch("/api/clientes/debug")
+
+      if (respuestaDebug.ok) {
+        const datosDebug = await respuestaDebug.json()
+        console.log("Respuesta de clientes/debug:", datosDebug)
+
+        if (datosDebug.clientes && Array.isArray(datosDebug.clientes) && datosDebug.clientes.length > 0) {
+          console.log(`Se cargaron ${datosDebug.clientes.length} clientes desde /api/clientes/debug`)
+          setClientes(datosDebug.clientes)
+          return
+        } else {
+          console.warn("No se encontraron clientes en /api/clientes/debug:", datosDebug)
+        }
+      } else {
+        console.error("Error al cargar clientes desde /api/clientes/debug:", await respuestaDebug.text())
+      }
+
+      // Si todo falla, usar datos de ejemplo
+      throw new Error("No se pudieron cargar los clientes desde ningún endpoint")
     } catch (error) {
-      console.error("Error:", error)
-      // Si falla, usar estados predeterminados
-      setEstadosPedido([
-        { idEstadoPedido: 1, nombre: "Pendiente" },
-        { idEstadoPedido: 2, nombre: "En proceso" },
-        { idEstadoPedido: 3, nombre: "Completado" },
-        { idEstadoPedido: 4, nombre: "Cancelado" },
-      ])
+      console.error("Error al cargar clientes:", error)
+
+      // Crear algunos clientes de ejemplo como último recurso
+      console.log("Creando clientes de ejemplo como último recurso...")
+      const clientesEjemplo = [
+        {
+          idCliente: 1,
+          nombre: "Juan",
+          apellido: "Pérez",
+          nroDocumento: "1234567",
+        },
+        {
+          idCliente: 2,
+          nombre: "María",
+          apellido: "González",
+          nroDocumento: "7654321",
+        },
+      ]
+
+      console.log("Usando clientes de ejemplo:", clientesEjemplo)
+      setClientes(clientesEjemplo)
+
+      setSnackbar({
+        abierto: true,
+        mensaje: "No se pudieron cargar los clientes reales. Usando datos de ejemplo.",
+        tipo: "warning",
+      })
+    } finally {
+      setCargandoClientes(false)
     }
   }
 
   // Cargar productos
   const cargarProductos = async () => {
+    setCargandoProductos(true)
     try {
+      console.log("Intentando cargar productos...")
       const respuesta = await fetch("/api/productos")
-      if (!respuesta.ok) throw new Error("Error al cargar productos")
+
+      if (!respuesta.ok) {
+        throw new Error(`Error al cargar productos: ${respuesta.status}`)
+      }
+
       const datos = await respuesta.json()
-      setProductos(datos || [])
+      console.log("Respuesta de productos:", datos)
+
+      if (datos.productos && Array.isArray(datos.productos)) {
+        console.log(`Se cargaron ${datos.productos.length} productos`)
+        setProductos(datos.productos)
+      } else if (Array.isArray(datos)) {
+        console.log(`Se cargaron ${datos.length} productos (formato array)`)
+        setProductos(datos)
+      } else {
+        console.warn("Formato de respuesta inesperado para productos:", datos)
+        setProductos([])
+      }
     } catch (error) {
-      console.error("Error:", error)
-      throw error
+      console.error("Error al cargar productos:", error)
+
+      // Crear algunos productos de ejemplo como último recurso
+      console.log("Creando productos de ejemplo como último recurso...")
+      const productosEjemplo = [
+        {
+          idProducto: 1,
+          nombreProducto: "Producto 1",
+          descripcion: "Descripción del producto 1",
+          precioUnitario: 10000,
+        },
+        {
+          idProducto: 2,
+          nombreProducto: "Producto 2",
+          descripcion: "Descripción del producto 2",
+          precioUnitario: 20000,
+        },
+      ]
+
+      console.log("Usando productos de ejemplo:", productosEjemplo)
+      setProductos(productosEjemplo)
+
+      setSnackbar({
+        abierto: true,
+        mensaje: "No se pudieron cargar los productos reales. Usando datos de ejemplo.",
+        tipo: "warning",
+      })
+    } finally {
+      setCargandoProductos(false)
     }
   }
 
@@ -171,6 +247,7 @@ export default function FormularioPedido() {
 
   // Manejar selección de cliente
   const handleClienteChange = (event, newValue) => {
+    console.log("Cliente seleccionado:", newValue)
     setClienteSeleccionado(newValue)
     setPedido({
       ...pedido,
@@ -186,25 +263,9 @@ export default function FormularioPedido() {
     }
   }
 
-  // Manejar selección de usuario
-  const handleUsuarioChange = (event, newValue) => {
-    setUsuarioSeleccionado(newValue)
-    setPedido({
-      ...pedido,
-      idUsuario: newValue ? newValue.idUsuario : "",
-    })
-
-    // Limpiar error del campo
-    if (errores.idUsuario) {
-      setErrores({
-        ...errores,
-        idUsuario: null,
-      })
-    }
-  }
-
   // Manejar selección de producto
   const handleProductoChange = (event, newValue) => {
+    console.log("Producto seleccionado:", newValue)
     setProductoActual(newValue)
     if (newValue) {
       setPrecio(newValue.precioUnitario || 0)
@@ -233,6 +294,15 @@ export default function FormularioPedido() {
       return
     }
 
+    if (precio <= 0) {
+      setSnackbar({
+        abierto: true,
+        mensaje: "El precio debe ser mayor a cero",
+        tipo: "error",
+      })
+      return
+    }
+
     // Verificar si el producto ya está en el detalle
     const productoExistente = detalles.find((detalle) => detalle.idProducto === productoActual.idProducto)
 
@@ -253,6 +323,7 @@ export default function FormularioPedido() {
       const nuevoDetalle = {
         idProducto: productoActual.idProducto,
         nombreProducto: productoActual.nombreProducto,
+        descripcion: productoActual.descripcion || "Sin descripción",
         cantidad: cantidad,
         precioUnitario: precio,
         subtotal: cantidad * precio,
@@ -282,20 +353,20 @@ export default function FormularioPedido() {
   const validarFormulario = () => {
     const nuevosErrores = {}
 
-    if (!pedido.fechaPedido) {
-      nuevosErrores.fechaPedido = "La fecha es obligatoria"
-    }
-
     if (!pedido.idCliente) {
       nuevosErrores.idCliente = "Debe seleccionar un cliente"
     }
 
-    if (!pedido.idUsuario) {
-      nuevosErrores.idUsuario = "Debe seleccionar un usuario"
-    }
-
     if (detalles.length === 0) {
       nuevosErrores.detalles = "Debe agregar al menos un producto al pedido"
+    }
+
+    // Validar fecha de entrega si se ha ingresado
+    if (pedido.fechaEntrega) {
+      const fechaEntrega = new Date(pedido.fechaEntrega)
+      if (isNaN(fechaEntrega.getTime())) {
+        nuevosErrores.fechaEntrega = "La fecha de entrega no es válida"
+      }
     }
 
     setErrores(nuevosErrores)
@@ -321,19 +392,23 @@ export default function FormularioPedido() {
       // Crear objeto con datos del pedido y sus detalles
       const pedidoCompleto = {
         pedido: {
-          fechaPedido: pedido.fechaPedido,
+          // No incluimos fechaPedido, se usará la fecha actual en el backend
+          fechaEntrega: pedido.fechaEntrega || null, // Incluir fecha de entrega si existe
           idCliente: Number.parseInt(pedido.idCliente),
-          idUsuario: Number.parseInt(pedido.idUsuario),
-          idEstadoPedido: Number.parseInt(pedido.idEstadoPedido),
+          vendedor: 1, // Usuario fijo con ID 1
+          idEstadoPedido: 1, // Estado "Pendiente" por defecto
           observacion: pedido.observacion || "",
-          montoTotal: calcularTotal(), // Cambiado de "total" a "montoTotal"
+          montoTotal: calcularTotal(), // Calculado como la suma de subtotales
         },
         detalles: detalles.map((detalle) => ({
           idProducto: detalle.idProducto,
           cantidad: detalle.cantidad,
           precioUnitario: detalle.precioUnitario,
+          // El subtotal se calculará en el backend como cantidad * precioUnitario
         })),
       }
+
+      console.log("Enviando pedido:", pedidoCompleto)
 
       // Enviar datos al servidor
       const respuesta = await fetch("/api/pedidos", {
@@ -353,7 +428,7 @@ export default function FormularioPedido() {
 
       setSnackbar({
         abierto: true,
-        mensaje: `Pedido #${resultado.pedido.idPedidoCliente} creado exitosamente`,
+        mensaje: `Pedido #${resultado.pedido.idPedido} creado exitosamente`,
         tipo: "success",
       })
 
@@ -399,50 +474,19 @@ export default function FormularioPedido() {
         </Typography>
 
         <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              name="fechaPedido"
-              label="Fecha del Pedido"
-              type="date"
-              value={pedido.fechaPedido}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              InputLabelProps={{ shrink: true }}
-              error={!!errores.fechaPedido}
-              helperText={errores.fechaPedido}
-              required
-            />
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth margin="normal" error={!!errores.idEstadoPedido}>
-              <InputLabel id="estado-pedido-label">Estado del Pedido</InputLabel>
-              <Select
-                labelId="estado-pedido-label"
-                name="idEstadoPedido"
-                value={pedido.idEstadoPedido}
-                onChange={handleChange}
-                label="Estado del Pedido"
-              >
-                {estadosPedido.map((estado) => (
-                  <MenuItem key={estado.idEstadoPedido} value={estado.idEstadoPedido}>
-                    {estado.nombre}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <Autocomplete
               id="cliente-select"
               options={clientes}
-              getOptionLabel={(option) =>
-                `${option.persona?.nombre || ""} ${option.persona?.apellido || ""} (${
-                  option.sectorCliente?.nombreSector || ""
-                })`
-              }
+              loading={cargandoClientes}
+              getOptionLabel={(option) => {
+                // Adaptado para manejar diferentes estructuras de datos
+                const nombre = option.nombre || (option.persona ? option.persona.nombre : "")
+                const apellido = option.apellido || (option.persona ? option.persona.apellido : "")
+                const documento = option.nroDocumento || (option.persona ? option.persona.nroDocumento : "")
+
+                return `${nombre} ${apellido} (${documento})`
+              }}
               value={clienteSeleccionado}
               onChange={handleClienteChange}
               renderInput={(params) => (
@@ -463,45 +507,63 @@ export default function FormularioPedido() {
                         {params.InputProps.startAdornment}
                       </>
                     ),
+                    endAdornment: (
+                      <>
+                        {cargandoClientes ? <CircularProgress color="inherit" size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
                   }}
                 />
               )}
             />
+            <Typography variant="caption" color="text.secondary">
+              {clientes.length} cliente(s) disponible(s)
+            </Typography>
           </Grid>
 
+          {/* Nuevo campo para fecha de entrega */}
           <Grid item xs={12} md={6}>
-            <Autocomplete
-              id="usuario-select"
-              options={usuarios}
-              getOptionLabel={(option) =>
-                `${option.nombreUsuario} (${option.persona?.nombre || ""} ${option.persona?.apellido || ""})`
-              }
-              value={usuarioSeleccionado}
-              onChange={handleUsuarioChange}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Usuario"
-                  margin="normal"
-                  error={!!errores.idUsuario}
-                  helperText={errores.idUsuario}
-                  required
-                />
-              )}
-            />
-          </Grid>
-
-          <Grid item xs={12}>
             <TextField
-              name="observacion"
-              label="Observaciones"
-              value={pedido.observacion}
+              name="fechaEntrega"
+              label="Fecha de Entrega"
+              type="date"
+              value={pedido.fechaEntrega}
               onChange={handleChange}
               fullWidth
               margin="normal"
-              multiline
-              rows={2}
+              error={!!errores.fechaEntrega}
+              helperText={errores.fechaEntrega || "Opcional"}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <CalendarTodayIcon />
+                  </InputAdornment>
+                ),
+              }}
+              InputLabelProps={{
+                shrink: true,
+              }}
             />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Box sx={{ display: "flex", alignItems: "center", mb: 1, mt: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                Estado del Pedido:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                Pendiente
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                Vendedor:
+              </Typography>
+              <Typography variant="body1" fontWeight="bold">
+                Usuario ID: 1
+              </Typography>
+            </Box>
           </Grid>
         </Grid>
       </Paper>
@@ -516,11 +578,36 @@ export default function FormularioPedido() {
             <Autocomplete
               id="producto-select"
               options={productos}
-              getOptionLabel={(option) => `${option.nombreProducto} (${option.tipoProducto?.nombreTipo || ""})`}
+              loading={cargandoProductos}
+              getOptionLabel={(option) => {
+                // Mostrar descripción en lugar de nombre
+                return (
+                  option.descripcion || option.nombreProducto || option.nombre || option.idProducto?.toString() || ""
+                )
+              }}
               value={productoActual}
               onChange={handleProductoChange}
-              renderInput={(params) => <TextField {...params} label="Producto" margin="normal" fullWidth />}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Producto"
+                  margin="normal"
+                  fullWidth
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {cargandoProductos ? <CircularProgress color="inherit" size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
             />
+            <Typography variant="caption" color="text.secondary">
+              {productos.length} producto(s) disponible(s)
+            </Typography>
           </Grid>
 
           <Grid item xs={12} md={2}>
@@ -577,6 +664,7 @@ export default function FormularioPedido() {
             <TableHead>
               <TableRow>
                 <TableCell>Producto</TableCell>
+                <TableCell>Descripción</TableCell>
                 <TableCell align="right">Precio Unit.</TableCell>
                 <TableCell align="right">Cantidad</TableCell>
                 <TableCell align="right">Subtotal</TableCell>
@@ -586,7 +674,7 @@ export default function FormularioPedido() {
             <TableBody>
               {detalles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     No hay productos agregados al pedido
                   </TableCell>
                 </TableRow>
@@ -594,6 +682,7 @@ export default function FormularioPedido() {
                 detalles.map((detalle, index) => (
                   <TableRow key={index}>
                     <TableCell>{detalle.nombreProducto}</TableCell>
+                    <TableCell>{detalle.descripcion}</TableCell>
                     <TableCell align="right">₲ {detalle.precioUnitario.toLocaleString("es-PY")}</TableCell>
                     <TableCell align="right">{detalle.cantidad}</TableCell>
                     <TableCell align="right">₲ {Math.round(detalle.subtotal).toLocaleString("es-PY")}</TableCell>
@@ -608,6 +697,21 @@ export default function FormularioPedido() {
             </TableBody>
           </Table>
         </TableContainer>
+      </Paper>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Observaciones
+        </Typography>
+        <TextField
+          name="observacion"
+          value={pedido.observacion}
+          onChange={handleChange}
+          fullWidth
+          multiline
+          rows={3}
+          placeholder="Ingrese cualquier observación o nota adicional sobre el pedido"
+        />
       </Paper>
 
       <Card sx={{ mb: 3 }}>

@@ -61,12 +61,10 @@ model Cliente {
   idCliente             Int                     @id @default(autoincrement()) @map("id_cliente")
   idPersona             Int                     @map("id_persona")
   idSectorCliente       Int                     @map("id_sector_cliente")
-  idCondicionPago       Int                     @map("id_condicion_pago")
   idEmpresa             Int?                    @map("id_empresa")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
-  condicionPago         CondicionPago           @relation(fields: [idCondicionPago], references: [idCondicionPago], onDelete: NoAction, onUpdate: NoAction, map: "condicion_pago_cliente_fk")
   empresa               Empresa?                @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_cliente_fk")
   persona               Persona                 @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_cliente_fk")
   sectorCliente         SectorCliente           @relation(fields: [idSectorCliente], references: [idSectorCliente], onDelete: NoAction, onUpdate: NoAction, map: "sector_cliente_cliente_fk")
@@ -82,7 +80,6 @@ model CondicionPago {
   createdAt         DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime?   @default(now()) @map("updated_at")
   deletedAt         DateTime?   @map("deleted_at")
-  cliente           Cliente[]
   proveedor         Proveedor[]
 }
 
