@@ -32,9 +32,7 @@ import { useRootContext } from "@/src/app/context/root"
 
 export default function CotizacionesPage() {
   const context = useRootContext()
-
   const permisos = context.session?.permisos || []
-
   const cotizacionesPermiso = permisos.find((permiso) => permiso === "VIEW_COTIZACIONCLIENTE")
 
   if (!cotizacionesPermiso) {
