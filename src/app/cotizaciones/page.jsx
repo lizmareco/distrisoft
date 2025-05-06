@@ -27,8 +27,24 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { useRootContext } from "@/src/app/context/root"
+
 
 export default function CotizacionesPage() {
+  const context = useRootContext()
+
+  const permisos = context.session?.permisos || []
+
+  const cotizacionesPermiso = permisos.find((permiso) => permiso === "VIEW_COTIZACIONCLIENTE")
+
+  if (!cotizacionesPermiso) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
+  }
+
   const router = useRouter()
   const [cotizaciones, setCotizaciones] = useState([])
   const [loading, setLoading] = useState(false)
