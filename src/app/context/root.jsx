@@ -36,6 +36,8 @@ export function RootProvider({ children }) {
             permisos: userSession.permisos,
           })
           console.log("Session loaded from localStorage:", userData)
+        } else if(window.location.pathname !== "/auth/login") {
+          window.location.href = "/auth/login"
         }
       } catch (error) {
         console.error("Error loading session from localStorage:", error)
