@@ -9,23 +9,28 @@ import {
   Paper,
   TextField,
   Grid,
-  MenuItem,
   FormControl,
   InputLabel,
   Select,
+  MenuItem,
   Box,
   CircularProgress,
   Alert,
+  Divider,
+  InputAdornment,
 } from "@mui/material"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import SaveIcon from "@mui/icons-material/Save"
+import BusinessIcon from "@mui/icons-material/Business"
+import ContactsIcon from "@mui/icons-material/Contacts"
+import EmailIcon from "@mui/icons-material/Email"
+import PhoneIcon from "@mui/icons-material/Phone"
+import LocationOnIcon from "@mui/icons-material/LocationOn"
 import Link from "next/link"
 
-export default function EmpresaFormPage({ params }) {
-  // Usar React.use para acceder a los parámetros
-  const unwrappedParams = use(params)
-  const { id } = unwrappedParams
-  const isEditing = id !== "nueva"
+export default function EditarEmpresaPage({ params }) {
+  // Usar React.use para acceder a los parámetros de ruta
+  const { id } = use(params)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -37,17 +42,13 @@ export default function EmpresaFormPage({ params }) {
     idCiudad: "",
     correoEmpresa: "",
     telefono: "",
-    personaContacto: "",
+    contacto: "", // Nuevo campo contacto como texto
   })
 
-  const [errors, setErrors] = useState({
-    correoEmpresa: "",
-  })
-
-  const [categorias, setCategorias] = useState([])
-  const [ciudades, setCiudades] = useState([])
   const [tiposDocumento, setTiposDocumento] = useState([])
-  const [personas, setPersonas] = useState([])
+  const [categoriasEmpresa, setCategoriasEmpresa] = useState([])
+  const [ciudades, setCiudades] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -55,52 +56,42 @@ export default function EmpresaFormPage({ params }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Cargar datos relacionados
-        const [categoriasRes, ciudadesRes, tiposDocumentoRes, personasRes] = await Promise.all([
+        setLoading(true)
+        // Cargar datos relacionados y la empresa a editar
+        const [tiposDocRes, categoriasRes, ciudadesRes, empresaRes] = await Promise.all([
+          fetch("/api/tipos-documento"),
           fetch("/api/categorias-empresa"),
           fetch("/api/ciudades"),
-          fetch("/api/tipos-documento"),
-          fetch("/api/personas"),
+          fetch(`/api/empresas/${id}`),
         ])
 
-        const [categoriasData, ciudadesData, tiposDocumentoData, personasData] = await Promise.all([
+        if (!tiposDocRes.ok || !categoriasRes.ok || !ciudadesRes.ok || !empresaRes.ok) {
+          throw new Error("Error al cargar datos")
+        }
+
+        const [tiposDocData, categoriasData, ciudadesData, empresaData] = await Promise.all([
+          tiposDocRes.json(),
           categoriasRes.json(),
           ciudadesRes.json(),
-          tiposDocumentoRes.json(),
-          personasRes.json(),
+          empresaRes.json(),
         ])
 
-        setCategorias(categoriasData)
+        setTiposDocumento(tiposDocData)
+        setCategoriasEmpresa(categoriasData)
         setCiudades(ciudadesData)
-        setTiposDocumento(tiposDocumentoData)
-        setPersonas(personasData)
 
-        // Si estamos editando, cargar datos de la empresa
-        if (isEditing && id !== "nueva") {
-          const empresaRes = await fetch(`/api/empresas/${id}`)
-          if (!empresaRes.ok) {
-            throw new Error("No se pudo cargar la empresa")
-          }
-          const empresaData = await empresaRes.json()
-
-          setFormData({
-            razonSocial: empresaData.razonSocial,
-            idCategoriaEmpresa: empresaData.idCategoriaEmpresa.toString(),
-            idTipoDocumento: empresaData.idTipoDocumento.toString(),
-            ruc: empresaData.ruc,
-            direccionEmpresa: empresaData.direccionEmpresa,
-            idCiudad: empresaData.idCiudad.toString(),
-            correoEmpresa: empresaData.correoEmpresa,
-            telefono: empresaData.telefono,
-            personaContacto: empresaData.personaContacto.toString(),
-          })
-
-          // Validar el correo electrónico cargado
-          setErrors((prev) => ({
-            ...prev,
-            correoEmpresa: validateEmail(empresaData.correoEmpresa),
-          }))
-        }
+        // Configurar el formulario con los datos de la empresa
+        setFormData({
+          razonSocial: empresaData.razonSocial || "",
+          idCategoriaEmpresa: empresaData.idCategoriaEmpresa?.toString() || "",
+          idTipoDocumento: empresaData.idTipoDocumento?.toString() || "",
+          ruc: empresaData.ruc || "",
+          direccionEmpresa: empresaData.direccionEmpresa || "",
+          idCiudad: empresaData.idCiudad?.toString() || "",
+          correoEmpresa: empresaData.correoEmpresa || "",
+          telefono: empresaData.telefono || "",
+          contacto: empresaData.contacto || "", // Usar el nuevo campo contacto
+        })
       } catch (error) {
         console.error("Error al cargar datos:", error)
         setError(error.message)
@@ -110,13 +101,7 @@ export default function EmpresaFormPage({ params }) {
     }
 
     fetchData()
-  }, [id, isEditing])
-
-  const validateEmail = (email) => {
-    if (!email) return "El correo electrónico es requerido"
-    if (!email.includes("@")) return "El correo electrónico debe contener @"
-    return ""
-  }
+  }, [id])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -124,26 +109,14 @@ export default function EmpresaFormPage({ params }) {
       ...prev,
       [name]: value,
     }))
-
-    // Validar correo electrónico
-    if (name === "correoEmpresa") {
-      setErrors((prev) => ({
-        ...prev,
-        correoEmpresa: validateEmail(value),
-      }))
-    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validar correo electrónico antes de enviar
-    const emailError = validateEmail(formData.correoEmpresa)
-    if (emailError) {
-      setErrors((prev) => ({
-        ...prev,
-        correoEmpresa: emailError,
-      }))
+    // Validar campos requeridos
+    if (!formData.razonSocial || !formData.idCategoriaEmpresa || !formData.idTipoDocumento || !formData.ruc) {
+      setError("Por favor complete todos los campos requeridos")
       return
     }
 
@@ -151,26 +124,40 @@ export default function EmpresaFormPage({ params }) {
     setError(null)
 
     try {
-      const url = isEditing ? `/api/empresas/${id}` : "/api/empresas"
-      const method = isEditing ? "PUT" : "POST"
-
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(`/api/empresas/${id}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       })
 
+      const responseData = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Error al guardar la empresa")
+        // Verificar si es un error de RUC duplicado
+        if (response.status === 409) {
+          setError(
+            `Ya existe una empresa registrada con el RUC ${formData.ruc}. La empresa "${responseData.empresaExistente?.razonSocial}" ya utiliza este RUC.`,
+          )
+        } else {
+          setError(responseData.error || "Error al actualizar la empresa")
+        }
+
+        // Desplazar la página hacia arriba para que el usuario vea el mensaje de error
+        window.scrollTo({ top: 0, behavior: "smooth" })
+        return // Importante: detener la ejecución aquí para evitar que se propague el error
       }
 
+      // Redirigir a la lista de empresas
       router.push("/empresas")
     } catch (error) {
       console.error("Error:", error)
-      setError(error.message)
+      // Mostrar el error en la interfaz de usuario
+      setError("Error de conexión. Por favor, inténtelo de nuevo más tarde.")
+
+      // Desplazar la página hacia arriba para que el usuario vea el mensaje de error
+      window.scrollTo({ top: 0, behavior: "smooth" })
     } finally {
       setSubmitting(false)
     }
@@ -192,18 +179,36 @@ export default function EmpresaFormPage({ params }) {
             Volver
           </Button>
           <Typography variant="h5" component="h1">
-            {isEditing ? "Editar Empresa" : "Nueva Empresa"}
+            Editar Empresa
           </Typography>
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert
+            severity="error"
+            sx={{
+              mb: 3,
+              fontWeight: "medium",
+              "& .MuiAlert-message": {
+                fontWeight: 500,
+              },
+              border: "1px solid",
+              borderColor: "error.main",
+            }}
+          >
             {error}
           </Alert>
         )}
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
+                <BusinessIcon sx={{ mr: 1 }} /> Información General
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -212,19 +217,26 @@ export default function EmpresaFormPage({ params }) {
                 value={formData.razonSocial}
                 onChange={handleChange}
                 required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <BusinessIcon />
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
               <FormControl fullWidth required>
-                <InputLabel>Categoría de Empresa</InputLabel>
+                <InputLabel>Categoría</InputLabel>
                 <Select
                   name="idCategoriaEmpresa"
                   value={formData.idCategoriaEmpresa}
                   onChange={handleChange}
-                  label="Categoría de Empresa"
+                  label="Categoría"
                 >
-                  {categorias.map((categoria) => (
+                  {categoriasEmpresa.map((categoria) => (
                     <MenuItem key={categoria.idCategoriaEmpresa} value={categoria.idCategoriaEmpresa.toString()}>
                       {categoria.descCategoriaEmpresa}
                     </MenuItem>
@@ -256,18 +268,74 @@ export default function EmpresaFormPage({ params }) {
             </Grid>
 
             <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, mt: 2, display: "flex", alignItems: "center" }}>
+                <ContactsIcon sx={{ mr: 1 }} /> Contacto
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Dirección"
-                name="direccionEmpresa"
-                value={formData.direccionEmpresa}
+                label="Contacto"
+                name="contacto"
+                value={formData.contacto}
                 onChange={handleChange}
-                required
+                placeholder="Nombre y cargo de la persona de contacto"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <ContactsIcon />
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth required>
+              <TextField
+                fullWidth
+                label="Correo Electrónico"
+                name="correoEmpresa"
+                value={formData.correoEmpresa}
+                onChange={handleChange}
+                type="email"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Teléfono"
+                name="telefono"
+                value={formData.telefono}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PhoneIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, mt: 2, display: "flex", alignItems: "center" }}>
+                <LocationOnIcon sx={{ mr: 1 }} /> Ubicación
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth>
                 <InputLabel>Ciudad</InputLabel>
                 <Select name="idCiudad" value={formData.idCiudad} onChange={handleChange} label="Ciudad">
                   {ciudades.map((ciudad) => (
@@ -282,50 +350,18 @@ export default function EmpresaFormPage({ params }) {
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Correo Electrónico"
-                name="correoEmpresa"
-                type="email"
-                value={formData.correoEmpresa}
+                label="Dirección"
+                name="direccionEmpresa"
+                value={formData.direccionEmpresa}
                 onChange={handleChange}
-                required
-                error={!!errors.correoEmpresa}
-                helperText={errors.correoEmpresa}
-                onBlur={() => {
-                  setErrors((prev) => ({
-                    ...prev,
-                    correoEmpresa: validateEmail(formData.correoEmpresa),
-                  }))
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LocationOnIcon />
+                    </InputAdornment>
+                  ),
                 }}
               />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Teléfono"
-                name="telefono"
-                value={formData.telefono}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Persona de Contacto</InputLabel>
-                <Select
-                  name="personaContacto"
-                  value={formData.personaContacto}
-                  onChange={handleChange}
-                  label="Persona de Contacto"
-                >
-                  {personas.map((persona) => (
-                    <MenuItem key={persona.idPersona} value={persona.idPersona.toString()}>
-                      {`${persona.nombre} ${persona.apellido}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
             </Grid>
 
             <Grid item xs={12}>
@@ -335,9 +371,9 @@ export default function EmpresaFormPage({ params }) {
                   variant="contained"
                   color="primary"
                   startIcon={<SaveIcon />}
-                  disabled={submitting || !!errors.correoEmpresa}
+                  disabled={submitting}
                 >
-                  {submitting ? "Guardando..." : "Guardar"}
+                  {submitting ? <CircularProgress size={24} /> : "Guardar Cambios"}
                 </Button>
               </Box>
             </Grid>
@@ -347,4 +383,3 @@ export default function EmpresaFormPage({ params }) {
     </Container>
   )
 }
-

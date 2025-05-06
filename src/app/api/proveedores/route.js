@@ -1,25 +1,63 @@
 import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
 
-export async function GET() {
+export async function GET(request) {
   try {
-    console.log("API: Obteniendo proveedores...")
-    const proveedores = await prisma.proveedor.findMany({
-      include: {
-        empresa: true,
-        condicionPago: true,
-      },
-      where: {
-        deletedAt: null,
-      },
-    })
-    console.log(`API: Se encontraron ${proveedores.length} proveedores`)
+    // Obtener parámetros de búsqueda de la URL
+    const { searchParams } = new URL(request.url)
+    const tipoDocumento = searchParams.get("tipoDocumento")
+    const numeroDocumento = searchParams.get("numeroDocumento")
 
-    return NextResponse.json(proveedores)
+    console.log("API: Buscando proveedores con parámetros:", { tipoDocumento, numeroDocumento })
+
+    // Si se proporcionan parámetros de búsqueda, buscar por tipo y número de documento
+    if (tipoDocumento && numeroDocumento) {
+      // Buscar proveedores cuyas empresas coincidan con el tipo y número de documento
+      const proveedores = await prisma.proveedor.findMany({
+        where: {
+          deletedAt: null,
+          empresa: {
+            idTipoDocumento: Number(tipoDocumento),
+            ruc: {
+              contains: numeroDocumento,
+              mode: "insensitive", // Búsqueda insensible a mayúsculas/minúsculas
+            },
+            deletedAt: null,
+          },
+        },
+        include: {
+          empresa: {
+            include: {
+              tipoDocumento: true,
+              persona: true,
+            },
+          },
+        },
+        orderBy: {
+          idProveedor: "desc",
+        },
+      })
+
+      console.log(`API: Se encontraron ${proveedores.length} proveedores con los criterios de búsqueda`)
+      return NextResponse.json(proveedores, { status: HTTP_STATUS_CODES.ok })
+    }
+
+    // Si no hay parámetros de búsqueda, devolver un array vacío en lugar de todos los proveedores
+    console.log("API: No se proporcionaron parámetros de búsqueda completos")
+    return NextResponse.json([], { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("API: Error al obtener proveedores:", error)
-    return NextResponse.json({ error: "Error al obtener proveedores" }, { status: 500 })
+    console.error("API: Error al buscar proveedores:", error)
+    return NextResponse.json(
+      {
+        error: "Error al buscar proveedores",
+        message: error.message,
+        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
 
@@ -27,155 +65,65 @@ export async function POST(request) {
   try {
     console.log("API: Creando nuevo proveedor...")
     const auditoriaService = new AuditoriaService()
+    const authController = new AuthController()
 
-    // Usar exactamente el mismo ID de usuario que en clientes
-    const userData = { idUsuario: 1 }
+    // Obtener el usuario actual desde el token (si está autenticado)
+    const accessToken = await authController.hasAccessToken(request)
+    let idUsuario = null
+
+    if (accessToken) {
+      const userData = await authController.getUserFromToken(accessToken)
+      idUsuario = userData?.idUsuario || null
+    }
+
+    // Si no hay usuario autenticado, usar un ID por defecto para desarrollo
+    if (!idUsuario) {
+      idUsuario = 1
+    }
 
     const data = await request.json()
     console.log("API: Datos recibidos:", data)
 
     // Validar datos requeridos
-    if (!data.idEmpresa || !data.idCondicionPago) {
+    if (!data.idEmpresa) {
       console.error("API: Datos incompletos:", data)
-      return NextResponse.json({ error: "Faltan datos requeridos (empresa o condición de pago)" }, { status: 400 })
+      return NextResponse.json({ error: "Faltan datos requeridos (empresa)" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
+    // Crear el proveedor con el nuevo campo comentario
     const proveedor = await prisma.proveedor.create({
       data: {
         idEmpresa: Number.parseInt(data.idEmpresa),
-        idCondicionPago: Number.parseInt(data.idCondicionPago),
+        comentario: data.comentario || "", // Incluir el campo comentario
       },
       include: {
-        empresa: true,
-        condicionPago: true,
+        empresa: {
+          include: {
+            tipoDocumento: true,
+            persona: true,
+          },
+        },
       },
     })
 
-    // Registrar la acción en auditoría - EXACTAMENTE IGUAL QUE EN CLIENTES
-    await auditoriaService.registrarCreacion("Proveedor", proveedor.idProveedor, proveedor, userData.idUsuario, request)
+    // Registrar la acción en auditoría
+    await auditoriaService.registrarAuditoria({
+      entidad: "Proveedor",
+      idRegistro: proveedor.idProveedor.toString(),
+      accion: "CREAR",
+      valorAnterior: null,
+      valorNuevo: proveedor,
+      idUsuario: idUsuario,
+      request: request,
+    })
 
     console.log("API: Proveedor creado con ID:", proveedor.idProveedor)
-    return NextResponse.json(proveedor)
+    return NextResponse.json(proveedor, { status: HTTP_STATUS_CODES.created })
   } catch (error) {
     console.error("API: Error al crear proveedor:", error)
-    return NextResponse.json({ error: `Error al crear proveedor: ${error.message}` }, { status: 500 })
-  }
-}
-
-export async function PUT(request) {
-  try {
-    console.log("API: Actualizando proveedor...")
-    const auditoriaService = new AuditoriaService()
-
-    // Usar exactamente el mismo ID de usuario que en clientes
-    const userData = { idUsuario: 1 }
-
-    const data = await request.json()
-    console.log("API: Datos recibidos:", data)
-
-    // Validar ID del proveedor
-    if (!data.idProveedor) {
-      console.error("API: Falta ID del proveedor:", data)
-      return NextResponse.json({ error: "Falta ID del proveedor" }, { status: 400 })
-    }
-
-    // Obtener el proveedor actual para auditoría
-    const proveedorAnterior = await prisma.proveedor.findUnique({
-      where: { idProveedor: Number.parseInt(data.idProveedor) },
-      include: {
-        empresa: true,
-        condicionPago: true,
-      },
-    })
-
-    if (!proveedorAnterior) {
-      return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 })
-    }
-
-    // Actualizar el proveedor
-    const proveedor = await prisma.proveedor.update({
-      where: { idProveedor: Number.parseInt(data.idProveedor) },
-      data: {
-        idEmpresa: data.idEmpresa ? Number.parseInt(data.idEmpresa) : undefined,
-        idCondicionPago: data.idCondicionPago ? Number.parseInt(data.idCondicionPago) : undefined,
-        updatedAt: new Date(),
-      },
-      include: {
-        empresa: true,
-        condicionPago: true,
-      },
-    })
-
-    // Registrar la acción en auditoría - EXACTAMENTE IGUAL QUE EN CLIENTES
-    await auditoriaService.registrarActualizacion(
-      "Proveedor",
-      proveedor.idProveedor,
-      proveedorAnterior,
-      proveedor,
-      userData.idUsuario,
-      request,
+    return NextResponse.json(
+      { error: `Error al crear proveedor: ${error.message}` },
+      { status: HTTP_STATUS_CODES.internalServerError },
     )
-
-    console.log("API: Proveedor actualizado con ID:", proveedor.idProveedor)
-    return NextResponse.json(proveedor)
-  } catch (error) {
-    console.error("API: Error al actualizar proveedor:", error)
-    return NextResponse.json({ error: "Error al actualizar proveedor" }, { status: 500 })
   }
 }
-
-export async function DELETE(request) {
-  try {
-    console.log("API: Eliminando proveedor...")
-    const auditoriaService = new AuditoriaService()
-
-    // Usar exactamente el mismo ID de usuario que en clientes
-    const userData = { idUsuario: 1 }
-
-    // Obtener ID del proveedor
-    const { searchParams } = new URL(request.url)
-    const idProveedor = searchParams.get("id")
-
-    if (!idProveedor) {
-      console.error("API: Falta ID del proveedor")
-      return NextResponse.json({ error: "Falta ID del proveedor" }, { status: 400 })
-    }
-
-    // Obtener el proveedor actual para auditoría
-    const proveedorAnterior = await prisma.proveedor.findUnique({
-      where: { idProveedor: Number.parseInt(idProveedor) },
-      include: {
-        empresa: true,
-        condicionPago: true,
-      },
-    })
-
-    if (!proveedorAnterior) {
-      return NextResponse.json({ error: "Proveedor no encontrado" }, { status: 404 })
-    }
-
-    // Eliminar el proveedor (soft delete)
-    await prisma.proveedor.update({
-      where: { idProveedor: Number.parseInt(idProveedor) },
-      data: {
-        deletedAt: new Date(),
-      },
-    })
-
-    // Registrar la acción en auditoría - EXACTAMENTE IGUAL QUE EN CLIENTES
-    await auditoriaService.registrarEliminacion(
-      "Proveedor",
-      idProveedor,
-      proveedorAnterior,
-      userData.idUsuario,
-      request,
-    )
-
-    console.log("API: Proveedor eliminado con ID:", idProveedor)
-    return NextResponse.json({ message: "Proveedor eliminado exitosamente" })
-  } catch (error) {
-    console.error("API: Error al eliminar proveedor:", error)
-    return NextResponse.json({ error: "Error al eliminar proveedor" }, { status: 500 })
-  }
-}
-

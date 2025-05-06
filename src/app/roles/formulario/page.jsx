@@ -15,12 +15,19 @@ import {
   Box,
   CircularProgress,
   Alert,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
+  Divider,
+  FormHelperText,
 } from "@mui/material"
 
 const RolFormulario = () => {
   const [formulario, setFormulario] = useState({
     nombreRol: "",
     permisos: [],
+    estadoRol: "ACTIVO", // Usar estadoRol en lugar de activo
   })
   const [permisosDisponibles, setPermisosDisponibles] = useState([])
   const [loading, setLoading] = useState(false)
@@ -29,6 +36,7 @@ const RolFormulario = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get("id")
+  const isEditing = !!id // Determinar si estamos en modo edición
 
   useEffect(() => {
     const fetchData = async () => {
@@ -90,6 +98,7 @@ const RolFormulario = () => {
             setFormulario({
               nombreRol: rolData.rol.nombreRol || "",
               permisos: permisosIds,
+              estadoRol: rolData.rol.estadoRol || "ACTIVO", // Usar estadoRol
             })
           } else {
             console.error("Estructura de datos del rol inesperada:", rolData)
@@ -110,7 +119,7 @@ const RolFormulario = () => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
 
-    if (type === "checkbox") {
+    if (type === "checkbox" && name === "permisos") {
       const permisoId = Number.parseInt(value)
 
       if (checked) {
@@ -127,7 +136,7 @@ const RolFormulario = () => {
         }))
       }
     } else {
-      // Campos de texto
+      // Campos de texto o select
       setFormulario((prev) => ({
         ...prev,
         [name]: value,
@@ -143,10 +152,15 @@ const RolFormulario = () => {
       setError(null)
 
       console.log("Enviando datos:", formulario)
-      console.log("Permisos a enviar:", formulario.permisos)
 
       const url = id ? `/api/roles/${id}` : "/api/roles"
       const method = id ? "PUT" : "POST"
+
+      const dataToSend = {
+        nombreRol: formulario.nombreRol,
+        permisos: formulario.permisos,
+        estadoRol: formulario.estadoRol, // Enviar estadoRol
+      }
 
       const response = await fetch(url, {
         method,
@@ -154,10 +168,7 @@ const RolFormulario = () => {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({
-          nombreRol: formulario.nombreRol,
-          permisos: formulario.permisos,
-        }),
+        body: JSON.stringify(dataToSend),
       })
 
       const responseData = await response.json()
@@ -210,43 +221,77 @@ const RolFormulario = () => {
           </Box>
         ) : (
           <form onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="Nombre del Rol"
-              name="nombreRol"
-              value={formulario.nombreRol}
-              onChange={handleChange}
-              margin="normal"
-              required
-              sx={{ mb: 3 }}
-            />
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Información del Rol
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
 
-            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-              Permisos
-            </Typography>
+              <TextField
+                fullWidth
+                label="Nombre del Rol"
+                name="nombreRol"
+                value={formulario.nombreRol}
+                onChange={handleChange}
+                margin="normal"
+                required
+                disabled={isEditing} // Deshabilitar si estamos editando
+                InputProps={{ readOnly: isEditing }} // Hacer de solo lectura si estamos editando
+                sx={{ mb: 1 }}
+                helperText={isEditing ? "El nombre del rol no se puede modificar" : ""}
+              />
 
-            {permisosDisponibles.length === 0 ? (
-              <Alert severity="info" sx={{ mb: 3 }}>
-                No hay permisos disponibles
-              </Alert>
-            ) : (
-              <FormGroup sx={{ mb: 3 }}>
-                {permisosDisponibles.map((permiso) => (
-                  <FormControlLabel
-                    key={permiso.idPermiso}
-                    control={
-                      <Checkbox
-                        checked={formulario.permisos.includes(permiso.idPermiso)}
-                        onChange={handleChange}
-                        value={permiso.idPermiso}
-                        name="permisos"
-                      />
-                    }
-                    label={permiso.nombrePermiso}
-                  />
-                ))}
-              </FormGroup>
-            )}
+              {/* Selector de estado del rol */}
+              <FormControl fullWidth margin="normal">
+                <InputLabel id="estado-rol-label">Estado del Rol</InputLabel>
+                <Select
+                  labelId="estado-rol-label"
+                  id="estadoRol"
+                  name="estadoRol"
+                  value={formulario.estadoRol}
+                  onChange={handleChange}
+                  label="Estado del Rol"
+                >
+                  <MenuItem value="ACTIVO">ACTIVO</MenuItem>
+                  <MenuItem value="INACTIVO">INACTIVO</MenuItem>
+                </Select>
+                <FormHelperText>
+                  {formulario.estadoRol === "ACTIVO"
+                    ? "El rol está activo y disponible en el sistema"
+                    : "El rol está inactivo y no estará disponible para asignar a usuarios"}
+                </FormHelperText>
+              </FormControl>
+            </Box>
+
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Permisos del Rol
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+
+              {permisosDisponibles.length === 0 ? (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                  No hay permisos disponibles
+                </Alert>
+              ) : (
+                <FormGroup sx={{ mb: 3 }}>
+                  {permisosDisponibles.map((permiso) => (
+                    <FormControlLabel
+                      key={permiso.idPermiso}
+                      control={
+                        <Checkbox
+                          checked={formulario.permisos.includes(permiso.idPermiso)}
+                          onChange={handleChange}
+                          value={permiso.idPermiso}
+                          name="permisos"
+                        />
+                      }
+                      label={permiso.nombrePermiso}
+                    />
+                  ))}
+                </FormGroup>
+              )}
+            </Box>
 
             <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end", mt: 3 }}>
               <Button variant="outlined" onClick={handleCancel} disabled={loading}>
@@ -264,4 +309,3 @@ const RolFormulario = () => {
 }
 
 export default RolFormulario
-

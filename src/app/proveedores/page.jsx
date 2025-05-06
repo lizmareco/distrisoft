@@ -16,13 +16,22 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Chip,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  InputAdornment,
+  Tooltip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import BusinessIcon from "@mui/icons-material/Business"
-import PaymentIcon from "@mui/icons-material/Payment"
+import SearchIcon from "@mui/icons-material/Search"
+import ListIcon from "@mui/icons-material/List"
+import CommentIcon from "@mui/icons-material/Comment"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
@@ -30,9 +39,21 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 
 export default function ProveedoresPage() {
   const [proveedores, setProveedores] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState(null)
+  const [tiposDocumento, setTiposDocumento] = useState([])
+  const [loadingTipos, setLoadingTipos] = useState(true)
   const router = useRouter()
+
+  // Estado para el formulario de búsqueda
+  const [busqueda, setBusqueda] = useState({
+    tipoDocumento: "",
+    numeroDocumento: "",
+  })
+
+  // Estado para controlar si ya se realizó una búsqueda
+  const [busquedaRealizada, setBusquedaRealizada] = useState(false)
 
   // Estado para el diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState({
@@ -41,27 +62,109 @@ export default function ProveedoresPage() {
     proveedorNombre: "",
   })
 
+  // Cargar tipos de documento al iniciar
   useEffect(() => {
-    const fetchProveedores = async () => {
+    const fetchTiposDocumento = async () => {
       try {
-        console.log("Cargando proveedores...")
-        const response = await fetch("/api/proveedores")
+        setLoadingTipos(true)
+        setError(null)
+        console.log("Cargando tipos de documento...")
+
+        const response = await fetch("/api/tipos-documento")
+
         if (!response.ok) {
-          throw new Error("Error al cargar proveedores")
+          throw new Error(`Error al cargar tipos de documento: ${response.status}`)
         }
+
         const data = await response.json()
-        console.log(`Se cargaron ${data.length} proveedores`)
-        setProveedores(data)
+
+        // Verificar que los datos sean un array
+        if (!Array.isArray(data)) {
+          console.error("Respuesta inesperada para tipos de documento:", data)
+          throw new Error("Formato de respuesta inválido para tipos de documento")
+        }
+
+        console.log(`Se cargaron ${data.length} tipos de documento`)
+        setTiposDocumento(data)
       } catch (error) {
         console.error("Error:", error)
-        setError(error.message)
+        setError("Error al cargar tipos de documento: " + error.message)
       } finally {
-        setLoading(false)
+        setLoadingTipos(false)
       }
     }
 
-    fetchProveedores()
+    fetchTiposDocumento()
   }, [])
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setBusqueda({
+      ...busqueda,
+      [name]: value,
+    })
+  }
+
+  const handleSearch = async (e) => {
+    e.preventDefault()
+
+    // Validar que se hayan ingresado ambos campos
+    if (!busqueda.tipoDocumento || !busqueda.numeroDocumento) {
+      setError("Debe seleccionar un tipo de documento e ingresar un número de documento")
+      return
+    }
+
+    setSearching(true)
+    setError(null)
+    setBusquedaRealizada(true)
+
+    try {
+      const response = await fetch(
+        `/api/proveedores?tipoDocumento=${busqueda.tipoDocumento}&numeroDocumento=${busqueda.numeroDocumento}`,
+      )
+
+      if (!response.ok) {
+        throw new Error(`Error al buscar proveedores: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setProveedores(data)
+    } catch (error) {
+      console.error("Error:", error)
+      setError(error.message)
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Función para listar todos los proveedores
+  const handleListAll = async () => {
+    setSearching(true)
+    setError(null)
+    setBusquedaRealizada(true)
+
+    // Limpiar los campos de búsqueda
+    setBusqueda({
+      tipoDocumento: "",
+      numeroDocumento: "",
+    })
+
+    try {
+      const response = await fetch("/api/proveedores/all")
+
+      if (!response.ok) {
+        throw new Error(`Error al obtener todos los proveedores: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setProveedores(data)
+    } catch (error) {
+      console.error("Error:", error)
+      setError(error.message)
+    } finally {
+      setSearching(false)
+    }
+  }
 
   const handleDeleteClick = (id, nombre) => {
     setConfirmDialog({
@@ -73,6 +176,7 @@ export default function ProveedoresPage() {
 
   const handleConfirmDelete = async () => {
     try {
+      setLoading(true)
       const response = await fetch(`/api/proveedores/${confirmDialog.proveedorId}`, {
         method: "DELETE",
       })
@@ -91,6 +195,8 @@ export default function ProveedoresPage() {
       setError(error.message)
       // Cerrar el diálogo incluso si hay error
       setConfirmDialog({ ...confirmDialog, open: false })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -101,14 +207,6 @@ export default function ProveedoresPage() {
   const handleEdit = (id) => {
     console.log(`Navegando a /proveedores/${id}`)
     router.push(`/proveedores/${id}`)
-  }
-
-  if (loading) {
-    return (
-      <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
-    )
   }
 
   return (
@@ -133,6 +231,82 @@ export default function ProveedoresPage() {
         </Alert>
       )}
 
+      {/* Formulario de búsqueda */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Buscar Proveedor
+        </Typography>
+        <form onSubmit={handleSearch}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth disabled={loadingTipos || searching}>
+                <InputLabel id="tipo-documento-label">Tipo de Documento</InputLabel>
+                <Select
+                  labelId="tipo-documento-label"
+                  id="tipoDocumento"
+                  name="tipoDocumento"
+                  value={busqueda.tipoDocumento}
+                  onChange={handleInputChange}
+                  label="Tipo de Documento"
+                  required
+                >
+                  {tiposDocumento.map((tipo) => (
+                    <MenuItem key={tipo.idTipoDocumento} value={tipo.idTipoDocumento}>
+                      {tipo.descTipoDocumento}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="Número de Documento"
+                id="numeroDocumento"
+                name="numeroDocumento"
+                value={busqueda.numeroDocumento}
+                onChange={handleInputChange}
+                required
+                disabled={searching}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                fullWidth
+                disabled={searching || loadingTipos}
+                sx={{ height: "56px" }}
+              >
+                {searching ? <CircularProgress size={24} /> : "Buscar"}
+              </Button>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                fullWidth
+                startIcon={<ListIcon />}
+                onClick={handleListAll}
+                disabled={searching}
+                sx={{ height: "56px" }}
+              >
+                Listar Todos
+              </Button>
+            </Grid>
+          </Grid>
+        </form>
+      </Paper>
+
+      {/* Tabla de resultados */}
       <Paper>
         <TableContainer>
           <Table>
@@ -142,13 +316,24 @@ export default function ProveedoresPage() {
                 <TableCell>Empresa</TableCell>
                 <TableCell>RUC</TableCell>
                 <TableCell>Contacto</TableCell>
-                <TableCell>Condición de Pago</TableCell>
+                <TableCell>Comentarios</TableCell>
                 <TableCell>Fecha Registro</TableCell>
                 <TableCell>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {proveedores.length > 0 ? (
+              {loading || searching ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 3 }}>
+                      <CircularProgress size={40} sx={{ mb: 2 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        {searching ? "Buscando proveedores..." : "Cargando..."}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : proveedores.length > 0 ? (
                 proveedores.map((proveedor) => (
                   <TableRow key={proveedor.idProveedor}>
                     <TableCell>{proveedor.idProveedor}</TableCell>
@@ -165,13 +350,18 @@ export default function ProveedoresPage() {
                         : "No especificado"}
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        icon={<PaymentIcon />}
-                        label={proveedor.condicionPago.descCondicionPago}
-                        color="primary"
-                        variant="outlined"
-                        size="small"
-                      />
+                      {proveedor.comentario ? (
+                        <Tooltip title={proveedor.comentario}>
+                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                            <CommentIcon sx={{ mr: 1, color: "text.secondary" }} />
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                              {proveedor.comentario}
+                            </Typography>
+                          </Box>
+                        </Tooltip>
+                      ) : (
+                        "Sin comentarios"
+                      )}
                     </TableCell>
                     <TableCell>{new Date(proveedor.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>
@@ -192,10 +382,24 @@ export default function ProveedoresPage() {
                     </TableCell>
                   </TableRow>
                 ))
+              ) : busquedaRealizada && !searching ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Box sx={{ py: 3 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        No se encontraron proveedores con los criterios de búsqueda
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    No hay proveedores registrados
+                    <Box sx={{ py: 3 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        Utilice el buscador para encontrar proveedores o haga clic en "Listar Todos"
+                      </Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
               )}
@@ -216,4 +420,3 @@ export default function ProveedoresPage() {
     </Container>
   )
 }
-

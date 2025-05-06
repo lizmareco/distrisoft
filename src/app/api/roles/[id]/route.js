@@ -12,10 +12,12 @@ export async function GET(request, { params }) {
     const { id } = params
     console.log(`API: Obteniendo rol con ID: ${id}`)
 
+    // Modificado para obtener el rol incluso si está inactivo
+    // pero no si está borrado (deletedAt no es null)
     const rol = await prisma.rol.findUnique({
       where: {
         idRol: Number.parseInt(id),
-        deletedAt: null,
+        deletedAt: null, // Solo roles no borrados
       },
       include: {
         rolPermiso: {
@@ -37,6 +39,7 @@ export async function GET(request, { params }) {
     const rolFormateado = {
       idRol: rol.idRol,
       nombreRol: rol.nombreRol,
+      estadoRol: rol.estadoRol, // Incluir el estado del rol
       permisos: rol.rolPermiso.map((rp) => ({
         idPermiso: rp.permiso.idPermiso,
         nombrePermiso: rp.permiso.nombrePermiso,
@@ -87,16 +90,11 @@ export async function PUT(request, { params }) {
     const datos = await request.json()
     console.log("API: Datos recibidos para actualizar rol:", datos)
 
-    // Validar datos
-    if (!datos.nombreRol) {
-      return NextResponse.json({ error: "El nombre del rol es obligatorio" }, { status: 400 })
-    }
-
     // Verificar si el rol existe
     const rolExistente = await prisma.rol.findUnique({
       where: {
         idRol: Number(id),
-        deletedAt: null,
+        deletedAt: null, // Solo roles no borrados
       },
       include: {
         rolPermiso: {
@@ -111,38 +109,42 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ message: "Rol no encontrado" }, { status: 404 })
     }
 
-    // Verificar si ya existe otro rol con el mismo nombre
-    const rolConMismoNombre = await prisma.rol.findFirst({
-      where: {
-        nombreRol: datos.nombreRol,
-        idRol: { not: Number(id) },
-        deletedAt: null,
-      },
-    })
+    // Guardar el estado anterior para auditoría
+    const rolAnterior = { ...rolExistente }
 
-    if (rolConMismoNombre) {
-      return NextResponse.json({ error: "Ya existe otro rol con este nombre" }, { status: 400 })
+    // Preparar los datos para actualizar
+    const updateData = {
+      updatedAt: new Date(),
     }
+
+    // Actualizar el estado del rol si se proporciona
+    if (datos.estadoRol) {
+      console.log("Actualizando estado del rol a:", datos.estadoRol)
+      updateData.estadoRol = datos.estadoRol
+    }
+
+    console.log("Datos de actualización:", updateData)
 
     // Actualizar el rol
     const rolActualizado = await prisma.rol.update({
       where: {
         idRol: Number(id),
       },
-      data: {
-        nombreRol: datos.nombreRol,
-        updatedAt: new Date(),
-      },
+      data: updateData,
     })
 
     // Actualizar permisos
     if (datos.permisos && Array.isArray(datos.permisos)) {
       // Obtener los permisos actuales del rol
-      const permisosActuales = rolExistente.rolPermiso.map((rp) => rp.idPermiso)
+      const permisosActuales = rolExistente.rolPermiso.filter((rp) => rp.deletedAt === null).map((rp) => rp.idPermiso)
 
       // Calcular los permisos a agregar y a eliminar
-      const permisosAAgregar = datos.permisos.filter((idPermiso) => !permisosActuales.includes(idPermiso))
+      const permisosAAgregar = datos.permisos.filter((idPermiso) => !permisosActuales.includes(Number(idPermiso)))
       const permisosAEliminar = permisosActuales.filter((idPermiso) => !datos.permisos.includes(idPermiso))
+
+      console.log("Permisos actuales:", permisosActuales)
+      console.log("Permisos a agregar:", permisosAAgregar)
+      console.log("Permisos a eliminar:", permisosAEliminar)
 
       // Eliminar permisos
       if (permisosAEliminar.length > 0) {
@@ -171,8 +173,6 @@ export async function PUT(request, { params }) {
             })
           } catch (permisoError) {
             console.error("Error al crear permiso:", permisoError)
-            // Manejar el error de manera más específica, por ejemplo, registrando el error
-            // o continuando con la siguiente iteración si es posible.
           }
         }
       }
@@ -197,7 +197,15 @@ export async function PUT(request, { params }) {
 
     // Registrar la acción en auditoría
     try {
-      await auditoriaService.registrarActualizacion("Rol", id, rolExistente, rolCompletoActualizado, idUsuario, request)
+      await auditoriaService.registrarAuditoria({
+        entidad: "Rol",
+        idRegistro: id.toString(),
+        accion: "ACTUALIZAR",
+        valorAnterior: rolAnterior,
+        valorNuevo: rolCompletoActualizado,
+        idUsuario,
+        request,
+      })
     } catch (auditoriaError) {
       console.error("Error al registrar auditoría:", auditoriaError)
       // No interrumpimos el flujo por un error de auditoría
@@ -209,15 +217,14 @@ export async function PUT(request, { params }) {
         mensaje: "Rol actualizado exitosamente",
         rol: rolActualizado,
       },
-      { status: 200 },
-    )
+      { status: 200 }
+    );
   } catch (error) {
-    console.error(`API: Error al actualizar rol:`, error)
+    console.error("API: Error al actualizar rol:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
-
-// DELETE /api/roles/[id] - Eliminar un rol
+// DELETE /api/roles/[id] - Eliminar un rol (soft delete)
 export async function DELETE(request, { params }) {
   try {
     const { id } = params
@@ -257,28 +264,35 @@ export async function DELETE(request, { params }) {
     })
 
     if (!rolAnterior) {
-      return NextResponse.json({ message: "Rol no encontrado" }, { status: 404 })
+      return NextResponse.json({ message: "Rol no encontrado o ya está eliminado" }, { status: 404 })
     }
 
-    // Eliminar el rol (soft delete)
+    // Actualizar el rol a estado INACTIVO en lugar de eliminarlo
     await prisma.rol.update({
       where: {
         idRol: Number.parseInt(id),
       },
       data: {
-        deletedAt: new Date(),
+        estadoRol: "INACTIVO",
         updatedAt: new Date(),
       },
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarEliminacion("Rol", id, rolAnterior, idUsuario, request)
+    await auditoriaService.registrarAuditoria({
+      entidad: "Rol",
+      idRegistro: id.toString(),
+      accion: "DESACTIVAR",
+      valorAnterior: rolAnterior,
+      valorNuevo: { ...rolAnterior, estadoRol: "INACTIVO" },
+      idUsuario,
+      request,
+    })
 
-    console.log(`API: Rol con ID ${id} eliminado correctamente`)
-    return NextResponse.json({ message: "Rol eliminado correctamente" }, { status: 200 })
+    console.log(`API: Rol con ID ${id} desactivado correctamente`)
+    return NextResponse.json({ message: "Rol desactivado correctamente" }, { status: 200 })
   } catch (error) {
-    console.error("API: Error al eliminar rol:", error)
+    console.error("API: Error al desactivar rol:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
-

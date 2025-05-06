@@ -1,28 +1,27 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 
 export async function GET() {
   try {
-    const estadosProducto = await prisma.estadoProducto.findMany({
+    console.log("API: Obteniendo estados de producto...")
+
+    const estados = await prisma.estadoProducto.findMany({
       where: {
         deletedAt: null,
       },
-      select: {
-        idEstadoProducto: true,
-        descEstadoProducto: true,
+      orderBy: {
+        descEstadoProducto: "asc",
       },
     })
 
-    // Mapear los resultados para mantener compatibilidad con el frontend
-    const estadosFormateados = estadosProducto.map((estado) => ({
-      idEstadoProducto: estado.idEstadoProducto,
-      nombreEstadoProducto: estado.descEstadoProducto, // Mapear descEstadoProducto a nombreEstadoProducto
-    }))
-
-    return NextResponse.json(estadosFormateados)
+    console.log(`API: Se encontraron ${estados.length} estados de producto`)
+    return NextResponse.json(estados, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("Error al obtener estados de producto:", error)
-    return NextResponse.json({ error: "Error al obtener estados de producto: " + error.message }, { status: 500 })
+    console.error("API: Error al obtener estados de producto:", error)
+    return NextResponse.json(
+      { message: "Error al obtener estados de producto", error: error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
-

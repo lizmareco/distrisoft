@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
 
 // GET - Obtener un producto por ID
 export async function GET(request, { params }) {
@@ -10,55 +12,51 @@ export async function GET(request, { params }) {
 
     if (isNaN(id)) {
       console.log(`API: ID de producto inválido: ${params.id}`)
-      return NextResponse.json({ error: "ID de producto inválido" }, { status: 400 })
+      return NextResponse.json({ error: "ID de producto inválido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
-    const producto = await prisma.producto.findUnique({
-      where: {
-        idProducto: id,
-        deletedAt: null, // Asegurar que solo se obtengan productos no eliminados
-      },
+    // Construir la consulta
+    const whereClause = {
+      idProducto: id,
+      deletedAt: null, // Solo productos no eliminados
+    }
+
+    const producto = await prisma.producto.findFirst({
+      where: whereClause,
       include: {
         unidadMedida: true,
-        estadoProducto: true,
         tipoProducto: true,
+        estadoProducto: true,
       },
     })
 
     if (!producto) {
       console.log(`API: Producto con ID ${id} no encontrado`)
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: HTTP_STATUS_CODES.notFound })
     }
 
-    // Formatear el producto para tener la estructura esperada por el frontend
-    const productoFormateado = {
-      ...producto,
-      unidadMedida: producto.unidadMedida
-        ? {
-            idUnidadMedida: producto.unidadMedida.idUnidadMedida,
-            descUnidadMedida: producto.unidadMedida.descUnidadMedida,
-            abreviatura: producto.unidadMedida.abreviatura,
-          }
-        : null,
-      estadoProducto: producto.estadoProducto
-        ? {
-            idEstadoProducto: producto.estadoProducto.idEstadoProducto,
-            nombreEstadoProducto: producto.estadoProducto.descEstadoProducto, // Mapear descEstadoProducto a nombreEstadoProducto
-          }
-        : null,
-      tipoProducto: producto.tipoProducto
-        ? {
-            idTipoProducto: producto.tipoProducto.idTipoProducto,
-            nombreTipoProducto: producto.tipoProducto.descTipoProducto, // Mapear descTipoProducto a nombreTipoProducto
-          }
-        : null,
+    // Mapear el producto para asegurar que tipoProducto tenga nombreTipoProducto
+    const productoFormateado = { ...producto }
+    if (productoFormateado.tipoProducto) {
+      productoFormateado.tipoProducto = {
+        ...productoFormateado.tipoProducto,
+        nombreTipoProducto: productoFormateado.tipoProducto.descTipoProducto,
+      }
     }
 
-    console.log(`API: Producto con ID ${id} encontrado`)
-    return NextResponse.json(productoFormateado)
+    console.log(`API: Producto con ID ${id} encontrado y formateado:`, {
+      id: productoFormateado.idProducto,
+      nombre: productoFormateado.nombreProducto,
+      tipoProducto: productoFormateado.tipoProducto,
+    })
+
+    return NextResponse.json(productoFormateado, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
     console.error("API: Error al obtener producto:", error)
-    return NextResponse.json({ error: "Error al obtener producto: " + error.message }, { status: 500 })
+    return NextResponse.json(
+      { error: "Error al obtener producto: " + error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
 
@@ -67,50 +65,70 @@ export async function PUT(request, { params }) {
   try {
     const id = Number.parseInt(params.id)
     console.log(`API: Actualizando producto con ID: ${id}`)
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID de producto inválido" }, { status: HTTP_STATUS_CODES.badRequest })
+    }
+
+    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
 
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    // En desarrollo, podemos usar un usuario ficticio
+    let userData = { idUsuario: 1 }
 
+    // Verificar si hay un usuario autenticado
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userFromToken = await authController.getUserFromToken(accessToken)
+      if (userFromToken) {
+        userData = userFromToken
+      }
+    }
+
+    // Obtener datos del producto
     const data = await request.json()
     console.log("API: Datos recibidos:", data)
 
-    // Obtener el producto actual para auditoría
-    const productoAnterior = await prisma.producto.findUnique({
-      where: { idProducto: id },
-      include: {
-        unidadMedida: true,
-        estadoProducto: true,
-        tipoProducto: true,
+    // Verificar si el producto existe
+    const productoExistente = await prisma.producto.findFirst({
+      where: {
+        idProducto: id,
+        deletedAt: null,
       },
     })
 
-    if (!productoAnterior) {
-      console.log(`API: Producto con ID ${id} no encontrado para actualizar`)
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
+    if (!productoExistente) {
+      console.log(`API: Producto con ID ${id} no encontrado`)
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: HTTP_STATUS_CODES.notFound })
     }
 
     // Verificar si ya existe otro producto con el mismo nombre
-    const productoExistente = await prisma.producto.findFirst({
+    const productoConMismoNombre = await prisma.producto.findFirst({
       where: {
         nombreProducto: {
           equals: data.nombreProducto,
           mode: "insensitive", // Ignorar mayúsculas/minúsculas
         },
         idProducto: {
-          not: id,
+          not: id, // Excluir el producto actual
         },
         deletedAt: null,
       },
     })
 
-    if (productoExistente) {
+    if (productoConMismoNombre) {
       console.log(`API: Ya existe otro producto con el nombre "${data.nombreProducto}"`)
-      return NextResponse.json({ error: "Ya existe otro producto con este nombre" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Ya existe otro producto con este nombre" },
+        { status: HTTP_STATUS_CODES.badRequest },
+      )
     }
 
-    // Convertir los valores a números
-    const productoActualizado = await prisma.producto.update({
+    // Guardar el estado anterior para auditoría
+    const productoAnterior = { ...productoExistente }
+
+    // Actualizar el producto
+    const producto = await prisma.producto.update({
       where: {
         idProducto: id,
       },
@@ -120,32 +138,39 @@ export async function PUT(request, { params }) {
         idTipoProducto: Number.parseInt(data.idTipoProducto),
         pesoUnidad: Number.parseFloat(data.pesoUnidad),
         precioUnitario: Number.parseFloat(data.precioUnitario),
-        idEstadoProducto: Number.parseInt(data.idEstadoProducto),
         idUnidadMedida: Number.parseInt(data.idUnidadMedida),
+        idEstadoProducto: Number.parseInt(data.idEstadoProducto),
         updatedAt: new Date(),
       },
       include: {
         unidadMedida: true,
-        estadoProducto: true,
         tipoProducto: true,
+        estadoProducto: true,
       },
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarActualizacion(
-      "Producto",
-      id,
-      productoAnterior,
-      productoActualizado,
-      userData.idUsuario,
-      request,
-    )
+    await auditoriaService.registrarAuditoria({
+      entidad: "Producto",
+      idRegistro: id.toString(),
+      accion: "ACTUALIZAR",
+      valorAnterior: productoAnterior,
+      valorNuevo: producto,
+      idUsuario: userData.idUsuario,
+      request: request,
+    })
 
     console.log(`API: Producto con ID ${id} actualizado correctamente`)
-    return NextResponse.json(productoActualizado)
+    return NextResponse.json(
+      { message: "Producto actualizado correctamente", producto },
+      { status: HTTP_STATUS_CODES.ok },
+    )
   } catch (error) {
     console.error("API: Error al actualizar producto:", error)
-    return NextResponse.json({ error: "Error al actualizar producto: " + error.message }, { status: 500 })
+    return NextResponse.json(
+      { error: "Error al actualizar producto: " + error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
 
@@ -154,44 +179,76 @@ export async function DELETE(request, { params }) {
   try {
     const id = Number.parseInt(params.id)
     console.log(`API: Eliminando producto con ID: ${id}`)
+
+    if (isNaN(id)) {
+      return NextResponse.json({ error: "ID de producto inválido" }, { status: HTTP_STATUS_CODES.badRequest })
+    }
+
+    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
 
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    // En desarrollo, podemos usar un usuario ficticio
+    let userData = { idUsuario: 1 }
 
-    // Obtener el producto actual para auditoría
-    const productoAnterior = await prisma.producto.findUnique({
-      where: { idProducto: id },
+    // Verificar si hay un usuario autenticado
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userFromToken = await authController.getUserFromToken(accessToken)
+      if (userFromToken) {
+        userData = userFromToken
+      }
+    }
+
+    // Verificar si el producto existe
+    const productoExistente = await prisma.producto.findFirst({
+      where: {
+        idProducto: id,
+        deletedAt: null,
+      },
       include: {
         unidadMedida: true,
-        estadoProducto: true,
         tipoProducto: true,
+        estadoProducto: true,
       },
     })
 
-    if (!productoAnterior) {
-      console.log(`API: Producto con ID ${id} no encontrado para eliminar`)
-      return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
+    if (!productoExistente) {
+      console.log(`API: Producto con ID ${id} no encontrado`)
+      return NextResponse.json({ error: "Producto no encontrado" }, { status: HTTP_STATUS_CODES.notFound })
     }
 
-    // Realizar soft delete
-    await prisma.producto.update({
+    // Guardar el estado anterior para auditoría
+    const productoAnterior = { ...productoExistente }
+
+    // Eliminar el producto (soft delete)
+    const producto = await prisma.producto.update({
       where: {
         idProducto: id,
       },
       data: {
         deletedAt: new Date(),
+        updatedAt: new Date(),
       },
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarEliminacion("Producto", id, productoAnterior, userData.idUsuario, request)
+    await auditoriaService.registrarAuditoria({
+      entidad: "Producto",
+      idRegistro: id.toString(),
+      accion: "ELIMINAR",
+      valorAnterior: productoAnterior,
+      valorNuevo: null,
+      idUsuario: userData.idUsuario,
+      request: request,
+    })
 
     console.log(`API: Producto con ID ${id} eliminado correctamente`)
-    return NextResponse.json({ message: "Producto eliminado correctamente" })
+    return NextResponse.json({ message: "Producto eliminado correctamente" }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
     console.error("API: Error al eliminar producto:", error)
-    return NextResponse.json({ error: "Error al eliminar producto: " + error.message }, { status: 500 })
+    return NextResponse.json(
+      { error: "Error al eliminar producto: " + error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
-

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Container,
   Typography,
@@ -16,10 +16,20 @@ import {
   Box,
   CircularProgress,
   Alert,
+  TextField,
+  Grid,
+  InputAdornment,
+  Pagination,
+  Stack,
+  Tabs,
+  Tab,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
+import SearchIcon from "@mui/icons-material/Search"
+import ListIcon from "@mui/icons-material/List"
+import BusinessIcon from "@mui/icons-material/Business"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
@@ -27,9 +37,30 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 
 export default function EmpresasPage() {
   const [empresas, setEmpresas] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState(null)
   const router = useRouter()
+
+  // Estado para el tipo de búsqueda (por RUC o por razón social)
+  const [searchType, setSearchType] = useState(0) // 0: Por RUC, 1: Por razón social
+
+  // Estado para el formulario de búsqueda
+  const [busquedaRUC, setBusquedaRUC] = useState("")
+  const [busquedaRazonSocial, setBusquedaRazonSocial] = useState("")
+
+  // Estado para controlar si ya se realizó una búsqueda
+  const [busquedaRealizada, setBusquedaRealizada] = useState(false)
+
+  // Estado para la paginación
+  const [paginacion, setPaginacion] = useState({
+    page: 1,
+    pageSize: 50,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  })
 
   // Estado para el diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState({
@@ -38,27 +69,161 @@ export default function EmpresasPage() {
     empresaNombre: "",
   })
 
-  useEffect(() => {
-    const fetchEmpresas = async () => {
+  const handleSearchTypeChange = (event, newValue) => {
+    setSearchType(newValue)
+  }
+
+  const handleInputChangeRUC = (e) => {
+    setBusquedaRUC(e.target.value)
+  }
+
+  const handleInputChangeRazonSocial = (e) => {
+    setBusquedaRazonSocial(e.target.value)
+  }
+
+  const handleSearch = async (e) => {
+    e.preventDefault()
+
+    if (searchType === 0) {
+      // Búsqueda por RUC
+      // Validar que se haya ingresado el RUC
+      if (!busquedaRUC.trim()) {
+        setError("Debe ingresar un número de RUC para buscar")
+        return
+      }
+
+      setSearching(true)
+      setError(null)
+      setBusquedaRealizada(true)
+
       try {
-        console.log("Cargando empresas...")
-        const response = await fetch("/api/empresas")
+        const response = await fetch(`/api/empresas?numeroDocumento=${busquedaRUC}`)
+
         if (!response.ok) {
-          throw new Error("Error al cargar empresas")
+          throw new Error("Error al buscar empresas")
         }
+
         const data = await response.json()
-        console.log(`Se cargaron ${data.length} empresas`)
+
+        // En búsqueda por RUC, no usamos paginación
         setEmpresas(data)
+
+        // Resetear la paginación
+        setPaginacion({
+          page: 1,
+          pageSize: 50,
+          totalItems: data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
       } catch (error) {
         console.error("Error:", error)
         setError(error.message)
       } finally {
-        setLoading(false)
+        setSearching(false)
+      }
+    } else {
+      // Búsqueda por razón social
+      // Validar que se haya ingresado la razón social
+      if (!busquedaRazonSocial.trim()) {
+        setError("Debe ingresar una razón social para buscar")
+        return
+      }
+
+      setSearching(true)
+      setError(null)
+      setBusquedaRealizada(true)
+
+      try {
+        const response = await fetch(`/api/empresas?razonSocial=${encodeURIComponent(busquedaRazonSocial)}`)
+
+        if (!response.ok) {
+          throw new Error("Error al buscar empresas")
+        }
+
+        const data = await response.json()
+
+        // En búsqueda por razón social, no usamos paginación
+        setEmpresas(data)
+
+        // Resetear la paginación
+        setPaginacion({
+          page: 1,
+          pageSize: 50,
+          totalItems: data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } catch (error) {
+        console.error("Error:", error)
+        setError(error.message)
+      } finally {
+        setSearching(false)
       }
     }
+  }
 
-    fetchEmpresas()
-  }, [])
+  // Función para listar todas las empresas activas con paginación
+  const handleListAll = async (page = 1) => {
+    setSearching(true)
+    setError(null)
+    setBusquedaRealizada(true)
+
+    // Limpiar los campos de búsqueda
+    setBusquedaRUC("")
+    setBusquedaRazonSocial("")
+
+    try {
+      const response = await fetch(`/api/empresas/all?page=${page}&pageSize=50`)
+
+      if (!response.ok) {
+        throw new Error("Error al obtener empresas")
+      }
+
+      const data = await response.json()
+      console.log("Datos recibidos:", data)
+
+      // Verificar que los datos tengan la estructura esperada
+      if (!data || typeof data !== "object") {
+        throw new Error("Formato de respuesta inválido")
+      }
+
+      // Actualizar las empresas y la información de paginación
+      setEmpresas(data.empresas || [])
+      setPaginacion(
+        data.pagination || {
+          page: 1,
+          pageSize: 50,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      )
+    } catch (error) {
+      console.error("Error:", error)
+      setError(error.message)
+      // Establecer estados consistentes en caso de error
+      setEmpresas([])
+      setPaginacion({
+        page: 1,
+        pageSize: 50,
+        totalItems: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      })
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  // Manejar cambio de página
+  const handlePageChange = (event, newPage) => {
+    handleListAll(newPage)
+  }
 
   const handleDeleteClick = (id, razonSocial) => {
     setConfirmDialog({
@@ -70,6 +235,7 @@ export default function EmpresasPage() {
 
   const handleConfirmDelete = async () => {
     try {
+      setLoading(true)
       const response = await fetch(`/api/empresas/${confirmDialog.empresaId}`, {
         method: "DELETE",
       })
@@ -88,6 +254,8 @@ export default function EmpresasPage() {
       setError(error.message)
       // Cerrar el diálogo incluso si hay error
       setConfirmDialog({ ...confirmDialog, open: false })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -100,14 +268,6 @@ export default function EmpresasPage() {
     router.push(`/empresas/${id}`)
   }
 
-  if (loading) {
-    return (
-      <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
-    )
-  }
-
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
@@ -116,14 +276,12 @@ export default function EmpresasPage() {
             Volver a Gestión
           </Button>
           <Typography variant="h5" component="h1">
-            Listado de Empresas
+            Gestión de Empresas
           </Typography>
         </Box>
-        <Link href="/empresas/nueva" passHref>
-          <Button variant="contained" color="primary" startIcon={<AddIcon />}>
-            Nueva Empresa
-          </Button>
-        </Link>
+        <Button variant="contained" color="primary" startIcon={<AddIcon />} component={Link} href="/empresas/nueva">
+          Nueva Empresa
+        </Button>
       </Box>
 
       {error && (
@@ -132,6 +290,123 @@ export default function EmpresasPage() {
         </Alert>
       )}
 
+      {/* Formulario de búsqueda */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Buscar Empresa
+        </Typography>
+
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+          <Tabs value={searchType} onChange={handleSearchTypeChange} aria-label="Tipo de búsqueda">
+            <Tab label="Por RUC" />
+            <Tab label="Por Razón Social" />
+          </Tabs>
+        </Box>
+
+        {searchType === 0 ? (
+          // Búsqueda por RUC
+          <form onSubmit={handleSearch}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={7}>
+                <TextField
+                  fullWidth
+                  label="Número de RUC"
+                  id="numeroRUC"
+                  name="numeroRUC"
+                  value={busquedaRUC}
+                  onChange={handleInputChangeRUC}
+                  required
+                  disabled={searching}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  disabled={searching}
+                  sx={{ height: "56px" }}
+                >
+                  {searching ? <CircularProgress size={24} /> : "Buscar"}
+                </Button>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  fullWidth
+                  startIcon={<ListIcon />}
+                  onClick={() => handleListAll(1)}
+                  disabled={searching}
+                  sx={{ height: "56px" }}
+                >
+                  Listar Todos
+                </Button>
+              </Grid>
+            </Grid>
+          </form>
+        ) : (
+          // Búsqueda por razón social
+          <form onSubmit={handleSearch}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={7}>
+                <TextField
+                  fullWidth
+                  label="Razón Social"
+                  id="razonSocial"
+                  name="razonSocial"
+                  value={busquedaRazonSocial}
+                  onChange={handleInputChangeRazonSocial}
+                  required
+                  disabled={searching}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <BusinessIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  disabled={searching}
+                  sx={{ height: "56px" }}
+                >
+                  {searching ? <CircularProgress size={24} /> : "Buscar"}
+                </Button>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  fullWidth
+                  startIcon={<ListIcon />}
+                  onClick={() => handleListAll(1)}
+                  disabled={searching}
+                  sx={{ height: "56px" }}
+                >
+                  Listar Todos
+                </Button>
+              </Grid>
+            </Grid>
+          </form>
+        )}
+      </Paper>
+
+      {/* Tabla de resultados */}
       <Paper>
         <TableContainer>
           <Table>
@@ -147,7 +422,18 @@ export default function EmpresasPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {empresas.length > 0 ? (
+              {loading || searching ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 3 }}>
+                      <CircularProgress size={40} sx={{ mb: 2 }} />
+                      <Typography variant="body2" color="text.secondary">
+                        {searching ? "Buscando empresas..." : "Cargando..."}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : empresas.length > 0 ? (
                 empresas.map((empresa) => (
                   <TableRow key={empresa.idEmpresa}>
                     <TableCell>{empresa.idEmpresa}</TableCell>
@@ -155,9 +441,7 @@ export default function EmpresasPage() {
                     <TableCell>{empresa.ruc}</TableCell>
                     <TableCell>{empresa.categoriaEmpresa?.descCategoriaEmpresa || "N/A"}</TableCell>
                     <TableCell>{empresa.ciudad?.descCiudad || "N/A"}</TableCell>
-                    <TableCell>
-                      {empresa.persona ? `${empresa.persona.nombre} ${empresa.persona.apellido}` : "N/A"}
-                    </TableCell>
+                    <TableCell>{empresa.contacto || "No especificado"}</TableCell>
                     <TableCell>
                       <IconButton
                         color="primary"
@@ -176,16 +460,49 @@ export default function EmpresasPage() {
                     </TableCell>
                   </TableRow>
                 ))
+              ) : busquedaRealizada && !searching ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Box sx={{ py: 3 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        No se encontraron empresas con los criterios de búsqueda
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    No hay empresas registradas
+                    <Box sx={{ py: 3 }}>
+                      <Typography variant="body1" color="text.secondary">
+                        Utilice el buscador para encontrar empresas o haga clic en "Listar Todos"
+                      </Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Controles de paginación */}
+        {busquedaRealizada && paginacion && paginacion.totalPages > 1 && (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+            <Stack spacing={2}>
+              <Pagination
+                count={paginacion.totalPages}
+                page={paginacion.page}
+                onChange={handlePageChange}
+                color="primary"
+                disabled={searching}
+              />
+              <Typography variant="body2" color="text.secondary" align="center">
+                Mostrando {empresas.length} de {paginacion.totalItems} empresas (Página {paginacion.page} de{" "}
+                {paginacion.totalPages})
+              </Typography>
+            </Stack>
+          </Box>
+        )}
       </Paper>
 
       {/* Diálogo de confirmación para eliminar */}
@@ -200,4 +517,3 @@ export default function EmpresasPage() {
     </Container>
   )
 }
-

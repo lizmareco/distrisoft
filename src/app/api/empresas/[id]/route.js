@@ -1,12 +1,12 @@
 import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 
 export async function GET(request, { params }) {
   try {
-    console.log(`Obteniendo empresa con ID: ${params.id}...`)
-
     const { id } = params
+    console.log(`API: Obteniendo empresa con ID: ${id}`)
 
     const empresa = await prisma.empresa.findUnique({
       where: {
@@ -16,48 +16,69 @@ export async function GET(request, { params }) {
       include: {
         categoriaEmpresa: true,
         ciudad: true,
-        persona: true,
         tipoDocumento: true,
       },
     })
 
     if (!empresa) {
-      return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 })
+      return NextResponse.json({ error: "Empresa no encontrada" }, { status: HTTP_STATUS_CODES.notFound })
     }
 
-    console.log(`Empresa encontrada con ID: ${id}`)
-    return NextResponse.json(empresa)
+    return NextResponse.json(empresa, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("Error al obtener empresa:", error)
-    return NextResponse.json({ error: "Error al obtener empresa: " + error.message }, { status: 500 })
+    console.error("API: Error al obtener empresa:", error)
+    return NextResponse.json(
+      { error: "Error al obtener empresa", message: error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
 
 export async function PUT(request, { params }) {
   try {
-    console.log(`Actualizando empresa con ID: ${params.id}...`)
-    const auditoriaService = new AuditoriaService()
+    const { id } = params
+    const data = await request.json()
+    console.log(`API: Actualizando empresa con ID: ${id}`)
+    console.log("Datos recibidos:", data)
 
+    const auditoriaService = new AuditoriaService()
     // Usuario ficticio para auditoría en desarrollo
     const userData = { idUsuario: 1 }
 
-    const { id } = params
-    const data = await request.json()
-    console.log("Datos recibidos:", data)
-
     // Obtener la empresa actual para auditoría
     const empresaAnterior = await prisma.empresa.findUnique({
-      where: { idEmpresa: Number.parseInt(id) },
-      include: {
-        categoriaEmpresa: true,
-        ciudad: true,
-        persona: true,
-        tipoDocumento: true,
+      where: {
+        idEmpresa: Number.parseInt(id),
       },
     })
 
     if (!empresaAnterior) {
-      return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 })
+      return NextResponse.json({ error: "Empresa no encontrada" }, { status: HTTP_STATUS_CODES.notFound })
+    }
+
+    // Verificar si ya existe otra empresa con el mismo RUC
+    if (data.ruc && data.ruc !== empresaAnterior.ruc) {
+      const empresaExistente = await prisma.empresa.findFirst({
+        where: {
+          ruc: data.ruc,
+          idEmpresa: { not: Number.parseInt(id) }, // Excluir la empresa actual
+          deletedAt: null, // Solo considerar empresas activas
+        },
+      })
+
+      if (empresaExistente) {
+        console.log(`Ya existe otra empresa con el RUC ${data.ruc}: ID ${empresaExistente.idEmpresa}`)
+        return NextResponse.json(
+          {
+            error: `Ya existe otra empresa registrada con el RUC ${data.ruc}`,
+            empresaExistente: {
+              id: empresaExistente.idEmpresa,
+              razonSocial: empresaExistente.razonSocial,
+            },
+          },
+          { status: HTTP_STATUS_CODES.conflict }, // 409 Conflict
+        )
+      }
     }
 
     // Actualizar la empresa
@@ -74,51 +95,55 @@ export async function PUT(request, { params }) {
         idCiudad: data.idCiudad ? Number.parseInt(data.idCiudad) : undefined,
         correoEmpresa: data.correoEmpresa,
         telefono: data.telefono,
-        personaContacto: data.personaContacto ? Number.parseInt(data.personaContacto) : null,
+        contacto: data.contacto || "", // Usar el nuevo campo contacto
         updatedAt: new Date(),
       },
       include: {
         categoriaEmpresa: true,
         ciudad: true,
-        persona: true,
         tipoDocumento: true,
       },
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarActualizacion("Empresa", id, empresaAnterior, empresa, userData.idUsuario, request)
+    await auditoriaService.registrarAuditoria({
+      entidad: "Empresa",
+      idRegistro: id.toString(),
+      accion: "ACTUALIZAR",
+      valorAnterior: empresaAnterior,
+      valorNuevo: empresa,
+      idUsuario: userData.idUsuario,
+      request: request,
+    })
 
-    console.log(`Empresa actualizada con ID: ${id}`)
-    return NextResponse.json(empresa)
+    return NextResponse.json(empresa, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("Error al actualizar empresa:", error)
-    return NextResponse.json({ error: "Error al actualizar empresa: " + error.message }, { status: 500 })
+    console.error("API: Error al actualizar empresa:", error)
+    return NextResponse.json(
+      { error: "Error al actualizar empresa", message: error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
 
 export async function DELETE(request, { params }) {
   try {
-    console.log(`Eliminando empresa con ID: ${params.id}...`)
-    const auditoriaService = new AuditoriaService()
+    const { id } = params
+    console.log(`API: Eliminando empresa con ID: ${id}`)
 
+    const auditoriaService = new AuditoriaService()
     // Usuario ficticio para auditoría en desarrollo
     const userData = { idUsuario: 1 }
 
-    const { id } = params
-
     // Obtener la empresa actual para auditoría
     const empresaAnterior = await prisma.empresa.findUnique({
-      where: { idEmpresa: Number.parseInt(id) },
-      include: {
-        categoriaEmpresa: true,
-        ciudad: true,
-        persona: true,
-        tipoDocumento: true,
+      where: {
+        idEmpresa: Number.parseInt(id),
       },
     })
 
     if (!empresaAnterior) {
-      return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 })
+      return NextResponse.json({ error: "Empresa no encontrada" }, { status: HTTP_STATUS_CODES.notFound })
     }
 
     // Eliminar la empresa (soft delete)
@@ -132,13 +157,22 @@ export async function DELETE(request, { params }) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarEliminacion("Empresa", id, empresaAnterior, userData.idUsuario, request)
+    await auditoriaService.registrarAuditoria({
+      entidad: "Empresa",
+      idRegistro: id.toString(),
+      accion: "ELIMINAR",
+      valorAnterior: empresaAnterior,
+      valorNuevo: null,
+      idUsuario: userData.idUsuario,
+      request: request,
+    })
 
-    console.log(`Empresa eliminada con ID: ${id}`)
-    return NextResponse.json({ message: "Empresa eliminada correctamente" })
+    return NextResponse.json({ message: "Empresa eliminada correctamente" }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("Error al eliminar empresa:", error)
-    return NextResponse.json({ error: "Error al eliminar empresa: " + error.message }, { status: 500 })
+    console.error("API: Error al eliminar empresa:", error)
+    return NextResponse.json(
+      { error: "Error al eliminar empresa", message: error.message },
+      { status: HTTP_STATUS_CODES.internalServerError },
+    )
   }
 }
-

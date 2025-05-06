@@ -153,15 +153,35 @@ export default function PersonaFormPage({ params }) {
         body: JSON.stringify(formData),
       })
 
+      const responseData = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Error al guardar la persona")
+        // Verificar si es un error de documento duplicado
+        if (response.status === 409) {
+          const tipoDoc =
+            tiposDocumento.find((t) => t.idTipoDocumento.toString() === formData.idTipoDocumento)?.descTipoDocumento ||
+            "Documento"
+
+          setError(`Ya existe otra persona registrada con el ${tipoDoc} ${formData.nroDocumento}. 
+                   Persona: ${responseData.personaExistente?.nombre || "No disponible"}`)
+
+          // Desplazar la página hacia arriba para que el usuario vea el mensaje de error
+          window.scrollTo({ top: 0, behavior: "smooth" })
+          return
+        }
+
+        setError(responseData.error || `Error al ${isEditing ? "actualizar" : "crear"} la persona`)
+        // Desplazar la página hacia arriba para que el usuario vea el mensaje de error
+        window.scrollTo({ top: 0, behavior: "smooth" })
+        return
       }
 
       router.push("/personas")
     } catch (error) {
       console.error("Error:", error)
       setError(error.message)
+      // Desplazar la página hacia arriba para que el usuario vea el mensaje de error
+      window.scrollTo({ top: 0, behavior: "smooth" })
     } finally {
       setSubmitting(false)
     }
@@ -188,7 +208,18 @@ export default function PersonaFormPage({ params }) {
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert
+            severity="error"
+            sx={{
+              mb: 3,
+              fontWeight: "medium",
+              "& .MuiAlert-message": {
+                fontWeight: 500,
+              },
+              border: "1px solid",
+              borderColor: "error.main",
+            }}
+          >
             {error}
           </Alert>
         )}
@@ -336,7 +367,14 @@ export default function PersonaFormPage({ params }) {
                   startIcon={<SaveIcon />}
                   disabled={submitting || !!errors.correoPersona}
                 >
-                  {submitting ? "Guardando..." : "Guardar"}
+                  {submitting ? (
+                    <>
+                      <CircularProgress size={24} sx={{ mr: 1, color: "white" }} />
+                      Guardando...
+                    </>
+                  ) : (
+                    "Guardar"
+                  )}
                 </Button>
               </Box>
             </Grid>
@@ -346,4 +384,3 @@ export default function PersonaFormPage({ params }) {
     </Container>
   )
 }
-

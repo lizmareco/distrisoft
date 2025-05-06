@@ -27,13 +27,10 @@ export default function FormularioMateriaPrimaPage() {
   const [formData, setFormData] = useState({
     nombreMateriaPrima: "",
     descMateriaPrima: "",
-    stockActual: "",
-    stockMinimo: "",
-    idUnidadMedida: "",
     idEstadoMateriaPrima: "",
   })
 
-  const [unidadesMedida, setUnidadesMedida] = useState([])
+
   const [estadosMateriaPrima, setEstadosMateriaPrima] = useState([])
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
@@ -48,15 +45,6 @@ export default function FormularioMateriaPrimaPage() {
     const fetchData = async () => {
       try {
         setLoadingData(true)
-
-        // Cargar unidades de medida
-        const unidadesResponse = await fetch("/api/unidadmedida")
-        if (!unidadesResponse.ok) {
-          showAlert("Error al cargar unidades de medida", "error")
-          return
-        }
-        const unidadesData = await unidadesResponse.json()
-        setUnidadesMedida(unidadesData)
 
         // Cargar estados de materia prima
         const estadosResponse = await fetch("/api/estadomateriaprima")
@@ -79,9 +67,6 @@ export default function FormularioMateriaPrimaPage() {
           setFormData({
             nombreMateriaPrima: materiaPrima.nombreMateriaPrima || "",
             descMateriaPrima: materiaPrima.descMateriaPrima || "",
-            stockActual: materiaPrima.stockActual || "",
-            stockMinimo: materiaPrima.stockMinimo || "",
-            idUnidadMedida: materiaPrima.idUnidadMedida || "",
             idEstadoMateriaPrima: materiaPrima.idEstadoMateriaPrima || "",
           })
         }
@@ -124,27 +109,6 @@ export default function FormularioMateriaPrimaPage() {
 
     if (!formData.descMateriaPrima.trim()) {
       errors.descMateriaPrima = "La descripción es requerida"
-      isValid = false
-    }
-
-    if (!formData.stockActual) {
-      errors.stockActual = "El stock actual es requerido"
-      isValid = false
-    } else if (isNaN(formData.stockActual) || Number.parseFloat(formData.stockActual) < 0) {
-      errors.stockActual = "El stock actual debe ser un número positivo"
-      isValid = false
-    }
-
-    if (!formData.stockMinimo) {
-      errors.stockMinimo = "El stock mínimo es requerido"
-      isValid = false
-    } else if (isNaN(formData.stockMinimo) || Number.parseFloat(formData.stockMinimo) < 0) {
-      errors.stockMinimo = "El stock mínimo debe ser un número positivo"
-      isValid = false
-    }
-
-    if (!formData.idUnidadMedida) {
-      errors.idUnidadMedida = "La unidad de medida es requerida"
       isValid = false
     }
 
@@ -291,59 +255,6 @@ export default function FormularioMateriaPrimaPage() {
                 error={!!fieldErrors.descMateriaPrima}
                 helperText={fieldErrors.descMateriaPrima}
               />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="stockActual"
-                label="Stock Actual"
-                type="number"
-                value={formData.stockActual}
-                onChange={handleChange}
-                fullWidth
-                required
-                margin="normal"
-                inputProps={{ step: "0.01", min: "0" }}
-                error={!!fieldErrors.stockActual}
-                helperText={fieldErrors.stockActual}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="stockMinimo"
-                label="Stock Mínimo"
-                type="number"
-                value={formData.stockMinimo}
-                onChange={handleChange}
-                fullWidth
-                required
-                margin="normal"
-                inputProps={{ step: "0.01", min: "0" }}
-                error={!!fieldErrors.stockMinimo}
-                helperText={fieldErrors.stockMinimo}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="idUnidadMedida"
-                label="Unidad de Medida"
-                select
-                value={formData.idUnidadMedida}
-                onChange={handleChange}
-                fullWidth
-                required
-                margin="normal"
-                error={!!fieldErrors.idUnidadMedida}
-                helperText={fieldErrors.idUnidadMedida}
-              >
-                {unidadesMedida.map((unidad) => (
-                  <MenuItem key={unidad.idUnidadMedida} value={unidad.idUnidadMedida}>
-                    {unidad.descUnidadMedida} ({unidad.abreviatura})
-                  </MenuItem>
-                ))}
-              </TextField>
             </Grid>
 
             <Grid item xs={12} sm={6}>

@@ -26,14 +26,16 @@ import {
   AdminPanelSettings,
   Dashboard as DashboardIcon,
   Security as SecurityIcon,
-  History as HistoryIcon, // Import HistoryIcon
+  History as HistoryIcon,
+  Description as DescriptionIcon,
+  ReceiptLong as ReceiptLongIcon, // Nuevo icono para cotizaciones de proveedores
 } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 
 export default function DashboardPage() {
   const router = useRouter()
   const { session } = useRootContext()
-  console.log ("DashboardPage session:", session)
+  console.log("DashboardPage session:", session)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userInfo, setUserInfo] = useState(null)
@@ -43,6 +45,8 @@ export default function DashboardPage() {
     entidades: true,
     inventario: true,
     usuarios: true,
+    ventas: true, // Nueva sección para ventas/cotizaciones
+    compras: true, // Nueva sección para compras/cotizaciones de proveedores
   })
 
   // Estado para controlar la visibilidad de los elementos dentro de cada sección
@@ -59,6 +63,12 @@ export default function DashboardPage() {
 
     // Sección de Usuarios
     administracionUsuarios: true,
+
+    // Sección de Ventas
+    cotizaciones: true,
+
+    // Sección de Compras
+    cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
   })
 
   // Modificar la función useEffect para asegurar que se obtengan correctamente los datos del usuario
@@ -162,6 +172,8 @@ export default function DashboardPage() {
       entidades: true,
       inventario: true,
       usuarios: true, // Siempre visible para pruebas
+      ventas: true, // Sección para ventas/cotizaciones
+      compras: true, // Nueva sección para compras/cotizaciones de proveedores
     }
 
     const items = {
@@ -172,6 +184,8 @@ export default function DashboardPage() {
       materiaprima: true,
       productos: true,
       administracionUsuarios: true, // Siempre visible para pruebas
+      cotizaciones: true, // Ítem para cotizaciones de clientes
+      cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
     }
 
     // Configurar permisos específicos según el rol
@@ -182,9 +196,11 @@ export default function DashboardPage() {
         break
 
       case "VENTAS":
-        // Rol de ventas: ve clientes, empresas y productos
+        // Rol de ventas: ve clientes, empresas, productos y cotizaciones
         items.proveedores = false
         items.materiaprima = false
+        items.cotizacionesProveedor = false // No ve cotizaciones de proveedores
+        secciones.compras = false // No ve sección de compras
         // Comentado para pruebas: items.administracionUsuarios = false;
         // Comentado para pruebas: secciones.usuarios = false;
         break
@@ -193,14 +209,20 @@ export default function DashboardPage() {
         // Rol de producción: ve materias primas y productos
         items.clientes = false
         items.empresas = false
+        items.cotizaciones = false // No ve cotizaciones de clientes
+        items.cotizacionesProveedor = false // No ve cotizaciones de proveedores
+        secciones.ventas = false // No ve sección de ventas
+        secciones.compras = false // No ve sección de compras
         // Comentado para pruebas: items.administracionUsuarios = false;
         // Comentado para pruebas: secciones.usuarios = false;
         break
 
       case "COMPRAS":
-        // Rol de compras: ve proveedores y materias primas
+        // Rol de compras: ve proveedores, materias primas y cotizaciones de proveedores
         items.clientes = false
         items.productos = false
+        items.cotizaciones = false // No ve cotizaciones de clientes
+        secciones.ventas = false // No ve sección de ventas
         // Comentado para pruebas: items.administracionUsuarios = false;
         // Comentado para pruebas: secciones.usuarios = false;
         break
@@ -269,6 +291,86 @@ export default function DashboardPage() {
           Selecciona una de las siguientes opciones para comenzar a gestionar el sistema:
         </Typography>
       </Paper>
+
+      {/* Sección de Gestión de Ventas */}
+      {visibleSections.ventas && (
+        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
+            Gestión de Ventas
+          </Typography>
+
+          <Grid container spacing={3} justifyContent="center">
+            {/* Tarjeta de Gestión de Cotizaciones */}
+            {visibleItems.cotizaciones && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                      <DescriptionIcon sx={{ fontSize: 60, color: "#00796b" }} /> {/* Verde azulado */}
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Gestión de Cotizaciones
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Administre las cotizaciones para clientes. Cree nuevas cotizaciones, consulte el historial y
+                      gestione el estado de las mismas.
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigateTo("/cotizaciones")}
+                      sx={{ bgcolor: "#00796b", "&:hover": { bgcolor: "#004d40" } }}
+                    >
+                      ACCEDER
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
+      )}
+
+      {/* Nueva Sección de Gestión de Compras */}
+      {visibleSections.compras && (
+        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
+            Gestión de Compras
+          </Typography>
+
+          <Grid container spacing={3} justifyContent="center">
+            {/* Tarjeta de Gestión de Cotizaciones de Proveedores */}
+            {visibleItems.cotizacionesProveedor && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                      <ReceiptLongIcon sx={{ fontSize: 60, color: "#e65100" }} /> {/* Naranja oscuro */}
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Cotizaciones de Proveedores
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Administre las cotizaciones de proveedores. Cree nuevas cotizaciones, consulte el historial y
+                      gestione el estado de las mismas.
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigateTo("/cotizaciones-proveedor")}
+                      sx={{ bgcolor: "#e65100", "&:hover": { bgcolor: "#bf360c" } }}
+                    >
+                      ACCEDER
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
+      )}
 
       {/* Sección de Gestión de Entidades */}
       {visibleSections.entidades && (
@@ -561,4 +663,3 @@ export default function DashboardPage() {
     </Container>
   )
 }
-

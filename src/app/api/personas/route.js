@@ -1,28 +1,53 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 
 const prisma = new PrismaClient()
 
-// GET /api/personas - Obtener todas las personas
-export async function GET() {
+// GET /api/personas - Obtener personas con filtros opcionales
+export async function GET(request) {
   try {
-    console.log("API: Consultando personas en la base de datos")
+    // Obtener parámetros de búsqueda de la URL
+    const { searchParams } = new URL(request.url)
+    const tipoDocumento = searchParams.get("tipoDocumento")
+    const numeroDocumento = searchParams.get("numeroDocumento")
+
+    console.log("API: Consultando personas con filtros:", { tipoDocumento, numeroDocumento })
+
+    // Construir la consulta base
+    const whereClause = {
+      deletedAt: null,
+    }
+
+    // Si se proporcionan parámetros de búsqueda, añadirlos al where
+    if (tipoDocumento && numeroDocumento) {
+      whereClause.idTipoDocumento = Number(tipoDocumento)
+      whereClause.nroDocumento = {
+        contains: numeroDocumento,
+        mode: "insensitive", // Búsqueda insensible a mayúsculas/minúsculas
+      }
+    }
+
+    // Ejecutar la consulta con los filtros aplicados
     const personas = await prisma.persona.findMany({
-      where: {
-        deletedAt: null,
+      where: whereClause,
+      include: {
+        tipoDocumento: true,
+        ciudad: true,
       },
       orderBy: {
         apellido: "asc",
       },
     })
+
     console.log("API: Personas encontradas:", personas.length)
 
-    // Devolver directamente el array de personas, no un objeto con propiedad personas
-    return NextResponse.json(personas, { status: 200 })
+    // Devolver directamente el array de personas
+    return NextResponse.json(personas, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
     console.error("API: Error al obtener personas:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.internalServerError })
   }
 }
 
@@ -42,7 +67,34 @@ export async function POST(request) {
         {
           error: "Faltan datos requeridos (nombre, apellido, tipo de documento o número de documento)",
         },
-        { status: 400 },
+        { status: HTTP_STATUS_CODES.badRequest },
+      )
+    }
+
+    // Verificar si ya existe una persona con el mismo tipo y número de documento
+    const personaExistente = await prisma.persona.findFirst({
+      where: {
+        idTipoDocumento: Number.parseInt(data.idTipoDocumento),
+        nroDocumento: data.nroDocumento,
+        deletedAt: null, // Solo considerar personas activas
+      },
+      include: {
+        tipoDocumento: true,
+      },
+    })
+
+    if (personaExistente) {
+      console.log(`Ya existe una persona con el documento ${data.nroDocumento}: ID ${personaExistente.idPersona}`)
+      return NextResponse.json(
+        {
+          error: `Ya existe una persona registrada con el documento ${data.nroDocumento}`,
+          personaExistente: {
+            id: personaExistente.idPersona,
+            nombre: `${personaExistente.nombre} ${personaExistente.apellido}`,
+            tipoDocumento: personaExistente.tipoDocumento?.descTipoDocumento || "Documento",
+          },
+        },
+        { status: HTTP_STATUS_CODES.conflict }, // 409 Conflict
       )
     }
 
@@ -69,10 +121,9 @@ export async function POST(request) {
     await auditoriaService.registrarCreacion("Persona", persona.idPersona, persona, userData.idUsuario, request)
 
     console.log("API: Persona creada con ID:", persona.idPersona)
-    return NextResponse.json(persona, { status: 201 })
+    return NextResponse.json(persona, { status: HTTP_STATUS_CODES.created })
   } catch (error) {
     console.error("API: Error al crear persona:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.internalServerError })
   }
 }
-

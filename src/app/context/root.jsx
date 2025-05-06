@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect } from "react"
+import jwt from "jsonwebtoken"
 
 const RootContext = createContext(undefined)
 
@@ -26,11 +27,17 @@ export function RootProvider({ children }) {
         if (storedUser && accessToken) {
           const userData = JSON.parse(storedUser)
           console.log("User data loaded from localStorage:", userData)
+
+          const userSession = jwt.decode(accessToken)
+
           setSession({
             ...userData,
             token: accessToken,
+            permisos: userSession.permisos,
           })
           console.log("Session loaded from localStorage:", userData)
+        } else if(window.location.pathname !== "/auth/login") {
+          window.location.href = "/auth/login"
         }
       } catch (error) {
         console.error("Error loading session from localStorage:", error)
