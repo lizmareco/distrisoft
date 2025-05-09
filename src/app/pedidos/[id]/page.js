@@ -5,11 +5,15 @@ export const metadata = {
   description: "Visualización detallada de un pedido",
 }
 
-export default function DetallePedidoPage({ params }) {
+// Convertimos la función a async para poder usar await con params
+export default async function DetallePedidoPage({ params }) {
+  // Esperamos a que params esté disponible y luego accedemos a id
+  const id = params ? params.id : ""
+
   return (
     <div>
       <h1>Detalle de Pedido</h1>
-      <DetallePedido id={params.id} />
+      <DetallePedido id={id} />
     </div>
   )
 }

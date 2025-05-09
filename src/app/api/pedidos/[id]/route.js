@@ -3,13 +3,22 @@ import { prisma } from "@/prisma/client"
 
 // GET /api/pedidos/[id] - Obtener un pedido por ID
 export async function GET(request, { params }) {
+  let idPedido
   try {
-    console.log(`API: Obteniendo pedido con ID ${params.id}...`)
-    const id = await params.id
+    // Extraer y convertir el ID de manera segura
+    // En Next.js 13+ con App Router, podemos acceder a params directamente
+    const id = params ? params.id : "0"
+    idPedido = Number.parseInt(id)
+
+    if (!idPedido) {
+      return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
+    }
+
+    console.log(`API: Obteniendo pedido con ID ${idPedido}...`)
 
     const pedido = await prisma.pedidoCliente.findUnique({
       where: {
-        idPedido: Number.parseInt(id),
+        idPedido: idPedido,
         deletedAt: null,
       },
       select: {
@@ -58,9 +67,10 @@ export async function GET(request, { params }) {
         // Seleccionar los detalles del pedido
         pedidoDetalle: {
           select: {
-            idPedidoDetalle: true,
+            idPedido: true,
+            idProducto: true,
             cantidad: true,
-            precioUnitario: true,
+            subtotal: true, // Usar subtotal en lugar de precioUnitario
             producto: {
               select: {
                 idProducto: true,
@@ -73,8 +83,8 @@ export async function GET(request, { params }) {
     })
 
     if (!pedido) {
-      console.log(`API: Pedido con ID ${id} no encontrado`)
-      return NextResponse.json({ error: `Pedido con ID ${id} no encontrado` }, { status: 404 })
+      console.log(`API: Pedido con ID ${idPedido} no encontrado`)
+      return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
     }
 
     // Función para convertir fecha a string en formato YYYY-MM-DD
@@ -99,24 +109,33 @@ export async function GET(request, { params }) {
     }
 
     // Imprimir fechas para depuración
-    console.log(`API: Fechas del pedido ${id} formateadas:`, {
+    console.log(`API: Fechas del pedido ${idPedido} formateadas:`, {
       fechaPedido: pedidoFormateado.fechaPedido,
       fechaEntrega: pedidoFormateado.fechaEntrega,
     })
 
-    console.log(`API: Pedido con ID ${id} obtenido correctamente`)
+    console.log(`API: Pedido con ID ${idPedido} obtenido correctamente`)
     return NextResponse.json(pedidoFormateado)
   } catch (error) {
-    console.error(`API: Error al obtener pedido con ID ${params.id}:`, error)
+    console.error(`API: Error al obtener pedido con ID ${idPedido || "desconocido"}:`, error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
 // PUT /api/pedidos/[id] - Actualizar un pedido
 export async function PUT(request, { params }) {
+  let idPedido
   try {
-    console.log(`API: Actualizando pedido con ID ${params.id}...`)
-    const id = await params.id
+    // Extraer y convertir el ID de manera segura
+    const id = params ? params.id : "0"
+    idPedido = Number.parseInt(id)
+
+    if (!idPedido) {
+      return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
+    }
+
+    console.log(`API: Actualizando pedido con ID ${idPedido}...`)
+
     const datos = await request.json()
     console.log("API: Datos recibidos:", datos)
 
@@ -129,14 +148,14 @@ export async function PUT(request, { params }) {
     // Verificar si el pedido existe
     const pedidoExistente = await prisma.pedidoCliente.findUnique({
       where: {
-        idPedido: Number.parseInt(id), // Usar idPedido en lugar de idPedidoCliente
+        idPedido: idPedido,
         deletedAt: null,
       },
     })
 
     if (!pedidoExistente) {
-      console.log(`API: Pedido con ID ${id} no encontrado para actualizar`)
-      return NextResponse.json({ error: `Pedido con ID ${id} no encontrado` }, { status: 404 })
+      console.log(`API: Pedido con ID ${idPedido} no encontrado para actualizar`)
+      return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
     }
 
     // Actualizar el pedido y sus detalles en una transacción
@@ -144,7 +163,7 @@ export async function PUT(request, { params }) {
       // Actualizar el pedido sin incluir idMetodoPago
       const pedidoActualizado = await prisma.pedidoCliente.update({
         where: {
-          idPedido: Number.parseInt(id), // Usar idPedido en lugar de idPedidoCliente
+          idPedido: idPedido,
         },
         data: {
           fechaPedido: new Date(datos.pedido.fechaPedido),
@@ -162,7 +181,7 @@ export async function PUT(request, { params }) {
         // Eliminar detalles existentes
         await prisma.pedidoDetalle.deleteMany({
           where: {
-            idPedidoCliente: Number.parseInt(id), // Usar idPedidoCliente para la relación
+            idPedidoCliente: idPedido,
           },
         })
 
@@ -170,10 +189,10 @@ export async function PUT(request, { params }) {
         const detallesPromises = datos.detalles.map((detalle) =>
           prisma.pedidoDetalle.create({
             data: {
-              idPedidoCliente: Number.parseInt(id), // Usar idPedidoCliente para la relación
+              idPedidoCliente: idPedido,
               idProducto: detalle.idProducto,
               cantidad: detalle.cantidad,
-              precioUnitario: detalle.precioUnitario,
+              subtotal: detalle.precioUnitario * detalle.cantidad, // Calcular subtotal
             },
           }),
         )
@@ -186,7 +205,7 @@ export async function PUT(request, { params }) {
       return { pedido: pedidoActualizado }
     })
 
-    console.log(`API: Pedido con ID ${id} actualizado correctamente`)
+    console.log(`API: Pedido con ID ${idPedido} actualizado correctamente`)
     return NextResponse.json(
       {
         mensaje: "Pedido actualizado exitosamente",
@@ -196,41 +215,49 @@ export async function PUT(request, { params }) {
       { status: 200 },
     )
   } catch (error) {
-    console.error(`API: Error al actualizar pedido con ID ${params.id}:`, error)
+    console.error(`API: Error al actualizar pedido con ID ${idPedido || "desconocido"}:`, error)
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }
 
 // DELETE /api/pedidos/[id] - Eliminar un pedido (borrado lógico)
 export async function DELETE(request, { params }) {
+  let idPedido
   try {
-    console.log(`API: Eliminando pedido con ID ${params.id}...`)
-    const id = await params.id
+    // Extraer y convertir el ID de manera segura
+    const id = params ? params.id : "0"
+    idPedido = Number.parseInt(id)
+
+    if (!idPedido) {
+      return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
+    }
+
+    console.log(`API: Eliminando pedido con ID ${idPedido}...`)
 
     // Verificar si el pedido existe
     const pedidoExistente = await prisma.pedidoCliente.findUnique({
       where: {
-        idPedido: Number.parseInt(id), // Usar idPedido en lugar de idPedidoCliente
+        idPedido: idPedido,
         deletedAt: null,
       },
     })
 
     if (!pedidoExistente) {
-      console.log(`API: Pedido con ID ${id} no encontrado para eliminar`)
-      return NextResponse.json({ error: `Pedido con ID ${id} no encontrado` }, { status: 404 })
+      console.log(`API: Pedido con ID ${idPedido} no encontrado para eliminar`)
+      return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
     }
 
     // Realizar borrado lógico
     await prisma.pedidoCliente.update({
       where: {
-        idPedido: Number.parseInt(id), // Usar idPedido en lugar de idPedidoCliente
+        idPedido: idPedido,
       },
       data: {
         deletedAt: new Date(),
       },
     })
 
-    console.log(`API: Pedido con ID ${id} eliminado correctamente`)
+    console.log(`API: Pedido con ID ${idPedido} eliminado correctamente`)
     return NextResponse.json(
       {
         mensaje: "Pedido eliminado exitosamente",
@@ -238,7 +265,7 @@ export async function DELETE(request, { params }) {
       { status: 200 },
     )
   } catch (error) {
-    console.error(`API: Error al eliminar pedido con ID ${params.id}:`, error)
+    console.error(`API: Error al eliminar pedido con ID ${idPedido || "desconocido"}:`, error)
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }

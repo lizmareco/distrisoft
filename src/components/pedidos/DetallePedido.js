@@ -115,6 +115,24 @@ export default function DetallePedido({ id }) {
     return "default"
   }
 
+  // Función para calcular el precio unitario a partir del subtotal y la cantidad
+  const calcularPrecioUnitario = (detalle) => {
+    if (!detalle) return 0
+
+    // Si tenemos precioUnitario directamente, usarlo
+    if (detalle.precioUnitario !== undefined) {
+      return detalle.precioUnitario
+    }
+
+    // Si tenemos subtotal y cantidad, calcular el precio unitario
+    if (detalle.subtotal !== undefined && detalle.cantidad) {
+      return detalle.subtotal / detalle.cantidad
+    }
+
+    // Si no tenemos suficiente información, devolver 0
+    return 0
+  }
+
   if (cargando) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
@@ -283,18 +301,22 @@ export default function DetallePedido({ id }) {
             </TableHead>
             <TableBody>
               {pedido.pedidoDetalle && pedido.pedidoDetalle.length > 0 ? (
-                pedido.pedidoDetalle.map((detalle) => (
-                  <TableRow key={detalle.idPedidoDetalle}>
-                    <TableCell>
-                      {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
-                    </TableCell>
-                    <TableCell align="right">₲ {detalle.precioUnitario.toLocaleString("es-PY")}</TableCell>
-                    <TableCell align="right">{detalle.cantidad}</TableCell>
-                    <TableCell align="right">
-                      ₲ {Math.round(detalle.cantidad * detalle.precioUnitario).toLocaleString("es-PY")}
-                    </TableCell>
-                  </TableRow>
-                ))
+                pedido.pedidoDetalle.map((detalle, index) => {
+                  // Calcular el precio unitario y subtotal de manera segura
+                  const precioUnitario = calcularPrecioUnitario(detalle)
+                  const subtotal = detalle.subtotal !== undefined ? detalle.subtotal : precioUnitario * detalle.cantidad
+
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
+                      </TableCell>
+                      <TableCell align="right">₲ {precioUnitario.toLocaleString("es-PY")}</TableCell>
+                      <TableCell align="right">{detalle.cantidad}</TableCell>
+                      <TableCell align="right">₲ {subtotal.toLocaleString("es-PY")}</TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} align="center">
