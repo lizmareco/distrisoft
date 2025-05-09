@@ -7,8 +7,8 @@ export async function GET(request, { params }) {
   try {
     // Extraer y convertir el ID de manera segura
     // En Next.js 13+ con App Router, podemos acceder a params directamente
-    const id = params ? params.id : "0"
-    idPedido = Number.parseInt(id)
+    const paramId = params ? String(params.id || "0") : "0"
+    idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
       return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
@@ -127,8 +127,8 @@ export async function PUT(request, { params }) {
   let idPedido
   try {
     // Extraer y convertir el ID de manera segura
-    const id = params ? params.id : "0"
-    idPedido = Number.parseInt(id)
+    const paramId = params ? String(params.id || "0") : "0"
+    idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
       return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
@@ -158,21 +158,34 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
     }
 
+    // Verificar la estructura de la tabla pedidoDetalle
+    console.log("API: Verificando estructura de pedidoDetalle...")
+    try {
+      const detalleEjemplo = await prisma.pedidoDetalle.findFirst({
+        where: {
+          idPedido: idPedido,
+        },
+      })
+      console.log("API: Ejemplo de detalle encontrado:", detalleEjemplo)
+    } catch (error) {
+      console.error("API: Error al verificar estructura:", error)
+    }
+
     // Actualizar el pedido y sus detalles en una transacción
     const resultado = await prisma.$transaction(async (prisma) => {
-      // Actualizar el pedido sin incluir idMetodoPago
+      // Actualizar el pedido
       const pedidoActualizado = await prisma.pedidoCliente.update({
         where: {
           idPedido: idPedido,
         },
         data: {
           fechaPedido: new Date(datos.pedido.fechaPedido),
+          fechaEntrega: new Date(datos.pedido.fechaEntrega), // Asegurarse de que se actualice la fecha de entrega
           idCliente: datos.pedido.idCliente,
           vendedor: datos.pedido.vendedor || datos.pedido.idUsuario, // Usar idUsuario si vendedor no está disponible
           idEstadoPedido: datos.pedido.idEstadoPedido,
           observacion: datos.pedido.observacion || "",
           montoTotal: datos.pedido.montoTotal,
-          // No incluir idMetodoPago
         },
       })
 
@@ -181,7 +194,7 @@ export async function PUT(request, { params }) {
         // Eliminar detalles existentes
         await prisma.pedidoDetalle.deleteMany({
           where: {
-            idPedidoCliente: idPedido,
+            idPedido: idPedido,
           },
         })
 
@@ -189,7 +202,7 @@ export async function PUT(request, { params }) {
         const detallesPromises = datos.detalles.map((detalle) =>
           prisma.pedidoDetalle.create({
             data: {
-              idPedidoCliente: idPedido,
+              idPedido: idPedido,
               idProducto: detalle.idProducto,
               cantidad: detalle.cantidad,
               subtotal: detalle.precioUnitario * detalle.cantidad, // Calcular subtotal
@@ -225,8 +238,8 @@ export async function DELETE(request, { params }) {
   let idPedido
   try {
     // Extraer y convertir el ID de manera segura
-    const id = params ? params.id : "0"
-    idPedido = Number.parseInt(id)
+    const paramId = params ? String(params.id || "0") : "0"
+    idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
       return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
