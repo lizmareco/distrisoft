@@ -24,6 +24,10 @@ import {
   CircularProgress,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material"
 import DeleteIcon from "@mui/icons-material/Delete"
 import AddIcon from "@mui/icons-material/Add"
@@ -32,6 +36,7 @@ import PersonIcon from "@mui/icons-material/Person"
 import InventoryIcon from "@mui/icons-material/Inventory"
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday"
+import SearchIcon from "@mui/icons-material/Search"
 
 export default function FormularioPedido() {
   const router = useRouter()
@@ -53,11 +58,9 @@ export default function FormularioPedido() {
     observacion: "",
   })
 
-  // Estados para los catálogos
-  const [clientes, setClientes] = useState([])
+  // Estados para los catálogos - Inicializamos con arrays vacíos
   const [productos, setProductos] = useState([])
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
-  const [cargandoClientes, setCargandoClientes] = useState(false)
   const [cargandoProductos, setCargandoProductos] = useState(false)
 
   // Estado para el detalle del pedido
@@ -69,12 +72,24 @@ export default function FormularioPedido() {
   // Estado para errores de validación
   const [errores, setErrores] = useState({})
 
+  // Estado para el diálogo de búsqueda manual de clientes
+  const [dialogoBusquedaAbierto, setDialogoBusquedaAbierto] = useState(false)
+  const [busquedaManual, setBusquedaManual] = useState({
+    tipoDocumento: "",
+    numeroDocumento: "",
+    nombre: "",
+    apellido: "",
+  })
+  const [resultadosBusqueda, setResultadosBusqueda] = useState([])
+  const [buscandoClientes, setBuscandoClientes] = useState(false)
+
   // Cargar datos iniciales
   useEffect(() => {
     const cargarDatos = async () => {
       try {
         setCargando(true)
-        await Promise.all([cargarClientes(), cargarProductos()])
+        // Solo cargamos productos, los clientes se buscarán manualmente
+        await cargarProductos()
       } catch (error) {
         console.error("Error al cargar datos iniciales:", error)
         setSnackbar({
@@ -90,94 +105,175 @@ export default function FormularioPedido() {
     cargarDatos()
   }, [])
 
-  // Cargar clientes
-  const cargarClientes = async () => {
-    setCargandoClientes(true)
-    try {
-      // Intentar con el endpoint principal
-      console.log("Intentando cargar clientes desde /api/clientes...")
-      const respuesta = await fetch("/api/clientes")
+  // Cargar tipos de documento
+  const [tiposDocumento, setTiposDocumento] = useState([])
+  const [cargandoTiposDocumento, setCargandoTiposDocumento] = useState(false)
 
+  const cargarTiposDocumento = async () => {
+    // Verificamos que tiposDocumento esté definido antes de acceder a su propiedad length
+    if (tiposDocumento && tiposDocumento.length > 0) return // Ya están cargados
+
+    setCargandoTiposDocumento(true)
+    try {
+      const respuesta = await fetch("/api/tipos-documento")
       if (respuesta.ok) {
         const datos = await respuesta.json()
-        console.log("Respuesta de clientes:", datos)
-
-        if (datos.clientes && Array.isArray(datos.clientes)) {
-          console.log(`Se cargaron ${datos.clientes.length} clientes`)
-          setClientes(datos.clientes)
-          return
-        } else if (Array.isArray(datos)) {
-          console.log(`Se cargaron ${datos.length} clientes (formato array)`)
-          setClientes(datos)
-          return
+        if (Array.isArray(datos) && datos.length > 0) {
+          setTiposDocumento(datos)
         } else {
-          console.warn("Formato de respuesta inesperado para clientes:", datos)
+          // Tipos de documento de ejemplo
+          setTiposDocumento([
+            { idTipoDocumento: 1, descTipoDocumento: "CI" },
+            { idTipoDocumento: 2, descTipoDocumento: "RUC" },
+            { idTipoDocumento: 3, descTipoDocumento: "Pasaporte" },
+          ])
         }
       } else {
-        console.error("Error al cargar clientes desde /api/clientes:", await respuesta.text())
+        throw new Error("Error al cargar tipos de documento")
       }
-
-      // Si el endpoint principal falla, intentar con /api/clientes/debug
-      console.log("Intentando cargar clientes desde /api/clientes/debug...")
-      const respuestaDebug = await fetch("/api/clientes/debug")
-
-      if (respuestaDebug.ok) {
-        const datosDebug = await respuestaDebug.json()
-        console.log("Respuesta de clientes/debug:", datosDebug)
-
-        if (datosDebug.clientes && Array.isArray(datosDebug.clientes) && datosDebug.clientes.length > 0) {
-          console.log(`Se cargaron ${datosDebug.clientes.length} clientes desde /api/clientes/debug`)
-          setClientes(datosDebug.clientes)
-          return
-        } else {
-          console.warn("No se encontraron clientes en /api/clientes/debug:", datosDebug)
-        }
-      } else {
-        console.error("Error al cargar clientes desde /api/clientes/debug:", await respuestaDebug.text())
-      }
-
-      // Si todo falla, usar datos de ejemplo
-      throw new Error("No se pudieron cargar los clientes desde ningún endpoint")
     } catch (error) {
-      console.error("Error al cargar clientes:", error)
+      console.error("Error al cargar tipos de documento:", error)
+      // Tipos de documento de ejemplo
+      setTiposDocumento([
+        { idTipoDocumento: 1, descTipoDocumento: "CI" },
+        { idTipoDocumento: 2, descTipoDocumento: "RUC" },
+        { idTipoDocumento: 3, descTipoDocumento: "Pasaporte" },
+      ])
+    } finally {
+      setCargandoTiposDocumento(false)
+    }
+  }
 
-      // Crear algunos clientes de ejemplo como último recurso
-      console.log("Creando clientes de ejemplo como último recurso...")
-      const clientesEjemplo = [
-        {
-          idCliente: 1,
-          nombre: "Juan",
-          apellido: "Pérez",
-          nroDocumento: "1234567",
-        },
-        {
-          idCliente: 2,
-          nombre: "María",
-          apellido: "González",
-          nroDocumento: "7654321",
-        },
-      ]
+  // Abrir diálogo de búsqueda manual
+  const abrirDialogoBusqueda = () => {
+    cargarTiposDocumento() // Cargar tipos de documento si no están cargados
+    setDialogoBusquedaAbierto(true)
+  }
 
-      console.log("Usando clientes de ejemplo:", clientesEjemplo)
-      setClientes(clientesEjemplo)
+  // Cerrar diálogo de búsqueda manual
+  const cerrarDialogoBusqueda = () => {
+    setDialogoBusquedaAbierto(false)
+    setBusquedaManual({
+      tipoDocumento: "",
+      numeroDocumento: "",
+      nombre: "",
+      apellido: "",
+    })
+    setResultadosBusqueda([])
+  }
 
+  // Manejar cambios en los campos de búsqueda manual
+  const handleBusquedaChange = (e) => {
+    const { name, value } = e.target
+    setBusquedaManual({
+      ...busquedaManual,
+      [name]: value,
+    })
+  }
+
+  // Buscar clientes por número de documento
+  const buscarClientesPorDocumento = async (numeroDocumento) => {
+    if (!numeroDocumento || numeroDocumento.trim() === "") {
+      return []
+    }
+
+    try {
+      // Usar el endpoint de búsqueda con el número de documento
+      const respuesta = await fetch(`/api/clientes/buscar?query=${numeroDocumento}`)
+
+      if (!respuesta.ok) {
+        throw new Error(`Error al buscar clientes: ${respuesta.status}`)
+      }
+
+      const datos = await respuesta.json()
+
+      if (Array.isArray(datos) && datos.length > 0) {
+        return datos
+      }
+
+      return []
+    } catch (error) {
+      console.error("Error al buscar clientes por documento:", error)
+      return []
+    }
+  }
+
+  // Buscar clientes manualmente
+  const buscarClientesManual = async () => {
+    // Validar que al menos un campo tenga valor
+    if (!busquedaManual.numeroDocumento && !busquedaManual.nombre && !busquedaManual.apellido) {
       setSnackbar({
         abierto: true,
-        mensaje: "No se pudieron cargar los clientes reales. Usando datos de ejemplo.",
-        tipo: "warning",
+        mensaje: "Debe ingresar al menos un criterio de búsqueda",
+        tipo: "error",
+      })
+      return
+    }
+
+    setBuscandoClientes(true)
+    try {
+      let resultados = []
+
+      // Priorizar búsqueda por número de documento
+      if (busquedaManual.numeroDocumento) {
+        resultados = await buscarClientesPorDocumento(busquedaManual.numeroDocumento)
+      }
+
+      // Si no hay resultados y tenemos nombre o apellido, intentar con ellos
+      if (resultados.length === 0 && (busquedaManual.nombre || busquedaManual.apellido)) {
+        const termino = busquedaManual.nombre || busquedaManual.apellido
+        const respuesta = await fetch(`/api/clientes/buscar?query=${termino}`)
+
+        if (respuesta.ok) {
+          const datos = await respuesta.json()
+          if (Array.isArray(datos) && datos.length > 0) {
+            resultados = datos
+          }
+        }
+      }
+
+      setResultadosBusqueda(resultados)
+
+      if (resultados.length === 0) {
+        setSnackbar({
+          abierto: true,
+          mensaje: "No se encontraron clientes con los criterios de búsqueda",
+          tipo: "info",
+        })
+      }
+    } catch (error) {
+      console.error("Error al buscar clientes:", error)
+      setSnackbar({
+        abierto: true,
+        mensaje: "Error al buscar clientes: " + error.message,
+        tipo: "error",
       })
     } finally {
-      setCargandoClientes(false)
+      setBuscandoClientes(false)
     }
+  }
+
+  // Seleccionar cliente desde la búsqueda manual
+  const seleccionarClienteManual = (cliente) => {
+    setClienteSeleccionado(cliente)
+    setPedido({
+      ...pedido,
+      idCliente: cliente.idCliente,
+    })
+    cerrarDialogoBusqueda()
+    setSnackbar({
+      abierto: true,
+      mensaje: "Cliente seleccionado correctamente",
+      tipo: "success",
+    })
   }
 
   // Cargar productos
   const cargarProductos = async () => {
     setCargandoProductos(true)
     try {
-      console.log("Intentando cargar productos...")
+      console.log("Cargando productos...")
       const respuesta = await fetch("/api/productos")
-
       if (!respuesta.ok) {
         throw new Error(`Error al cargar productos: ${respuesta.status}`)
       }
@@ -185,43 +281,26 @@ export default function FormularioPedido() {
       const datos = await respuesta.json()
       console.log("Respuesta de productos:", datos)
 
-      if (datos.productos && Array.isArray(datos.productos)) {
-        console.log(`Se cargaron ${datos.productos.length} productos`)
-        setProductos(datos.productos)
-      } else if (Array.isArray(datos)) {
-        console.log(`Se cargaron ${datos.length} productos (formato array)`)
+      // Verificamos la estructura de la respuesta
+      if (datos && Array.isArray(datos)) {
+        console.log("Productos encontrados (array directo):", datos.length)
         setProductos(datos)
+      } else if (datos && Array.isArray(datos.productos)) {
+        console.log("Productos encontrados (en propiedad productos):", datos.productos.length)
+        setProductos(datos.productos)
       } else {
         console.warn("Formato de respuesta inesperado para productos:", datos)
+        // Si no podemos determinar la estructura, inicializamos con un array vacío
         setProductos([])
       }
     } catch (error) {
       console.error("Error al cargar productos:", error)
-
-      // Crear algunos productos de ejemplo como último recurso
-      console.log("Creando productos de ejemplo como último recurso...")
-      const productosEjemplo = [
-        {
-          idProducto: 1,
-          nombreProducto: "Producto 1",
-          descripcion: "Descripción del producto 1",
-          precioUnitario: 10000,
-        },
-        {
-          idProducto: 2,
-          nombreProducto: "Producto 2",
-          descripcion: "Descripción del producto 2",
-          precioUnitario: 20000,
-        },
-      ]
-
-      console.log("Usando productos de ejemplo:", productosEjemplo)
-      setProductos(productosEjemplo)
-
+      // Si hay un error, inicializamos con un array vacío
+      setProductos([])
       setSnackbar({
         abierto: true,
-        mensaje: "No se pudieron cargar los productos reales. Usando datos de ejemplo.",
-        tipo: "warning",
+        mensaje: "Error al cargar productos: " + error.message,
+        tipo: "error",
       })
     } finally {
       setCargandoProductos(false)
@@ -241,24 +320,6 @@ export default function FormularioPedido() {
       setErrores({
         ...errores,
         [name]: null,
-      })
-    }
-  }
-
-  // Manejar selección de cliente
-  const handleClienteChange = (event, newValue) => {
-    console.log("Cliente seleccionado:", newValue)
-    setClienteSeleccionado(newValue)
-    setPedido({
-      ...pedido,
-      idCliente: newValue ? newValue.idCliente : "",
-    })
-
-    // Limpiar error del campo
-    if (errores.idCliente) {
-      setErrores({
-        ...errores,
-        idCliente: null,
       })
     }
   }
@@ -466,6 +527,9 @@ export default function FormularioPedido() {
     )
   }
 
+  // Aseguramos que productos sea un array
+  const productosArray = Array.isArray(productos) ? productos : []
+
   return (
     <Box component="form" onSubmit={guardarPedido} noValidate>
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -475,51 +539,48 @@ export default function FormularioPedido() {
 
         <Grid container spacing={2}>
           <Grid item xs={12}>
-            <Autocomplete
-              id="cliente-select"
-              options={clientes}
-              loading={cargandoClientes}
-              getOptionLabel={(option) => {
-                // Adaptado para manejar diferentes estructuras de datos
-                const nombre = option.nombre || (option.persona ? option.persona.nombre : "")
-                const apellido = option.apellido || (option.persona ? option.persona.apellido : "")
-                const documento = option.nroDocumento || (option.persona ? option.persona.nroDocumento : "")
-
-                return `${nombre} ${apellido} (${documento})`
-              }}
-              value={clienteSeleccionado}
-              onChange={handleClienteChange}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Cliente"
-                  margin="normal"
-                  error={!!errores.idCliente}
-                  helperText={errores.idCliente}
-                  required
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <>
-                        <InputAdornment position="start">
-                          <PersonIcon />
-                        </InputAdornment>
-                        {params.InputProps.startAdornment}
-                      </>
-                    ),
-                    endAdornment: (
-                      <>
-                        {cargandoClientes ? <CircularProgress color="inherit" size={20} /> : null}
-                        {params.InputProps.endAdornment}
-                      </>
-                    ),
-                  }}
-                />
-              )}
-            />
-            <Typography variant="caption" color="text.secondary">
-              {clientes.length} cliente(s) disponible(s)
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "flex-end" }}>
+              {/* Campo de solo lectura para mostrar el cliente seleccionado */}
+              <TextField
+                label="Cliente"
+                value={
+                  clienteSeleccionado
+                    ? clienteSeleccionado.persona
+                      ? `${clienteSeleccionado.persona.nombre || ""} ${clienteSeleccionado.persona.apellido || ""} - ${
+                          clienteSeleccionado.persona.nroDocumento || ""
+                        }`
+                      : `${clienteSeleccionado.nombre || ""} ${clienteSeleccionado.apellido || ""} - ${
+                          clienteSeleccionado.nroDocumento || ""
+                        }`
+                    : ""
+                }
+                onClick={abrirDialogoBusqueda}
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonIcon />
+                    </InputAdornment>
+                  ),
+                  style: { cursor: "pointer" },
+                }}
+                fullWidth
+                margin="normal"
+                error={!!errores.idCliente}
+                helperText={errores.idCliente || "Haga clic aquí para buscar un cliente"}
+                required
+                sx={{ cursor: "pointer" }}
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={abrirDialogoBusqueda}
+                sx={{ ml: 2, height: 56, mt: 1 }}
+                title="Buscar cliente por documento"
+              >
+                <SearchIcon />
+              </Button>
+            </Box>
           </Grid>
 
           {/* Nuevo campo para fecha de entrega */}
@@ -577,7 +638,7 @@ export default function FormularioPedido() {
           <Grid item xs={12} md={5}>
             <Autocomplete
               id="producto-select"
-              options={productos}
+              options={productosArray}
               loading={cargandoProductos}
               getOptionLabel={(option) => {
                 // Mostrar descripción en lugar de nombre
@@ -606,7 +667,7 @@ export default function FormularioPedido() {
               )}
             />
             <Typography variant="caption" color="text.secondary">
-              {productos.length} producto(s) disponible(s)
+              {productosArray.length} producto(s) disponible(s)
             </Typography>
           </Grid>
 
@@ -740,6 +801,138 @@ export default function FormularioPedido() {
           {guardando ? "Guardando..." : "Guardar Pedido"}
         </Button>
       </Box>
+
+      {/* Diálogo de búsqueda manual de clientes */}
+      <Dialog open={dialogoBusquedaAbierto} onClose={cerrarDialogoBusqueda} maxWidth="md" fullWidth>
+        <DialogTitle>Búsqueda de Cliente por Documento</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                name="numeroDocumento"
+                label="Número de Documento"
+                value={busquedaManual.numeroDocumento}
+                onChange={handleBusquedaChange}
+                fullWidth
+                margin="normal"
+                autoFocus
+                placeholder="Ingrese el número de documento del cliente"
+                helperText="Ingrese el número de documento para buscar el cliente"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: "flex", alignItems: "flex-end", height: "100%" }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={buscarClientesManual}
+                  disabled={buscandoClientes || !busquedaManual.numeroDocumento}
+                  startIcon={buscandoClientes ? <CircularProgress size={20} /> : <SearchIcon />}
+                  fullWidth
+                  sx={{ mt: 3 }}
+                >
+                  {buscandoClientes ? "Buscando..." : "Buscar por Documento"}
+                </Button>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle1">Búsqueda Alternativa</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Si no conoce el número de documento, puede buscar por nombre o apellido
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} md={5}>
+              <TextField
+                name="nombre"
+                label="Nombre"
+                value={busquedaManual.nombre}
+                onChange={handleBusquedaChange}
+                fullWidth
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={5}>
+              <TextField
+                name="apellido"
+                label="Apellido"
+                value={busquedaManual.apellido}
+                onChange={handleBusquedaChange}
+                fullWidth
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={buscarClientesManual}
+                disabled={buscandoClientes || (!busquedaManual.nombre && !busquedaManual.apellido)}
+                startIcon={buscandoClientes ? <CircularProgress size={20} /> : <SearchIcon />}
+                fullWidth
+                sx={{ mt: 3 }}
+              >
+                Buscar
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Aseguramos que resultadosBusqueda sea un array antes de acceder a su propiedad length */}
+          {Array.isArray(resultadosBusqueda) && resultadosBusqueda.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Resultados de la búsqueda
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Nombre</TableCell>
+                      <TableCell>Documento</TableCell>
+                      <TableCell align="center">Acciones</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {resultadosBusqueda.map((cliente) => (
+                      <TableRow key={cliente.idCliente || Math.random()}>
+                        <TableCell>
+                          {cliente.persona
+                            ? `${cliente.persona.nombre || ""} ${cliente.persona.apellido || ""}`
+                            : `${cliente.nombre || ""} ${cliente.apellido || ""}`}
+                        </TableCell>
+                        <TableCell>
+                          {cliente.persona
+                            ? `${
+                                cliente.persona.tipoDocumento ? cliente.persona.tipoDocumento.descTipoDocumento : ""
+                              }: ${cliente.persona.nroDocumento || ""}`
+                            : cliente.nroDocumento || ""}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            onClick={() => seleccionarClienteManual(cliente)}
+                          >
+                            Seleccionar
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cerrarDialogoBusqueda} color="primary">
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar open={snackbar.abierto} autoHideDuration={6000} onClose={cerrarSnackbar}>
         <Alert onClose={cerrarSnackbar} severity={snackbar.tipo} sx={{ width: "100%" }}>

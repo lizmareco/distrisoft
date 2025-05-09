@@ -80,7 +80,6 @@ model CondicionPago {
   createdAt         DateTime    @default(now()) @map("created_at")
   updatedAt         DateTime?   @default(now()) @map("updated_at")
   deletedAt         DateTime?   @map("deleted_at")
-  proveedor         Proveedor[]
 }
 
 model CotizacionCliente {
@@ -776,7 +775,7 @@ model Departamento {
   deletedAt        DateTime? @map("deleted_at")
   ciudades         Ciudad[]
 }
-/*
+
 model RecuperacionContrasena {
   id_recuperacion Int       @id(map: "recuperacion_contrasena_pk") @default(autoincrement())
   token           String    @unique(map: "token_unique") @db.VarChar
@@ -790,7 +789,7 @@ model RecuperacionContrasena {
 
   @@index([token], map: "idx_recuperacion_token")
   @@index([id_usuario], map: "idx_recuperacion_usuario")
-} */
+} 
 
 model Auditoria {
   idAuditoria   Int       @id @default(autoincrement()) @map("id_auditoria")
