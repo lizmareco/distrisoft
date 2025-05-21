@@ -64,6 +64,14 @@ export default function VerCotizacionProveedorPage({ params }) {
 
         const data = await response.json()
         console.log("Datos de cotización recibidos:", data)
+
+        // Verificar si hay detalles
+        if (data.detallesCotizacionProv) {
+          console.log(`Detalles encontrados en el frontend: ${data.detallesCotizacionProv.length}`)
+        } else {
+          console.log("No se encontraron detalles en la respuesta")
+        }
+
         setCotizacion(data)
       } catch (error) {
         console.error("Error:", error)
@@ -267,22 +275,34 @@ export default function VerCotizacionProveedorPage({ params }) {
     }
   }
 
-  // Función para obtener los detalles de materias primas
+  // Función para obtener los detalles de materias primas - CORREGIDA
   const getDetallesMateriaPrima = () => {
     if (!cotizacion) return []
 
-    // Intentar obtener detalles de diferentes propiedades posibles
+    // Verificar si hay detalles en la propiedad correcta (detallesCotizacionProv en plural)
+    if (cotizacion.detallesCotizacionProv && cotizacion.detallesCotizacionProv.length > 0) {
+      console.log(`Usando detallesCotizacionProv con ${cotizacion.detallesCotizacionProv.length} elementos`)
+      return cotizacion.detallesCotizacionProv
+    }
+
+    // Verificar alternativas por compatibilidad
     if (cotizacion.detalleCotizacionProv && cotizacion.detalleCotizacionProv.length > 0) {
+      console.log(`Usando detalleCotizacionProv con ${cotizacion.detalleCotizacionProv.length} elementos`)
       return cotizacion.detalleCotizacionProv
     }
 
     if (cotizacion.detalles && cotizacion.detalles.length > 0) {
+      console.log(`Usando detalles con ${cotizacion.detalles.length} elementos`)
       return cotizacion.detalles
     }
 
     // Si no hay detalles en ninguna propiedad conocida
+    console.log("No se encontraron detalles en ninguna propiedad conocida")
     return []
   }
+
+  // Obtener los detalles para mostrar en la tabla
+  const detalles = getDetallesMateriaPrima()
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -407,52 +427,58 @@ export default function VerCotizacionProveedorPage({ params }) {
             </Typography>
             <Divider sx={{ mb: 3 }} />
 
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Materia Prima</TableCell>
-                    <TableCell align="right">Precio Unitario</TableCell>
-                    <TableCell align="right">Cantidad</TableCell>
-                    <TableCell align="right">Subtotal</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {getDetallesMateriaPrima().map((detalle) => (
-                    <TableRow key={detalle.idMateriaPrima}>
-                      <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
-                      <TableCell align="right">
-                        {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                          detalle.precioUnitario || 0,
-                        )}
+            {detalles.length > 0 ? (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Materia Prima</TableCell>
+                      <TableCell align="right">Precio Unitario</TableCell>
+                      <TableCell align="right">Cantidad</TableCell>
+                      <TableCell align="right">Subtotal</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {detalles.map((detalle, index) => (
+                      <TableRow key={detalle.idDetalleCotizacionProv || index}>
+                        <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
+                        <TableCell align="right">
+                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                            detalle.precioUnitario || 0,
+                          )}
+                        </TableCell>
+                        <TableCell align="right">{detalle.cantidad}</TableCell>
+                        <TableCell align="right">
+                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                            detalle.subtotal || 0,
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell colSpan={3} align="right">
+                        <Typography variant="subtitle1">
+                          <strong>TOTAL:</strong>
+                        </Typography>
                       </TableCell>
-                      <TableCell align="right">{detalle.cantidad}</TableCell>
                       <TableCell align="right">
-                        {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                          detalle.subtotal || 0,
-                        )}
+                        <Typography variant="subtitle1">
+                          <strong>
+                            {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                              cotizacion.montoTotal || 0,
+                            )}
+                          </strong>
+                        </Typography>
                       </TableCell>
                     </TableRow>
-                  ))}
-                  <TableRow>
-                    <TableCell colSpan={3} align="right">
-                      <Typography variant="subtitle1">
-                        <strong>TOTAL:</strong>
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="subtitle1">
-                        <strong>
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                            cotizacion.montoTotal || 0,
-                          )}
-                        </strong>
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                No hay detalles disponibles para esta cotización
+              </Alert>
+            )}
           </Paper>
         </>
       ) : (

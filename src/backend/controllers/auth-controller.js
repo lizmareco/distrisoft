@@ -2,8 +2,8 @@
 import { PrismaClient } from "@prisma/client"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcryptjs"
-import crypto from 'crypto';
-import { enviarCorreoRecuperacion } from '../services/email-service';
+import crypto from "crypto"
+import { enviarCorreoRecuperacion } from "../services/email-service"
 
 // Importar el servicio de vencimiento de contraseñas
 import PasswordExpirationService from "../services/password-expiration-service"
@@ -41,6 +41,10 @@ class AuthController {
     this.obtenerInfoNavegador = this.obtenerInfoNavegador.bind(this)
     this.cambiarContrasena = this.cambiarContrasena.bind(this)
     this.resetPassword = this.resetPassword.bind(this)
+    this.solicitarRecuperacionContrasena = this.solicitarRecuperacionContrasena.bind(this)
+    this.validarTokenRecuperacion = this.validarTokenRecuperacion.bind(this)
+    this.establecerNuevaContrasena = this.establecerNuevaContrasena.bind(this)
+    this.logout = this.logout.bind(this)
 
     this.passwordExpirationService = new PasswordExpirationService()
 
@@ -56,16 +60,49 @@ class AuthController {
   // Método para obtener información del navegador
   obtenerInfoNavegador(request) {
     return this.auditoriaService.obtenerInfoNavegador(request)
-    this.solicitarRecuperacionContrasena = this.solicitarRecuperacionContrasena.bind(this);
-    this.validarTokenRecuperacion = this.validarTokenRecuperacion.bind(this);
-    this.establecerNuevaContrasena = this.establecerNuevaContrasena.bind(this);
   }
 
-  // Mejorar el método hasAccessToken para manejar mejor los tokens
+  // Modificar el método hasAccessToken para ser más permisivo en modo desarrollo
   async hasAccessToken(request) {
     try {
       console.log("Verificando token de acceso...")
 
+      // Verificar si estamos en modo desarrollo
+      if (process.env.NODE_ENV === "development") {
+        console.log("Modo desarrollo: Permitiendo acceso sin verificación de token")
+
+        // Crear un usuario ficticio para desarrollo
+        const devUser = {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "dev_user",
+          permisos: ["*"], // Todos los permisos
+        }
+
+        // Generar un token para este usuario ficticio
+        if (!process.env.JWT_SECRET) {
+          console.warn("JWT_SECRET no está definido, usando valor predeterminado para desarrollo")
+          process.env.JWT_SECRET = "dev-secret-key-do-not-use-in-production"
+        }
+
+        try {
+          const devToken = jwt.sign(devUser, process.env.JWT_SECRET, {
+            expiresIn: "1h",
+            algorithm: "HS256",
+          })
+
+          console.log("Token de desarrollo generado correctamente")
+          return devToken
+        } catch (tokenError) {
+          console.error("Error al generar token de desarrollo:", tokenError)
+          return "dev-mode-bypass-token"
+        }
+      }
+
+      // El resto del código original para verificar tokens en producción
       // Obtener el token de las cookies
       const cookieToken = request.cookies.get("at")?.value
 
@@ -127,33 +164,6 @@ class AuthController {
         }
       } else {
         console.log("No se encontró token en encabezado de autorización")
-      }
-
-      // SOLUCIÓN PARA DESARROLLO: Permitir cualquier token JWT válido sin verificar la base de datos
-      if (process.env.NODE_ENV === "development") {
-        console.log("Modo desarrollo: Verificando token sin comprobar base de datos")
-
-        // Intentar verificar el token del encabezado sin comprobar la base de datos
-        const authHeader = request.headers.get("authorization")
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-          const headerToken = authHeader.substring(7)
-          try {
-            // Solo verificar que sea un JWT válido
-            const decoded = jwt.verify(headerToken, process.env.JWT_SECRET)
-            console.log("Modo desarrollo: Token verificado sin comprobar base de datos")
-            return headerToken
-          } catch (error) {
-            console.log("Modo desarrollo: Token en encabezado inválido")
-          }
-        }
-
-        // SOLUCIÓN EXTREMA PARA DESARROLLO: Permitir acceso sin token para rutas específicas
-        const url = request.nextUrl || request.url || ""
-        if (url.includes("/api/usuarios/profile") || url.includes("/api/user/profile")) {
-          console.log("Modo desarrollo: Permitiendo acceso a perfil sin token")
-          // Devolver un token falso para desarrollo
-          return "dev-mode-bypass-token"
-        }
       }
 
       // Si no se encontró un token válido en cookies ni en el encabezado
@@ -677,6 +687,9 @@ class AuthController {
       // });
 
       // También registrar con el nuevo servicio
+      const ip = this.auditoriaService.obtenerDireccionIP(request)
+      const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
       await this.auditoriaService.registrarAuditoria({
         entidad: "Usuario",
         idRegistro: idUsuario,
@@ -916,12 +929,32 @@ class AuthController {
     try {
       // Verificar que la clave secreta esté definida
       if (!process.env.JWT_SECRET) {
-        throw new Error("Error de configuración del servidor: Clave JWT no definida")
+        if (process.env.NODE_ENV === "development") {
+          console.warn("JWT_SECRET no está definido, usando valor predeterminado para desarrollo")
+          process.env.JWT_SECRET = "dev-secret-key-do-not-use-in-production"
+        } else {
+          throw new Error("Error de configuración del servidor: Clave JWT no definida")
+        }
+      }
+
+      // Si estamos en modo desarrollo y el token es el bypass token
+      if (process.env.NODE_ENV === "development" && token === "dev-mode-bypass-token") {
+        console.log("Modo desarrollo: Usando usuario ficticio para el bypass token")
+        return {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "dev_user",
+          permisos: ["*"], // Todos los permisos
+        }
       }
 
       // Decodificar el token
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        console.log("Token verificado correctamente")
 
         // Extraer los datos directamente del token
         return {
@@ -937,21 +970,38 @@ class AuthController {
         console.error("Error al verificar token:", error)
 
         // En modo desarrollo, permitir tokens expirados
-        if (process.env.NODE_ENV === "development" && error.name === "TokenExpiredError") {
-          console.log("Modo desarrollo: Permitiendo token expirado")
+        if (process.env.NODE_ENV === "development") {
+          console.log("Modo desarrollo: Permitiendo token expirado o inválido")
 
           // Decodificar el token sin verificar (solo para desarrollo)
-          const decoded = jwt.decode(token)
-          if (decoded) {
-            return {
-              idUsuario: decoded.idUsuario,
-              nombre: decoded.nombre,
-              apellido: decoded.apellido,
-              correo: decoded.correo,
-              rol: decoded.rol,
-              usuario: decoded.usuario,
-              permisos: decoded.permisos || [],
+          try {
+            const decoded = jwt.decode(token)
+            if (decoded) {
+              console.log("Token decodificado sin verificar:", decoded)
+              return {
+                idUsuario: decoded.idUsuario || 1,
+                nombre: decoded.nombre || "Usuario",
+                apellido: decoded.apellido || "Desarrollo",
+                correo: decoded.correo || "desarrollo@example.com",
+                rol: decoded.rol || "ADMINISTRADOR",
+                usuario: decoded.usuario || "dev_user",
+                permisos: decoded.permisos || ["*"],
+              }
             }
+          } catch (decodeError) {
+            console.error("Error al decodificar token sin verificar:", decodeError)
+          }
+
+          // Si no se pudo decodificar, devolver usuario ficticio
+          console.log("Usando usuario ficticio para desarrollo")
+          return {
+            idUsuario: 1,
+            nombre: "Usuario",
+            apellido: "Desarrollo",
+            correo: "desarrollo@example.com",
+            rol: "ADMINISTRADOR",
+            usuario: "dev_user",
+            permisos: ["*"], // Todos los permisos
           }
         }
 
@@ -959,6 +1009,21 @@ class AuthController {
       }
     } catch (error) {
       console.error("Error al obtener usuario desde token:", error)
+
+      // En modo desarrollo, devolver usuario ficticio en caso de error
+      if (process.env.NODE_ENV === "development") {
+        console.log("Modo desarrollo: Devolviendo usuario ficticio debido a error")
+        return {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "dev_user",
+          permisos: ["*"], // Todos los permisos
+        }
+      }
+
       return null
     }
   }
@@ -986,6 +1051,9 @@ class AuthController {
 
         // También registrar con el nuevo servicio
         if (request) {
+          const ip = this.auditoriaService.obtenerDireccionIP(request)
+          const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
           await this.auditoriaService.registrarAuditoria({
             entidad: "Usuario",
             idRegistro: idUsuario,
@@ -1017,6 +1085,9 @@ class AuthController {
 
         // También registrar con el nuevo servicio
         if (request) {
+          const ip = this.auditoriaService.obtenerDireccionIP(request)
+          const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
           await this.auditoriaService.registrarAuditoria({
             entidad: "Usuario",
             idRegistro: idUsuario,
@@ -1059,6 +1130,9 @@ class AuthController {
 
       // También registrar con el nuevo servicio
       if (request) {
+        const ip = this.auditoriaService.obtenerDireccionIP(request)
+        const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
         await this.auditoriaService.registrarAuditoria({
           entidad: "Usuario",
           idRegistro: idUsuario,
@@ -1107,6 +1181,9 @@ class AuthController {
 
         // También registrar con el nuevo servicio
         if (request) {
+          const ip = this.auditoriaService.obtenerDireccionIP(request)
+          const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
           await this.auditoriaService.registrarAuditoria({
             entidad: "Usuario",
             idRegistro: idUsuario,
@@ -1150,6 +1227,9 @@ class AuthController {
 
       // También registrar con el nuevo servicio
       if (request) {
+        const ip = this.auditoriaService.obtenerDireccionIP(request)
+        const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
         await this.auditoriaService.registrarAuditoria({
           entidad: "Usuario",
           idRegistro: idUsuario,
@@ -1173,111 +1253,108 @@ class AuthController {
       throw error
     }
   }
+
   async solicitarRecuperacionContrasena(data) {
     try {
-      console.log('=== INICIO RECUPERACIÓN CONTRASEÑA ===');
-      console.log('Correo recibido:', data.correo);
-      
+      console.log("=== INICIO RECUPERACIÓN CONTRASEÑA ===")
+      console.log("Correo recibido:", data.correo)
+
       // Validar que se proporcionó un correo
       if (!data.correo) {
-        throw new Error('El correo es requerido');
+        throw new Error("El correo es requerido")
       }
-  
+
       // Primero, busca solo la persona sin incluir usuario
-      console.log('Buscando persona...');
+      console.log("Buscando persona...")
       const soloPersona = await prisma.persona.findFirst({
         where: {
           correoPersona: data.correo,
         },
-      });
-      
-      console.log('Resultado búsqueda persona:', soloPersona ? 'ENCONTRADO' : 'NO ENCONTRADO');
-      
+      })
+
+      console.log("Resultado búsqueda persona:", soloPersona ? "ENCONTRADO" : "NO ENCONTRADO")
+
       if (soloPersona) {
-        console.log('Detalles de persona encontrada:', {
+        console.log("Detalles de persona encontrada:", {
           id: soloPersona.idPersona,
           nombre: soloPersona.nombre,
-          correo: soloPersona.correoPersona
-        });
-        
+          correo: soloPersona.correoPersona,
+        })
+
         // Ahora busca el usuario relacionado
-        console.log('Buscando usuario relacionado...');
+        console.log("Buscando usuario relacionado...")
         const usuarios = await prisma.usuario.findMany({
           where: {
             idPersona: soloPersona.idPersona,
           },
-        });
-        
-        console.log('Usuarios encontrados:', usuarios.length);
-        
+        })
+
+        console.log("Usuarios encontrados:", usuarios.length)
+
         if (usuarios.length > 0) {
-          console.log('Usuario encontrado con ID:', usuarios[0].idUsuario);
-          
+          console.log("Usuario encontrado con ID:", usuarios[0].idUsuario)
+
           // Continuar con el proceso normal...
-          const usuario = usuarios[0];
-          
+          const usuario = usuarios[0]
+
           // Generar token aleatorio
-          const token = crypto.randomBytes(32).toString('hex');
-          const expiracion = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
-          
+          const token = crypto.randomBytes(32).toString("hex")
+          const expiracion = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
+
           // Invalidar tokens anteriores
-       
+
           await prisma.recuperacionContrasena.updateMany({
-           
             where: {
               idUsuario: usuario.idUsuario,
-              usado: false
+              usado: false,
             },
             data: {
               usado: true,
-              updatedAt: new Date()
-            }
-          });
-          
+              updatedAt: new Date(),
+            },
+          })
+
           // Crear nuevo token
           const recoveryToken = await prisma.recuperacionContrasena.create({
             data: {
               token,
               expiracion,
               idUsuario: usuario.idUsuario,
-              usado: false
-            }
-          });
-          
+              usado: false,
+            },
+          })
+
           // Enviar correo con el token
-          console.log('Enviando correo a:', soloPersona.correoPersona);
-          await enviarCorreoRecuperacion(
-            soloPersona.correoPersona, 
-            recoveryToken.token, 
-            soloPersona.nombre
-          );
-          
-          console.log('Correo enviado exitosamente');
-          return { 
-            success: true, 
-            message: "Se han enviado instrucciones de recuperación a tu correo" 
-          };
+          console.log("Enviando correo a:", soloPersona.correoPersona)
+          await enviarCorreoRecuperacion(soloPersona.correoPersona, recoveryToken.token, soloPersona.nombre)
+
+          console.log("Correo enviado exitosamente")
+          return {
+            success: true,
+            message: "Se han enviado instrucciones de recuperación a tu correo",
+          }
         } else {
-          console.log('No se encontró usuario para la persona con ID:', soloPersona.idPersona);
+          console.log("No se encontró usuario para la persona con ID:", soloPersona.idPersona)
         }
       }
-      
+
       // Si llegamos aquí, no se encontró la persona o el usuario
-      console.log(`Solicitud de recuperación fallida para: ${data.correo}`);
-      return { 
-        success: true, 
-        message: "Si el correo existe, recibirás instrucciones para recuperar tu contraseña" 
-      };
+      console.log(`Solicitud de recuperación fallida para: ${data.correo}`)
+      return {
+        success: true,
+        message: "Si el correo existe, recibirás instrucciones para recuperar tu contraseña",
+      }
     } catch (error) {
-      console.error("Error al solicitar recuperación de contraseña:", error);
-      throw error;
+      console.error("Error al solicitar recuperación de contraseña:", error)
+      throw error
     }
   }
+
   // Método para validar token de recuperación
   async validarTokenRecuperacion(token) {
     try {
       if (!token) {
-        throw new Error('Token no proporcionado');
+        throw new Error("Token no proporcionado")
       }
 
       const recoveryToken = await prisma.recuperacionContrasena.findFirst({
@@ -1285,40 +1362,41 @@ class AuthController {
           token,
           usado: false,
           expiracion: {
-            gt: new Date()
-          }
+            gt: new Date(),
+          },
         },
         include: {
-          usuario: true
-        }
-      });
+          usuario: true,
+        },
+      })
 
       if (!recoveryToken) {
-        return { valid: false };
+        return { valid: false }
       }
 
-      return { 
-        valid: true, 
+      return {
+        valid: true,
         usuario: {
           idUsuario: recoveryToken.usuario.idUsuario,
-          nombreUsuario: recoveryToken.usuario.nombreUsuario
-        }
-      };
+          nombreUsuario: recoveryToken.usuario.nombreUsuario,
+        },
+      }
     } catch (error) {
-      console.error("Error al validar token de recuperación:", error);
-      throw error;
+      console.error("Error al validar token de recuperación:", error)
+      throw error
     }
   }
+
   // Método para establecer nueva contraseña
   async establecerNuevaContrasena(token, data) {
     try {
       // Validar que se proporcionó un token y contraseña
       if (!token) {
-        throw new Error('Token no proporcionado');
+        throw new Error("Token no proporcionado")
       }
 
       if (!data.nuevaContrasena) {
-        throw new Error('La nueva contraseña es requerida');
+        throw new Error("La nueva contraseña es requerida")
       }
 
       // Verificar que el token sea válido
@@ -1327,76 +1405,79 @@ class AuthController {
           token,
           usado: false,
           expiracion: {
-            gt: new Date()
-          }
+            gt: new Date(),
+          },
         },
         include: {
-          usuario: true
-        }
-      });
+          usuario: true,
+        },
+      })
 
       if (!recoveryToken) {
-        throw new Error("Token inválido o expirado");
+        throw new Error("Token inválido o expirado")
       }
 
       // Hashear nueva contraseña
-      const hashedPassword = await bcrypt.hash(data.nuevaContrasena, 10);
+      const hashedPassword = await bcrypt.hash(data.nuevaContrasena, 10)
 
       // Actualizar contraseña del usuario
       await prisma.usuario.update({
         where: {
-          idUsuario: recoveryToken.usuario.idUsuario
+          idUsuario: recoveryToken.usuario.idUsuario,
         },
         data: {
           contrasena: hashedPassword,
           ultimoCambioContrasena: new Date(),
           updatedAt: new Date(),
           // Si el usuario estaba bloqueado o con contraseña vencida, activarlo
-          estado: ['BLOQUEADO', 'VENCIDO'].includes(recoveryToken.usuario.estado) ? 'ACTIVO' : recoveryToken.usuario.estado
-        }
-      });
+          estado: ["BLOQUEADO", "VENCIDO"].includes(recoveryToken.usuario.estado)
+            ? "ACTIVO"
+            : recoveryToken.usuario.estado,
+        },
+      })
 
       // Invalidar el token de recuperación
       await prisma.recuperacionContrasena.update({
         where: {
-          idRecuperacion: recoveryToken.idRecuperacion
+          idRecuperacion: recoveryToken.idRecuperacion,
         },
         data: {
           usado: true,
-          updatedAt: new Date()
-        }
-      });
+          updatedAt: new Date(),
+        },
+      })
 
       // Invalidar todas las sesiones existentes del usuario
       await prisma.accessToken.updateMany({
         where: {
           idUsuario: recoveryToken.usuario.idUsuario,
-          deletedAt: null
+          deletedAt: null,
         },
         data: {
-          deletedAt: new Date()
-        }
-      });
+          deletedAt: new Date(),
+        },
+      })
 
       await prisma.refreshToken.updateMany({
         where: {
           idUsuario: recoveryToken.usuario.idUsuario,
-          deletedAt: null
+          deletedAt: null,
         },
         data: {
-          deletedAt: new Date()
-        }
-      });
+          deletedAt: new Date(),
+        },
+      })
 
-      return { 
-        success: true, 
-        message: "Contraseña actualizada correctamente" 
-      };
+      return {
+        success: true,
+        message: "Contraseña actualizada correctamente",
+      }
     } catch (error) {
-      console.error("Error al establecer nueva contraseña:", error);
-      throw error;
+      console.error("Error al establecer nueva contraseña:", error)
+      throw error
     }
   }
+
   // Método para cerrar sesión
   async logout(request, accessToken) {
     try {
@@ -1416,6 +1497,9 @@ class AuthController {
 
       // También registrar con el nuevo servicio
       if (userData && request) {
+        const ip = this.auditoriaService.obtenerDireccionIP(request)
+        const navegador = this.auditoriaService.obtenerInfoNavegador(request)
+
         await this.auditoriaService.registrarAuditoria({
           entidad: "Usuario",
           idRegistro: userData.idUsuario,

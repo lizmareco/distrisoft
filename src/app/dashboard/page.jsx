@@ -69,6 +69,7 @@ export default function DashboardPage() {
 
     // Sección de Compras
     cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
+    ordenesCompra: true, // Nuevo ítem para órdenes de compra
   })
 
   // Modificar la función useEffect para asegurar que se obtengan correctamente los datos del usuario
@@ -186,6 +187,7 @@ export default function DashboardPage() {
       administracionUsuarios: true, // Siempre visible para pruebas
       cotizaciones: true, // Ítem para cotizaciones de clientes
       cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
+      ordenesCompra: true, // Nuevo ítem para órdenes de compra
     }
 
     // Configurar permisos específicos según el rol
@@ -361,6 +363,33 @@ export default function DashboardPage() {
                       variant="contained"
                       onClick={() => navigateTo("/cotizaciones-proveedor")}
                       sx={{ bgcolor: "#e65100", "&:hover": { bgcolor: "#bf360c" } }}
+                    >
+                      ACCEDER
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )}
+            {visibleItems.ordenesCompra && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                      <LocalShipping sx={{ fontSize: 60, color: "#d32f2f" }} /> {/* Rojo */}
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Órdenes de Compra
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Administre las órdenes de compra. Cree nuevas órdenes, consulte el historial y gestione el estado
+                      de las mismas.
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigateTo("/ordenes-compra")}
+                      sx={{ bgcolor: "#d32f2f", "&:hover": { bgcolor: "#b71c1c" } }}
                     >
                       ACCEDER
                     </Button>

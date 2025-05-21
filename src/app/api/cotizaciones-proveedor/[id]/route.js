@@ -10,71 +10,40 @@ export async function GET(request, { params }) {
     const { id } = params
     console.log(`API: Obteniendo cotización de proveedor con ID: ${id}`)
 
-    // Intentar obtener la cotización con sus detalles
-    let cotizacion
+    if (!id || isNaN(Number.parseInt(id))) {
+      return NextResponse.json(
+        { message: "ID de cotización de proveedor inválido" },
+        { status: HTTP_STATUS_CODES.badRequest },
+      )
+    }
 
-    try {
-      // Primero intentamos con detalleCotizacionProv
-      cotizacion = await prisma.cotizacionProveedor.findUnique({
-        where: {
-          idCotizacionProveedor: Number.parseInt(id),
-          deletedAt: null,
-        },
-        include: {
-          proveedor: {
-            include: {
-              empresa: true,
-            },
+    // Intentar obtener la cotización con sus detalles usando el nombre correcto de la relación
+    const cotizacion = await prisma.cotizacionProveedor.findUnique({
+      where: {
+        idCotizacionProveedor: Number.parseInt(id),
+        deletedAt: null,
+      },
+      include: {
+        proveedor: {
+          include: {
+            empresa: true,
           },
-          detalleCotizacionProv: {
-            include: {
-              materiaPrima: {
-                include: {
-                  estadoMateriaPrima: true,
-                },
+        },
+        detallesCotizacionProv: {
+          // Nombre correcto en plural
+          where: {
+            deletedAt: null,
+          },
+          include: {
+            materiaPrima: {
+              include: {
+                estadoMateriaPrima: true,
               },
             },
           },
         },
-      })
-    } catch (error) {
-      console.log("Error al incluir detalleCotizacionProv, intentando sin detalles:", error.message)
-
-      // Si falla, obtenemos la cotización sin detalles
-      cotizacion = await prisma.cotizacionProveedor.findUnique({
-        where: {
-          idCotizacionProveedor: Number.parseInt(id),
-          deletedAt: null,
-        },
-        include: {
-          proveedor: {
-            include: {
-              empresa: true,
-            },
-          },
-        },
-      })
-
-      // Obtener los detalles por separado
-      const detalles = await prisma.detalleCotizacionProv.findMany({
-        where: {
-          idCotizacionProveedor: Number.parseInt(id),
-          deletedAt: null,
-        },
-        include: {
-          materiaPrima: {
-            include: {
-              estadoMateriaPrima: true,
-            },
-          },
-        },
-      })
-
-      // Agregar los detalles manualmente
-      if (cotizacion) {
-        cotizacion.detalles = detalles
-      }
-    }
+      },
+    })
 
     if (!cotizacion) {
       console.error(`API: Cotización de proveedor con ID ${id} no encontrada`)
@@ -83,6 +52,9 @@ export async function GET(request, { params }) {
         { status: HTTP_STATUS_CODES.notFound },
       )
     }
+
+    console.log(`API: Cotización de proveedor encontrada: ${cotizacion.idCotizacionProveedor}`)
+    console.log(`API: Detalles encontrados: ${cotizacion.detallesCotizacionProv.length}`)
 
     return NextResponse.json(cotizacion)
   } catch (error) {
@@ -115,44 +87,25 @@ export async function DELETE(request, { params }) {
     }
 
     // Obtener la cotización antes de eliminarla para la auditoría
-    let cotizacionAnterior
-
-    try {
-      cotizacionAnterior = await prisma.cotizacionProveedor.findUnique({
-        where: {
-          idCotizacionProveedor: Number.parseInt(id),
-          deletedAt: null,
-        },
-        include: {
-          proveedor: {
-            include: {
-              empresa: true,
-            },
-          },
-          detalleCotizacionProv: {
-            include: {
-              materiaPrima: true,
-            },
+    const cotizacionAnterior = await prisma.cotizacionProveedor.findUnique({
+      where: {
+        idCotizacionProveedor: Number.parseInt(id),
+        deletedAt: null,
+      },
+      include: {
+        proveedor: {
+          include: {
+            empresa: true,
           },
         },
-      })
-    } catch (error) {
-      console.log("Error al incluir detalleCotizacionProv, intentando sin detalles:", error.message)
-
-      cotizacionAnterior = await prisma.cotizacionProveedor.findUnique({
-        where: {
-          idCotizacionProveedor: Number.parseInt(id),
-          deletedAt: null,
-        },
-        include: {
-          proveedor: {
-            include: {
-              empresa: true,
-            },
+        detallesCotizacionProv: {
+          // Nombre correcto en plural
+          include: {
+            materiaPrima: true,
           },
         },
-      })
-    }
+      },
+    })
 
     if (!cotizacionAnterior) {
       return NextResponse.json(

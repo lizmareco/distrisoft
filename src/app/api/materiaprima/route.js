@@ -62,6 +62,7 @@ export async function POST(request) {
         nombreMateriaPrima: data.nombreMateriaPrima,
         descMateriaPrima: data.descMateriaPrima,
         idEstadoMateriaPrima: Number.parseInt(data.idEstadoMateriaPrima),
+        stockActual: 0, // Inicializar el stock en 0 (aunque ya es el valor predeterminado)
         createdAt: new Date(),
       },
       include: {
@@ -85,4 +86,3 @@ export async function POST(request) {
     return NextResponse.json({ error: "Error al crear materia prima" }, { status: 500 })
   }
 }
-

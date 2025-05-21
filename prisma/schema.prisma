@@ -416,8 +416,10 @@ model MateriaPrima {
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
+  stockActual           Float                   @default(0) @map("stock_actual")
   detalleCotizacionProv DetalleCotizacionProv[]
   estadoMateriaPrima    EstadoMateriaPrima      @relation(fields: [idEstadoMateriaPrima], references: [idEstadoMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "estado_materia_prima_materia_prima_fk")
+  inventario            Inventario[] 
 }
 
 model MetodoPago {
@@ -475,6 +477,7 @@ model OrdenCompra {
   facturaCreditoProv    FacturaCreditoProv[]
   cotizacionProveedor   CotizacionProveedor  @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_orden_compra_fk")
   estadoOrdenCompra     EstadoOrdenCompra    @relation(fields: [idEstadoOrdenCompra], references: [idEstadoOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "estado_orden_compra_orden_compra_fk")
+  inventario            Inventario[]
 }
 
 model OrdenProduccion {
@@ -568,6 +571,7 @@ model Producto {
   createdAt                 DateTime                   @default(now()) @map("created_at")
   updatedAt                 DateTime?                  @default(now()) @map("updated_at")
   deletedAt                 DateTime?                  @map("deleted_at")
+  stockActual               Float                   @default(0) @map("stock_actual")
   detalleCotizacionCliente DetalleCotizacionCliente[]
   pedidoDetalle             PedidoDetalle[]
   tipoProducto              TipoProducto               @relation(fields: [idTipoProducto], references: [idTipoProducto], onDelete: NoAction, onUpdate: NoAction, map: "tipo_producto_producto_fk")
@@ -803,4 +807,22 @@ model Auditoria {
   navegador     String?   @map("navegador") @db.VarChar(255)
   fechaCreacion DateTime? @default(now()) @map("fecha_creacion") @db.Timestamp(6)
   usuario       Usuario   @relation(fields: [idUsuario], references: [idUsuario], onDelete: Cascade, onUpdate: NoAction, map: "fk_auditoria_usuario")
+}
+
+model Inventario {
+  idInventario       Int           @id @default(autoincrement()) @map("id_inventario")
+  idMateriaPrima     Int           @map("id_materia_prima")
+  cantidad           Float         @default(0)
+  unidadMedida       String        @map("unidad_medida") @db.VarChar(20)
+  fechaIngreso       DateTime      @default(now()) @map("fecha_ingreso")
+  idOrdenCompra      Int?          @map("id_orden_compra")
+  observacion        String?       @db.VarChar(500)
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime?     @default(now()) @map("updated_at")
+  deletedAt          DateTime?     @map("deleted_at")
+  
+  // Relaciones
+  materiaPrima       MateriaPrima  @relation(fields: [idMateriaPrima], references: [idMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "inventario_materia_prima_fk")
+  ordenCompra        OrdenCompra?  @relation(fields: [idOrdenCompra], references: [idOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "inventario_orden_compra_fk")
+
 }

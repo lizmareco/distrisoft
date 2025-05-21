@@ -4,28 +4,25 @@ import AuditoriaService from "@/src/backend/services/auditoria-service"
 
 const auditoriaService = new AuditoriaService()
 
-console.log("API MateriaPrima/buscar: Endpoint cargado")
-
 export async function GET(request) {
   try {
-    console.log("API MateriaPrima/buscar - Iniciando solicitud GET")
+    console.log("API: Obteniendo stock de materias primas...")
 
     // Usuario ficticio para auditoría en desarrollo
     const userData = { idUsuario: 1 }
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("query") || ""
-    const activas = searchParams.get("activas") === "true"
-
-    // Añadir logs para depuración
-    console.log("API MateriaPrima/buscar - Parámetros recibidos:", {
-      query,
-      activas,
-    })
+    const idMateriaPrima = searchParams.get("idMateriaPrima") ? Number(searchParams.get("idMateriaPrima")) : null
 
     // Construir condiciones de búsqueda
     const where = {
       deletedAt: null,
+    }
+
+    // Si se proporciona un ID específico, filtrar por ese ID
+    if (idMateriaPrima) {
+      where.idMateriaPrima = idMateriaPrima
     }
 
     // Si hay término de búsqueda, añadir condición OR
@@ -36,13 +33,7 @@ export async function GET(request) {
       ]
     }
 
-    // Si no hay consulta y no se especifica activas=true, devolver array vacío
-    if (!query.trim() && !activas) {
-      console.log("API MateriaPrima/buscar - Consulta vacía y no se especificó activas=true, devolviendo array vacío")
-      return NextResponse.json([], { status: 200 })
-    }
-
-    // Buscar materias primas
+    // Obtener materias primas con sus stocks actuales
     const materiasPrimas = await prisma.materiaPrima.findMany({
       where,
       include: {
@@ -56,34 +47,21 @@ export async function GET(request) {
     // Registrar la acción en auditoría
     await auditoriaService.registrarAuditoria({
       entidad: "MateriaPrima",
-      idRegistro: "busqueda",
+      idRegistro: "stock",
       accion: "CONSULTAR",
       valorAnterior: null,
-      valorNuevo: { query, activas },
+      valorNuevo: { query, idMateriaPrima },
       idUsuario: userData.idUsuario,
       request,
     })
 
-    console.log(`API MateriaPrima/buscar - Se encontraron ${materiasPrimas.length} materias primas`)
-
-    // Log detallado para depuración
-    if (materiasPrimas.length > 0) {
-      console.log("API MateriaPrima/buscar - Primera materia prima encontrada:", {
-        id: materiasPrimas[0].idMateriaPrima,
-        nombre: materiasPrimas[0].nombreMateriaPrima,
-        descripcion: materiasPrimas[0].descMateriaPrima,
-        estado: materiasPrimas[0].estadoMateriaPrima?.descEstadoMateriaPrima || "N/A",
-      })
-    } else {
-      console.log("API MateriaPrima/buscar - No se encontraron materias primas")
-    }
-
+    console.log(`API: Se encontraron ${materiasPrimas.length} materias primas con stock`)
     return NextResponse.json(materiasPrimas, { status: 200 })
   } catch (error) {
-    console.error("API MateriaPrima/buscar - Error:", error)
+    console.error("API: Error al obtener stock de materias primas:", error)
     return NextResponse.json(
       {
-        message: "Error al buscar materias primas",
+        message: "Error al obtener stock de materias primas",
         error: error.message,
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       },
