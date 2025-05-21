@@ -13,7 +13,6 @@ import {
   TableRow,
   TextField,
   Button,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -28,34 +27,27 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material"
-import {
-  Add as AddIcon,
-  Remove as RemoveIcon,
-  Refresh as RefreshIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-} from "@mui/icons-material"
+import { Refresh as RefreshIcon, Search as SearchIcon } from "@mui/icons-material"
 import InventarioNav from "@/src/components/inventario-nav"
 
 export default function ProductosInventarioPage() {
   const [productos, setProductos] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [openDialog, setOpenDialog] = useState(false)
   const [selectedProducto, setSelectedProducto] = useState(null)
   const [cantidad, setCantidad] = useState("")
   const [observacion, setObservacion] = useState("")
-  const [tiposProducto, setTiposProducto] = useState([])
-  const [filtroTipo, setFiltroTipo] = useState("")
-  const [filtroEstado, setFiltroEstado] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("todos")
   const [estadosProducto, setEstadosProducto] = useState([])
-  const [showFilters, setShowFilters] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "info",
   })
+  const [loadingEstados, setLoadingEstados] = useState(true)
 
   // Cargar productos
   const fetchProductos = async () => {
@@ -63,22 +55,41 @@ export default function ProductosInventarioPage() {
     try {
       let url = "/api/productos/stock"
       const params = new URLSearchParams()
+      let loadAll = false
 
-      if (searchTerm) params.append("nombre", searchTerm)
-      if (filtroTipo) params.append("tipoProducto", filtroTipo)
-      if (filtroEstado) params.append("estado", filtroEstado)
+      if (searchTerm) {
+        params.append("nombre", searchTerm)
+        loadAll = true
+      }
+
+      if (filtroEstado && filtroEstado !== "todos") {
+        params.append("estado", filtroEstado)
+        loadAll = true
+      }
+
+      // Si se seleccionó "Todos" explícitamente en el filtro de estado
+      if (filtroEstado === "todos") {
+        loadAll = true
+      }
+
+      if (loadAll) {
+        params.append("loadAll", "true")
+      }
 
       if (params.toString()) {
         url += `?${params.toString()}`
       }
 
+      console.log("Consultando productos:", url)
       const response = await fetch(url)
       if (!response.ok) {
         throw new Error("Error al cargar los productos")
       }
 
       const data = await response.json()
+      console.log("Productos recibidos:", data)
       setProductos(data.productos || [])
+      setHasSearched(true)
       setError(null)
     } catch (err) {
       console.error("Error al cargar productos:", err)
@@ -89,47 +100,46 @@ export default function ProductosInventarioPage() {
     }
   }
 
-  // Cargar tipos de producto
-  const fetchTiposProducto = async () => {
-    try {
-      const response = await fetch("/api/tipoproducto")
-      if (!response.ok) {
-        throw new Error("Error al cargar tipos de producto")
-      }
-
-      const data = await response.json()
-      setTiposProducto(data || [])
-    } catch (err) {
-      console.error("Error al cargar tipos de producto:", err)
-    }
-  }
-
   // Cargar estados de producto
   const fetchEstadosProducto = async () => {
+    setLoadingEstados(true)
     try {
+      console.log("Consultando estados de producto")
       const response = await fetch("/api/estadoproducto")
       if (!response.ok) {
         throw new Error("Error al cargar estados de producto")
       }
 
       const data = await response.json()
-      setEstadosProducto(data || [])
+      console.log("Estados de producto recibidos:", data)
+
+      // Verificar la estructura de los datos recibidos
+      if (Array.isArray(data)) {
+        setEstadosProducto(data)
+      } else if (data && Array.isArray(data.estadosProducto)) {
+        setEstadosProducto(data.estadosProducto)
+      } else {
+        console.error("Formato de datos inesperado para estados de producto:", data)
+        setEstadosProducto([])
+      }
     } catch (err) {
       console.error("Error al cargar estados de producto:", err)
+      setEstadosProducto([])
+    } finally {
+      setLoadingEstados(false)
     }
   }
 
   // Cargar datos iniciales
   useEffect(() => {
-    fetchProductos()
-    fetchTiposProducto()
     fetchEstadosProducto()
+    // No cargar productos automáticamente al inicio
   }, [])
 
   // Actualizar productos cuando cambian los filtros
-  useEffect(() => {
+  const handleSearch = () => {
     fetchProductos()
-  }, [searchTerm, filtroTipo, filtroEstado])
+  }
 
   // Abrir diálogo para ajustar stock
   const handleOpenDialog = (producto) => {
@@ -213,6 +223,24 @@ export default function ProductosInventarioPage() {
     }
   }
 
+  // Estilos para los botones de acción
+  const actionButtonStyles = {
+    actualizar: {
+      backgroundColor: "#0099cc",
+      color: "white",
+      "&:hover": {
+        backgroundColor: "#007399",
+      },
+    },
+    crear: {
+      backgroundColor: "#28a745",
+      color: "white",
+      "&:hover": {
+        backgroundColor: "#218838",
+      },
+    },
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -223,7 +251,7 @@ export default function ProductosInventarioPage() {
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={12} sm={4} md={3}>
             <TextField
               fullWidth
               label="Buscar por nombre o descripción"
@@ -236,55 +264,44 @@ export default function ProductosInventarioPage() {
             />
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2}>
+          <Grid item xs={12} sm={4} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select value={filtroEstado} label="Estado" onChange={(e) => setFiltroEstado(e.target.value)}>
+                <MenuItem value="todos">Todos</MenuItem>
+                {loadingEstados ? (
+                  <MenuItem disabled>Cargando estados...</MenuItem>
+                ) : estadosProducto && estadosProducto.length > 0 ? (
+                  estadosProducto.map((estado) => (
+                    <MenuItem key={estado.idEstadoProducto} value={estado.idEstadoProducto.toString()}>
+                      {estado.descEstadoProducto}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No hay estados disponibles</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={4} md={3}>
             <Button
-              variant="outlined"
-              startIcon={<FilterIcon />}
-              onClick={() => setShowFilters(!showFilters)}
+              variant="contained"
+              sx={actionButtonStyles.actualizar}
+              startIcon={<RefreshIcon />}
+              onClick={handleSearch}
               fullWidth
             >
-              Filtros
+              ACTUALIZAR
             </Button>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2}>
-            <Button variant="contained" color="primary" startIcon={<RefreshIcon />} onClick={fetchProductos} fullWidth>
-              Actualizar
+          <Grid item xs={12} sm={4} md={3}>
+            <Button variant="contained" sx={actionButtonStyles.crear} href="/producto/formulario" fullWidth>
+              CREAR
             </Button>
           </Grid>
         </Grid>
-
-        {showFilters && (
-          <Grid container spacing={2} sx={{ mt: 2 }}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Tipo de Producto</InputLabel>
-                <Select value={filtroTipo} label="Tipo de Producto" onChange={(e) => setFiltroTipo(e.target.value)}>
-                  <MenuItem value="">Todos</MenuItem>
-                  {tiposProducto.map((tipo) => (
-                    <MenuItem key={tipo.idTipoProducto} value={tipo.idTipoProducto}>
-                      {tipo.descTipoProducto}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Estado</InputLabel>
-                <Select value={filtroEstado} label="Estado" onChange={(e) => setFiltroEstado(e.target.value)}>
-                  <MenuItem value="">Todos</MenuItem>
-                  {estadosProducto.map((estado) => (
-                    <MenuItem key={estado.idEstadoProducto} value={estado.idEstadoProducto}>
-                      {estado.descEstadoProducto}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        )}
       </Paper>
 
       {error && (
@@ -297,6 +314,21 @@ export default function ProductosInventarioPage() {
         <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
           <CircularProgress />
         </Box>
+      ) : !hasSearched ? (
+        <Paper sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h6" gutterBottom>
+            Utilice los filtros para buscar productos
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Ingrese un término de búsqueda o seleccione un estado para ver resultados
+          </Typography>
+        </Paper>
+      ) : productos.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h6" color="error">
+            No se encontraron productos con los filtros seleccionados
+          </Typography>
+        </Paper>
       ) : (
         <TableContainer component={Paper}>
           <Table>
@@ -308,53 +340,35 @@ export default function ProductosInventarioPage() {
                 <TableCell>Unidad</TableCell>
                 <TableCell align="right">Stock Actual</TableCell>
                 <TableCell>Estado</TableCell>
-                <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {productos.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    No se encontraron productos
+              {productos.map((producto) => (
+                <TableRow
+                  key={producto.idProducto}
+                  hover
+                  onClick={() => handleOpenDialog(producto)}
+                  sx={{ cursor: "pointer" }}
+                >
+                  <TableCell>{producto.nombreProducto}</TableCell>
+                  <TableCell>{producto.descripcion}</TableCell>
+                  <TableCell>{producto.tipoProducto?.descTipoProducto || "N/A"}</TableCell>
+                  <TableCell>
+                    {producto.unidadMedida
+                      ? `${producto.unidadMedida.descUnidadMedida} (${producto.unidadMedida.abreviatura})`
+                      : "N/A"}
                   </TableCell>
+                  <TableCell align="right">
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+                      <Typography variant="body2" sx={{ mr: 1 }}>
+                        {Number.parseFloat(producto.stockActual || 0).toFixed(2)}
+                      </Typography>
+                      {renderStockStatus(producto.stockActual || 0)}
+                    </Box>
+                  </TableCell>
+                  <TableCell>{producto.estadoProducto?.descEstadoProducto || "N/A"}</TableCell>
                 </TableRow>
-              ) : (
-                productos.map((producto) => (
-                  <TableRow key={producto.idProducto}>
-                    <TableCell>{producto.nombreProducto}</TableCell>
-                    <TableCell>{producto.descripcion}</TableCell>
-                    <TableCell>{producto.tipoProducto?.descTipoProducto || "N/A"}</TableCell>
-                    <TableCell>{producto.unidadMedida?.nombreUnidadMedida || "N/A"}</TableCell>
-                    <TableCell align="right">
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-                        <Typography variant="body2" sx={{ mr: 1 }}>
-                          {Number.parseFloat(producto.stockActual || 0).toFixed(2)}
-                        </Typography>
-                        {renderStockStatus(producto.stockActual || 0)}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{producto.estadoProducto?.descEstadoProducto || "N/A"}</TableCell>
-                    <TableCell align="center">
-                      <IconButton color="primary" onClick={() => handleOpenDialog(producto)} title="Añadir stock">
-                        <AddIcon />
-                      </IconButton>
-                      <IconButton
-                        color="secondary"
-                        onClick={() => {
-                          setSelectedProducto(producto)
-                          setCantidad("-")
-                          setObservacion("")
-                          setOpenDialog(true)
-                        }}
-                        title="Reducir stock"
-                        disabled={(producto.stockActual || 0) <= 0}
-                      >
-                        <RemoveIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
@@ -362,7 +376,7 @@ export default function ProductosInventarioPage() {
 
       {/* Diálogo para ajustar stock */}
       <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>{cantidad && cantidad.startsWith("-") ? "Reducir Stock" : "Añadir Stock"}</DialogTitle>
+        <DialogTitle>Ajustar Stock</DialogTitle>
         <DialogContent>
           {selectedProducto && (
             <>
@@ -371,7 +385,7 @@ export default function ProductosInventarioPage() {
               </Typography>
               <Typography variant="body2" gutterBottom>
                 Stock actual: {Number.parseFloat(selectedProducto.stockActual || 0).toFixed(2)}{" "}
-                {selectedProducto.unidadMedida?.nombreUnidadMedida || ""}
+                {selectedProducto.unidadMedida ? selectedProducto.unidadMedida.abreviatura : ""}
               </Typography>
 
               <TextField
@@ -382,15 +396,7 @@ export default function ProductosInventarioPage() {
                 fullWidth
                 value={cantidad}
                 onChange={(e) => setCantidad(e.target.value)}
-                InputProps={{
-                  inputProps: {
-                    min:
-                      cantidad && cantidad.startsWith("-")
-                        ? -Number.parseFloat(selectedProducto.stockActual || 0)
-                        : 0.01,
-                    step: 0.01,
-                  },
-                }}
+                helperText="Ingrese un valor positivo para añadir o negativo para reducir"
                 sx={{ mt: 2 }}
               />
 

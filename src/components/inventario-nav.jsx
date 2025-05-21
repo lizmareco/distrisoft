@@ -9,7 +9,7 @@ export default function InventarioNav({ activeTab = "materias" }) {
   const handleChange = (event, newValue) => {
     switch (newValue) {
       case "materias":
-        router.push("/inventario/stock")
+        router.push("/inventario/materiaprima")
         break
       case "productos":
         router.push("/inventario/productos")
@@ -21,19 +21,13 @@ export default function InventarioNav({ activeTab = "materias" }) {
         router.push("/inventario/reporte")
         break
       default:
-        router.push("/inventario")
+        router.push("/inventario/materiaprima")
     }
   }
 
   return (
     <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-      <Tabs
-        value={activeTab}
-        onChange={handleChange}
-        aria-label="inventario navigation tabs"
-        variant="scrollable"
-        scrollButtons="auto"
-      >
+      <Tabs value={activeTab} onChange={handleChange} aria-label="inventario navigation tabs">
         <Tab label="Materias Primas" value="materias" />
         <Tab label="Productos" value="productos" />
         <Tab label="Movimientos" value="movimientos" />

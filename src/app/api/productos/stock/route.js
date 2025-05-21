@@ -3,8 +3,9 @@ import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
 
-
 const prisma = new PrismaClient()
+const auditoriaService = new AuditoriaService()
+const authController = new AuthController()
 
 // Función para verificar si estamos en modo desarrollo
 const isDevelopment = process.env.NODE_ENV === "development"
@@ -23,7 +24,7 @@ export async function GET(request) {
         return NextResponse.json({ error: "Token no proporcionado" }, { status: 401 })
       }
 
-      const tokenValido = await AuthController(token)
+      const tokenValido = await authController.verificarToken(token)
       if (!tokenValido) {
         return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 })
       }
@@ -32,8 +33,14 @@ export async function GET(request) {
     // Obtener parámetros de consulta
     const { searchParams } = new URL(request.url)
     const nombre = searchParams.get("nombre") || ""
-    const tipoProducto = searchParams.get("tipoProducto") || ""
     const estado = searchParams.get("estado") || ""
+    const loadAll = searchParams.get("loadAll") === "true"
+
+    // Si no hay filtros y no se solicita cargar todo, devolver array vacío
+    if (!nombre && !estado && !loadAll) {
+      console.log("API: No se proporcionaron filtros y no se solicitó cargar todo")
+      return NextResponse.json({ productos: [] })
+    }
 
     // Construir filtro
     let filtro = {
@@ -50,13 +57,11 @@ export async function GET(request) {
       }
     }
 
-    if (tipoProducto && !isNaN(Number.parseInt(tipoProducto))) {
-      filtro.idTipoProducto = Number.parseInt(tipoProducto)
-    }
-
-    if (estado && !isNaN(Number.parseInt(estado))) {
+    if (estado && estado !== "todos" && !isNaN(Number.parseInt(estado))) {
       filtro.idEstadoProducto = Number.parseInt(estado)
     }
+
+    console.log("API: Buscando productos con filtro:", filtro)
 
     // Obtener productos con su stock
     const productos = await prisma.producto.findMany({
@@ -71,13 +76,9 @@ export async function GET(request) {
       },
     })
 
-    // Registrar auditoría
-    await AuditoriaService({
-      accion: "CONSULTA_STOCK_PRODUCTOS",
-      tabla: "Producto",
-      descripcion: `Consulta de stock de productos${nombre ? ` con filtro: ${nombre}` : ""}`,
-      data: { filtro },
-    })
+    console.log(`API: Se encontraron ${productos.length} productos`)
+
+    // NO registramos auditoría para consultas como solicitó el usuario
 
     return NextResponse.json({ productos })
   } catch (error) {
@@ -100,7 +101,7 @@ export async function POST(request) {
         return NextResponse.json({ error: "Token no proporcionado" }, { status: 401 })
       }
 
-      const tokenValido = await AuthController(token)
+      const tokenValido = await authController.verificarToken(token)
       if (!tokenValido) {
         return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 })
       }
@@ -125,10 +126,16 @@ export async function POST(request) {
       }
 
       // Calcular nuevo stock
-      const nuevoStock = Number.parseFloat(producto.stockActual || 0) + Number.parseFloat(cantidad)
+      const stockAnterior = Number.parseFloat(producto.stockActual || 0)
+      const nuevoStock = stockAnterior + Number.parseFloat(cantidad)
 
       if (nuevoStock < 0) {
         throw new Error("El stock no puede ser negativo")
+      }
+
+      // Si no hay cambio en el stock, no hacer nada
+      if (stockAnterior === nuevoStock) {
+        return { productoActualizado: producto, cambioRealizado: false }
       }
 
       // Actualizar stock del producto
@@ -140,22 +147,29 @@ export async function POST(request) {
         },
       })
 
-      // Registrar movimiento en inventario (si se implementa en el futuro)
-      // Por ahora, solo registramos la auditoría
-
-      return { productoActualizado }
+      return { productoActualizado, cambioRealizado: true, stockAnterior }
     })
 
-    // Registrar auditoría
-    await AuditoriaService({
-      accion: "ACTUALIZAR_STOCK_PRODUCTO",
-      tabla: "Producto",
-      descripcion: `Actualización de stock del producto ID: ${idProducto}, Cantidad: ${cantidad}, Observación: ${observacion || "N/A"}`,
-      data,
-    })
+    // Registrar auditoría solo si hubo un cambio real
+    if (resultado.cambioRealizado) {
+      await auditoriaService.registrarEvento(
+        "Inventario",
+        "ACTUALIZAR_STOCK_PRODUCTO",
+        `Actualización de stock del producto ID: ${idProducto}, Stock anterior: ${resultado.stockAnterior}, Nuevo stock: ${resultado.productoActualizado.stockActual}, Ajuste: ${cantidad}, Observación: ${observacion || "N/A"}`,
+        1, // Usuario ficticio para desarrollo
+        request,
+        {
+          idProducto,
+          stockAnterior: resultado.stockAnterior,
+          nuevoStock: resultado.productoActualizado.stockActual,
+          ajuste: cantidad,
+          observacion,
+        },
+      )
+    }
 
     return NextResponse.json({
-      mensaje: "Stock actualizado correctamente",
+      mensaje: resultado.cambioRealizado ? "Stock actualizado correctamente" : "No hubo cambios en el stock",
       producto: resultado.productoActualizado,
     })
   } catch (error) {
@@ -181,7 +195,7 @@ export async function PUT(request) {
         return NextResponse.json({ error: "Token no proporcionado" }, { status: 401 })
       }
 
-      const tokenValido = await AuthController(token)
+      const tokenValido = await authController.verificarToken(token)
       if (!tokenValido) {
         return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 })
       }
@@ -207,10 +221,16 @@ export async function PUT(request) {
       }
 
       // Calcular nuevo stock
-      const nuevoStock = Number.parseFloat(producto.stockActual || 0) + Number.parseFloat(cantidad)
+      const stockAnterior = Number.parseFloat(producto.stockActual || 0)
+      const nuevoStock = stockAnterior + Number.parseFloat(cantidad)
 
       if (nuevoStock < 0) {
         throw new Error("El stock no puede ser negativo")
+      }
+
+      // Si no hay cambio en el stock, no hacer nada
+      if (stockAnterior === nuevoStock) {
+        return { productoActualizado: producto, cambioRealizado: false }
       }
 
       // Actualizar stock del producto
@@ -222,22 +242,30 @@ export async function PUT(request) {
         },
       })
 
-      // Registrar movimiento en inventario (si se implementa en el futuro)
-      // Por ahora, solo registramos la auditoría
-
-      return { productoActualizado }
+      return { productoActualizado, cambioRealizado: true, stockAnterior }
     })
 
-    // Registrar auditoría
-    await AuditoriaService({
-      accion: "REGISTRAR_MOVIMIENTO_PRODUCTO",
-      tabla: "Producto",
-      descripcion: `Registro de movimiento para producto ID: ${idProducto}, Cantidad: ${cantidad}, Orden Producción: ${idOrdenProduccion || "N/A"}, Observación: ${observacion || "N/A"}`,
-      data,
-    })
+    // Registrar auditoría solo si hubo un cambio real
+    if (resultado.cambioRealizado) {
+      await auditoriaService.registrarEvento(
+        "Inventario",
+        "REGISTRAR_MOVIMIENTO_PRODUCTO",
+        `Registro de movimiento para producto ID: ${idProducto}, Stock anterior: ${resultado.stockAnterior}, Nuevo stock: ${resultado.productoActualizado.stockActual}, Ajuste: ${cantidad}, Orden Producción: ${idOrdenProduccion || "N/A"}, Observación: ${observacion || "N/A"}`,
+        1, // Usuario ficticio para desarrollo
+        request,
+        {
+          idProducto,
+          stockAnterior: resultado.stockAnterior,
+          nuevoStock: resultado.productoActualizado.stockActual,
+          ajuste: cantidad,
+          idOrdenProduccion,
+          observacion,
+        },
+      )
+    }
 
     return NextResponse.json({
-      mensaje: "Movimiento registrado correctamente",
+      mensaje: resultado.cambioRealizado ? "Movimiento registrado correctamente" : "No hubo cambios en el stock",
       producto: resultado.productoActualizado,
     })
   } catch (error) {
@@ -248,4 +276,3 @@ export async function PUT(request) {
     )
   }
 }
-

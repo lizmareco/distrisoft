@@ -21,6 +21,8 @@ export async function GET(request) {
     console.log("API MateriaPrima/buscar - Parámetros recibidos:", {
       query,
       activas,
+      url: request.url,
+      searchParams: Object.fromEntries(searchParams.entries()),
     })
 
     // Construir condiciones de búsqueda
@@ -34,13 +36,28 @@ export async function GET(request) {
         { nombreMateriaPrima: { contains: query, mode: "insensitive" } },
         { descMateriaPrima: { contains: query, mode: "insensitive" } },
       ]
+      console.log("API MateriaPrima/buscar - Aplicando filtro de búsqueda:", query)
     }
 
-    // Si no hay consulta y no se especifica activas=true, devolver array vacío
-    if (!query.trim() && !activas) {
-      console.log("API MateriaPrima/buscar - Consulta vacía y no se especificó activas=true, devolviendo array vacío")
-      return NextResponse.json([], { status: 200 })
+    // Si se especifica activas=true, filtrar por estado activo
+    if (activas) {
+      // Primero, buscar el ID del estado "ACTIVO"
+      const estadoActivo = await prisma.estadoMateriaPrima.findFirst({
+        where: {
+          descEstadoMateriaPrima: { equals: "ACTIVO", mode: "insensitive" },
+          deletedAt: null,
+        },
+      })
+
+      if (estadoActivo) {
+        where.idEstadoMateriaPrima = estadoActivo.idEstadoMateriaPrima
+        console.log(`API MateriaPrima/buscar - Filtrando por estado ACTIVO (ID: ${estadoActivo.idEstadoMateriaPrima})`)
+      } else {
+        console.log("API MateriaPrima/buscar - No se encontró el estado ACTIVO")
+      }
     }
+
+    console.log("API MateriaPrima/buscar - Condiciones de búsqueda finales:", JSON.stringify(where))
 
     // Buscar materias primas
     const materiasPrimas = await prisma.materiaPrima.findMany({
@@ -61,7 +78,6 @@ export async function GET(request) {
       valorAnterior: null,
       valorNuevo: { query, activas },
       idUsuario: userData.idUsuario,
-      request,
     })
 
     console.log(`API MateriaPrima/buscar - Se encontraron ${materiasPrimas.length} materias primas`)
@@ -73,6 +89,7 @@ export async function GET(request) {
         nombre: materiasPrimas[0].nombreMateriaPrima,
         descripcion: materiasPrimas[0].descMateriaPrima,
         estado: materiasPrimas[0].estadoMateriaPrima?.descEstadoMateriaPrima || "N/A",
+        stock: materiasPrimas[0].stockActual,
       })
     } else {
       console.log("API MateriaPrima/buscar - No se encontraron materias primas")
