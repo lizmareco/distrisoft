@@ -131,4 +131,3 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Error al eliminar cliente: " + error.message }, { status: 500 })
   }
 }
-

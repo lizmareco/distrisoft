@@ -795,7 +795,7 @@ model RecuperacionContrasena {
 
   @@index([token], map: "idx_recuperacion_token")
   @@index([id_usuario], map: "idx_recuperacion_usuario")
-}
+} 
 
 model Auditoria {
   idAuditoria   Int       @id @default(autoincrement()) @map("id_auditoria")
