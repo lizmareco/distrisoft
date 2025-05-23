@@ -1,3 +1,4 @@
+// src/backend/services/auditoria-service.js
 import { PrismaClient } from "@prisma/client"
 import { UAParser } from "ua-parser-js"
 
@@ -14,6 +15,8 @@ class AuditoriaService {
    * @param {Object|null} params.valorNuevo - Nuevo valor del registro (opcional)
    * @param {number} params.idUsuario - ID del usuario que realizó la acción
    * @param {Object|null} params.request - Objeto de solicitud HTTP (opcional)
+   * @param {string} params.direccionIP - Dirección IP del cliente (opcional)
+   * @param {string} params.navegador - Información del navegador del cliente (opcional)
    */
   async registrarAuditoria({
     entidad,
@@ -252,9 +255,10 @@ class AuditoriaService {
    * @param {string|number} idRegistro - ID del registro creado
    * @param {Object} valorNuevo - Datos del nuevo registro
    * @param {number} idUsuario - ID del usuario que realizó la acción
-   * @param {Object} request - Objeto de solicitud HTTP
+   * @param {string} direccionIP - Dirección IP del cliente
+   * @param {string} navegador - Información del navegador del cliente
    */
-  async registrarCreacion(entidad, idRegistro, valorNuevo, idUsuario, request) {
+  async registrarCreacion(entidad, idRegistro, valorNuevo, idUsuario, direccionIP, navegador) {
     console.log(`Registrando CREACIÓN de ${entidad} con ID ${idRegistro}`)
     return this.registrarAuditoria({
       entidad,
@@ -263,7 +267,8 @@ class AuditoriaService {
       valorAnterior: null,
       valorNuevo,
       idUsuario,
-      request,
+      direccionIP,
+      navegador
     })
   }
 
@@ -274,9 +279,10 @@ class AuditoriaService {
    * @param {Object} valorAnterior - Datos anteriores del registro
    * @param {Object} valorNuevo - Nuevos datos del registro
    * @param {number} idUsuario - ID del usuario que realizó la acción
-   * @param {Object} request - Objeto de solicitud HTTP
+   * @param {string} direccionIP - Dirección IP del cliente
+   * @param {string} navegador - Información del navegador del cliente
    */
-  async registrarActualizacion(entidad, idRegistro, valorAnterior, valorNuevo, idUsuario, request) {
+  async registrarActualizacion(entidad, idRegistro, valorAnterior, valorNuevo, idUsuario, direccionIP, navegador) {
     console.log(`Registrando ACTUALIZACIÓN de ${entidad} con ID ${idRegistro}`)
     return this.registrarAuditoria({
       entidad,
@@ -285,7 +291,8 @@ class AuditoriaService {
       valorAnterior,
       valorNuevo,
       idUsuario,
-      request,
+      direccionIP,
+      navegador
     })
   }
 
@@ -295,9 +302,10 @@ class AuditoriaService {
    * @param {string|number} idRegistro - ID del registro eliminado
    * @param {Object} valorAnterior - Datos del registro eliminado
    * @param {number} idUsuario - ID del usuario que realizó la acción
-   * @param {Object} request - Objeto de solicitud HTTP
+   * @param {string} direccionIP - Dirección IP del cliente
+   * @param {string} navegador - Información del navegador del cliente
    */
-  async registrarEliminacion(entidad, idRegistro, valorAnterior, idUsuario, request) {
+  async registrarEliminacion(entidad, idRegistro, valorAnterior, idUsuario, direccionIP, navegador) {
     console.log(`Registrando ELIMINACIÓN de ${entidad} con ID ${idRegistro}`)
     return this.registrarAuditoria({
       entidad,
@@ -306,7 +314,8 @@ class AuditoriaService {
       valorAnterior,
       valorNuevo: null,
       idUsuario,
-      request,
+      direccionIP,
+      navegador
     })
   }
 
@@ -400,4 +409,3 @@ class AuditoriaService {
 }
 
 export default AuditoriaService
-

@@ -141,6 +141,9 @@ export async function PUT(request, { params }) {
         idUnidadMedida: Number.parseInt(data.idUnidadMedida),
         idEstadoProducto: Number.parseInt(data.idEstadoProducto),
         updatedAt: new Date(),
+        unidadesPorPaquete: datos.unidadesPorPaquete || 1,
+        ventaPorPaquete: datos.ventaPorPaquete || false,
+        paqueteMinimo: datos.paqueteMinimo,
       },
       include: {
         unidadMedida: true,

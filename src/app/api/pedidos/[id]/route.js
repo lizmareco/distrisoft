@@ -1,17 +1,49 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import AuditoriaService from "@/src/backend/services/auditoria-service"
+
+const authController = new AuthController()
+const auditoriaService = new AuditoriaService()
 
 // GET /api/pedidos/[id] - Obtener un pedido por ID
 export async function GET(request, { params }) {
   let idPedido
   try {
+    // Verificar autenticación
+    const token = await authController.hasAccessToken(request)
+    let userData = null
+
+    if (process.env.NODE_ENV === "development") {
+      if (!token) {
+        console.log("Modo desarrollo: Usando token especial de desarrollo")
+        userData = {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "desarrollo",
+          permisos: ["*"],
+        }
+      } else {
+        userData = await authController.getUserFromToken(token)
+      }
+    } else {
+      if (!token) {
+        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
+      }
+      userData = await authController.getUserFromToken(token)
+    }
+
     // Extraer y convertir el ID de manera segura
     // En Next.js 13+ con App Router, podemos acceder a params directamente
     const paramId = params ? String(params.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
-      return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
+      return NextResponse.json({ error: "ID de pedido no válido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
     console.log(`API: Obteniendo pedido con ID ${idPedido}...`)
@@ -84,7 +116,10 @@ export async function GET(request, { params }) {
 
     if (!pedido) {
       console.log(`API: Pedido con ID ${idPedido} no encontrado`)
-      return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
+      return NextResponse.json(
+        { error: `Pedido con ID ${idPedido} no encontrado` },
+        { status: HTTP_STATUS_CODES.notFound },
+      )
     }
 
     // Función para convertir fecha a string en formato YYYY-MM-DD
@@ -118,7 +153,7 @@ export async function GET(request, { params }) {
     return NextResponse.json(pedidoFormateado)
   } catch (error) {
     console.error(`API: Error al obtener pedido con ID ${idPedido || "desconocido"}:`, error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.internalServerError })
   }
 }
 
@@ -126,12 +161,38 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   let idPedido
   try {
+    // Verificar autenticación
+    const token = await authController.hasAccessToken(request)
+    let userData = null
+
+    if (process.env.NODE_ENV === "development") {
+      if (!token) {
+        console.log("Modo desarrollo: Usando token especial de desarrollo")
+        userData = {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "desarrollo",
+          permisos: ["*"],
+        }
+      } else {
+        userData = await authController.getUserFromToken(token)
+      }
+    } else {
+      if (!token) {
+        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
+      }
+      userData = await authController.getUserFromToken(token)
+    }
+
     // Extraer y convertir el ID de manera segura
     const paramId = params ? String(params.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
-      return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
+      return NextResponse.json({ error: "ID de pedido no válido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
     console.log(`API: Actualizando pedido con ID ${idPedido}...`)
@@ -142,7 +203,7 @@ export async function PUT(request, { params }) {
     // Validar datos
     if (!datos.pedido) {
       console.error("API: Datos de pedido incompletos")
-      return NextResponse.json({ error: "Datos de pedido incompletos" }, { status: 400 })
+      return NextResponse.json({ error: "Datos de pedido incompletos" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
     // Verificar si el pedido existe
@@ -151,11 +212,23 @@ export async function PUT(request, { params }) {
         idPedido: idPedido,
         deletedAt: null,
       },
+      include: {
+        pedidoDetalle: true,
+      },
     })
 
     if (!pedidoExistente) {
       console.log(`API: Pedido con ID ${idPedido} no encontrado para actualizar`)
-      return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
+      return NextResponse.json(
+        { error: `Pedido con ID ${idPedido} no encontrado` },
+        { status: HTTP_STATUS_CODES.notFound },
+      )
+    }
+
+    // Guardar el valor anterior para auditoría
+    const valorAnterior = {
+      pedido: { ...pedidoExistente },
+      detalles: pedidoExistente.pedidoDetalle,
     }
 
     // Verificar la estructura de la tabla pedidoDetalle
@@ -182,7 +255,7 @@ export async function PUT(request, { params }) {
           fechaPedido: new Date(datos.pedido.fechaPedido),
           fechaEntrega: new Date(datos.pedido.fechaEntrega), // Asegurarse de que se actualice la fecha de entrega
           idCliente: datos.pedido.idCliente,
-          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario, // Usar idUsuario si vendedor no está disponible
+          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario || userData.idUsuario, // Usar idUsuario si vendedor no está disponible
           idEstadoPedido: datos.pedido.idEstadoPedido,
           observacion: datos.pedido.observacion || "",
           montoTotal: datos.pedido.montoTotal,
@@ -190,6 +263,7 @@ export async function PUT(request, { params }) {
       })
 
       // Si hay detalles nuevos, actualizar los detalles
+      let detallesCreados = []
       if (datos.detalles && datos.detalles.length > 0) {
         // Eliminar detalles existentes
         await prisma.pedidoDetalle.deleteMany({
@@ -210,13 +284,26 @@ export async function PUT(request, { params }) {
           }),
         )
 
-        const detallesCreados = await Promise.all(detallesPromises)
-
-        return { pedido: pedidoActualizado, detalles: detallesCreados }
+        detallesCreados = await Promise.all(detallesPromises)
       }
 
-      return { pedido: pedidoActualizado }
+      return { pedido: pedidoActualizado, detalles: detallesCreados }
     })
+
+    // Registrar auditoría
+    if (userData) {
+      await auditoriaService.registrarActualizacion(
+        "PedidoCliente",
+        idPedido,
+        valorAnterior,
+        {
+          pedido: resultado.pedido,
+          detalles: resultado.detalles,
+        },
+        userData.idUsuario,
+        request,
+      )
+    }
 
     console.log(`API: Pedido con ID ${idPedido} actualizado correctamente`)
     return NextResponse.json(
@@ -225,11 +312,11 @@ export async function PUT(request, { params }) {
         pedido: resultado.pedido,
         detalles: resultado.detalles,
       },
-      { status: 200 },
+      { status: HTTP_STATUS_CODES.ok },
     )
   } catch (error) {
     console.error(`API: Error al actualizar pedido con ID ${idPedido || "desconocido"}:`, error)
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
   }
 }
 
@@ -237,12 +324,38 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   let idPedido
   try {
+    // Verificar autenticación
+    const token = await authController.hasAccessToken(request)
+    let userData = null
+
+    if (process.env.NODE_ENV === "development") {
+      if (!token) {
+        console.log("Modo desarrollo: Usando token especial de desarrollo")
+        userData = {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "desarrollo",
+          permisos: ["*"],
+        }
+      } else {
+        userData = await authController.getUserFromToken(token)
+      }
+    } else {
+      if (!token) {
+        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
+      }
+      userData = await authController.getUserFromToken(token)
+    }
+
     // Extraer y convertir el ID de manera segura
     const paramId = params ? String(params.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
-      return NextResponse.json({ error: "ID de pedido no válido" }, { status: 400 })
+      return NextResponse.json({ error: "ID de pedido no válido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
     console.log(`API: Eliminando pedido con ID ${idPedido}...`)
@@ -253,15 +366,27 @@ export async function DELETE(request, { params }) {
         idPedido: idPedido,
         deletedAt: null,
       },
+      include: {
+        pedidoDetalle: true,
+      },
     })
 
     if (!pedidoExistente) {
       console.log(`API: Pedido con ID ${idPedido} no encontrado para eliminar`)
-      return NextResponse.json({ error: `Pedido con ID ${idPedido} no encontrado` }, { status: 404 })
+      return NextResponse.json(
+        { error: `Pedido con ID ${idPedido} no encontrado` },
+        { status: HTTP_STATUS_CODES.notFound },
+      )
+    }
+
+    // Guardar el valor anterior para auditoría
+    const valorAnterior = {
+      pedido: { ...pedidoExistente },
+      detalles: pedidoExistente.pedidoDetalle,
     }
 
     // Realizar borrado lógico
-    await prisma.pedidoCliente.update({
+    const pedidoEliminado = await prisma.pedidoCliente.update({
       where: {
         idPedido: idPedido,
       },
@@ -270,15 +395,28 @@ export async function DELETE(request, { params }) {
       },
     })
 
+    // Registrar auditoría
+    if (userData) {
+      await auditoriaService.registrarAuditoria({
+        entidad: "PedidoCliente",
+        idRegistro: idPedido,
+        accion: "ELIMINACION",
+        valorAnterior: valorAnterior,
+        valorNuevo: { deletedAt: pedidoEliminado.deletedAt },
+        idUsuario: userData.idUsuario,
+        request,
+      })
+    }
+
     console.log(`API: Pedido con ID ${idPedido} eliminado correctamente`)
     return NextResponse.json(
       {
         mensaje: "Pedido eliminado exitosamente",
       },
-      { status: 200 },
+      { status: HTTP_STATUS_CODES.ok },
     )
   } catch (error) {
     console.error(`API: Error al eliminar pedido con ID ${idPedido || "desconocido"}:`, error)
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
   }
 }

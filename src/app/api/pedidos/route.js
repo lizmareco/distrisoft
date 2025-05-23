@@ -1,10 +1,43 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import AuditoriaService from "@/src/backend/services/auditoria-service"
+
+const authController = new AuthController()
+const auditoriaService = new AuditoriaService()
 
 // GET /api/pedidos - Obtener todos los pedidos
-export async function GET() {
+export async function GET(request) {
   try {
     console.log("API: Obteniendo pedidos...")
+
+    // Verificar autenticación
+    const token = await authController.hasAccessToken(request)
+    let userData = null
+
+    if (process.env.NODE_ENV === "development") {
+      if (!token) {
+        console.log("Modo desarrollo: Usando token especial de desarrollo")
+        userData = {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "desarrollo",
+          permisos: ["*"],
+        }
+      } else {
+        userData = await authController.getUserFromToken(token)
+      }
+    } else {
+      if (!token) {
+        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
+      }
+      userData = await authController.getUserFromToken(token)
+    }
+
     // Modificar la consulta para usar los nombres de campos correctos
     const pedidos = await prisma.pedidoCliente.findMany({
       where: {
@@ -90,7 +123,7 @@ export async function GET() {
     return NextResponse.json(pedidosFormateados)
   } catch (error) {
     console.error("API: Error al obtener pedidos:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.internalServerError })
   }
 }
 
@@ -98,13 +131,40 @@ export async function GET() {
 export async function POST(request) {
   try {
     console.log("API: Creando nuevo pedido...")
+
+    // Verificar autenticación
+    const token = await authController.hasAccessToken(request)
+    let userData = null
+
+    if (process.env.NODE_ENV === "development") {
+      if (!token) {
+        console.log("Modo desarrollo: Usando token especial de desarrollo")
+        userData = {
+          idUsuario: 1,
+          nombre: "Usuario",
+          apellido: "Desarrollo",
+          correo: "desarrollo@example.com",
+          rol: "ADMINISTRADOR",
+          usuario: "desarrollo",
+          permisos: ["*"],
+        }
+      } else {
+        userData = await authController.getUserFromToken(token)
+      }
+    } else {
+      if (!token) {
+        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
+      }
+      userData = await authController.getUserFromToken(token)
+    }
+
     const datos = await request.json()
     console.log("API: Datos recibidos:", datos)
 
     // Validar datos
     if (!datos.pedido || !datos.detalles || datos.detalles.length === 0) {
       console.error("API: Datos de pedido incompletos")
-      return NextResponse.json({ error: "Datos de pedido incompletos" }, { status: 400 })
+      return NextResponse.json({ error: "Datos de pedido incompletos" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
     // Crear transacción para asegurar que se guarden tanto el pedido como sus detalles
@@ -133,7 +193,7 @@ export async function POST(request) {
           idEstadoPedido: datos.pedido.idEstadoPedido,
           observacion: datos.pedido.observacion || "",
           montoTotal: datos.pedido.montoTotal || 0,
-          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario, // Usar idUsuario si vendedor no está disponible
+          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario || userData.idUsuario, // Usar idUsuario si vendedor no está disponible
           // No incluir idMetodoPago
         },
       })
@@ -170,6 +230,22 @@ export async function POST(request) {
       return { pedido, detalles: detallesCreados }
     })
 
+    // Registrar auditoría
+    if (userData) {
+      await auditoriaService.registrarAuditoria({
+        entidad: "PedidoCliente",
+        idRegistro: resultado.pedido.idPedido,
+        accion: "CREACION",
+        valorAnterior: null,
+        valorNuevo: {
+          pedido: resultado.pedido,
+          detalles: resultado.detalles,
+        },
+        idUsuario: userData.idUsuario,
+        request,
+      })
+    }
+
     console.log(`API: Pedido creado con ID: ${resultado.pedido.idPedido}`)
     return NextResponse.json(
       {
@@ -177,10 +253,10 @@ export async function POST(request) {
         pedido: resultado.pedido,
         detalles: resultado.detalles,
       },
-      { status: 201 },
+      { status: HTTP_STATUS_CODES.created },
     )
   } catch (error) {
     console.error("API: Error al crear pedido:", error)
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ error: error.message }, { status: HTTP_STATUS_CODES.badRequest })
   }
 }

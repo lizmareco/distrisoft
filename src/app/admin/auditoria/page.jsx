@@ -77,6 +77,9 @@ export default function AuditoriaPage() {
     { value: "Proveedor", label: "Proveedor" },
     { value: "Venta", label: "Venta" },
     { value: "Compra", label: "Compra" },
+    { value: "PedidoCliente", label: "Pedidos" },
+    { value: "MateriaPrima", label: "Materia Prima" },
+    { value: "OrdenCompra", label: "Orden de Compra" },
   ]
 
   // Cargar datos al montar el componente y cuando cambien los filtros o paginación
@@ -213,24 +216,47 @@ export default function AuditoriaPage() {
     })
   }
 
-  // Función para obtener color de chip según acción
+  // Función para obtener color de chip según acción - MODIFICADA
   const getChipColor = (accion) => {
-    switch (accion) {
+    if (!accion) return "default"
+
+    const accionUpper = accion.toString().toUpperCase()
+
+    switch (accionUpper) {
       case "CREAR":
+      case "CREACION":
+      case "CREATE":
         return "success"
       case "ACTUALIZAR":
-        return "info"
+      case "ACTUALIZACION":
+      case "UPDATE":
+        return "primary"
       case "ELIMINAR":
+      case "ELIMINACION":
+      case "DELETE":
         return "error"
       case "LOGIN_EXITOSO":
+      case "CAMBIO_CONTRASEÑA_EXITOSO":
         return "success"
       case "LOGIN_FALLIDO":
         return "error"
       case "LOGOUT":
         return "default"
-      case "CAMBIO_CONTRASEÑA_EXITOSO":
-        return "warning"
+      case "CONSULTA":
+      case "READ":
+      case "GET":
+        return "info"
       default:
+        // Para cualquier acción que contenga estas palabras clave
+        if (accionUpper.includes("CREAR") || accionUpper.includes("CREATE")) {
+          return "success"
+        }
+        if (accionUpper.includes("ACTUALIZAR") || accionUpper.includes("UPDATE")) {
+          return "primary"
+        }
+        if (accionUpper.includes("ELIMINAR") || accionUpper.includes("DELETE")) {
+          return "error"
+        }
         return "default"
     }
   }
@@ -550,4 +576,3 @@ export default function AuditoriaPage() {
     </Container>
   )
 }
-

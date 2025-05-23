@@ -419,7 +419,8 @@ model MateriaPrima {
   stockActual           Float                   @default(0) @map("stock_actual")
   detalleCotizacionProv DetalleCotizacionProv[]
   estadoMateriaPrima    EstadoMateriaPrima      @relation(fields: [idEstadoMateriaPrima], references: [idEstadoMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "estado_materia_prima_materia_prima_fk")
-  inventario            Inventario[] 
+  inventario            Inventario[]
+  formulaDetalle        FormulaDetalle[] 
 }
 
 model MetodoPago {
@@ -493,7 +494,7 @@ model OrdenProduccion {
   estadoOrdenProd     EstadoOrdenProd     @relation(fields: [idEstadoOrdenProd], references: [idEstadoOrdenProd], onDelete: NoAction, onUpdate: NoAction, map: "estado_orden_prod_orden_produccion_fk")
   pedidoCliente       PedidoCliente       @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_orden_produccion_fk")
   usuario             Usuario             @relation(fields: [operadorEncargado], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_orden_produccion_fk")
-  inventarioProducto  InventarioProducto[] // Relación inversa con InventarioProducto
+  inventarioProducto  InventarioProducto[] 
 }
 
 model PedidoCliente {
@@ -573,12 +574,18 @@ model Producto {
   createdAt                 DateTime                   @default(now()) @map("created_at")
   updatedAt                 DateTime?                  @default(now()) @map("updated_at")
   deletedAt                 DateTime?                  @map("deleted_at")
+  unidadesPorPaquete        Int                        @default(1) @map("unidadesporpaquete")
+  ventaPorPaquete           Boolean                    @default(false) @map("ventaporpaquete")
+  paqueteMinimo             Int                        @default(1) @map("paqueteminimo")
+  costoPorPaquete           Decimal                    @default(0) @db.Decimal(18, 2) @map("costoporpaquete")
   detalleCotizacionCliente  DetalleCotizacionCliente[]
   pedidoDetalle             PedidoDetalle[]
   tipoProducto              TipoProducto               @relation(fields: [idTipoProducto], references: [idTipoProducto], onDelete: NoAction, onUpdate: NoAction, map: "tipo_producto_producto_fk")
   unidadMedida              UnidadMedida               @relation(fields: [idUnidadMedida], references: [idUnidadMedida], onDelete: NoAction, onUpdate: NoAction, map: "unidad_medida_producto_fk")
   estadoProducto            EstadoProducto             @relation(fields: [idEstadoProducto], references: [idEstadoProducto], onDelete: NoAction, onUpdate: NoAction, map: "estado_producto_producto_fk")
-  inventarioProducto        InventarioProducto[]       // Relación inversa con InventarioProducto
+  inventarioProducto        InventarioProducto[]       
+  formulas            Formula[]
+  produccion          Produccion[]
 }
 
 model Proveedor {
@@ -731,6 +738,7 @@ model Usuario {
   pedidoCliente          PedidoCliente[]
   RecuperacionContrasena RecuperacionContrasena[]
   refreshToken           RefreshToken[]
+  produccion             Produccion[]
   persona                Persona                  @relation(fields: [idPersona], references: [idPersona], onDelete: NoAction, onUpdate: NoAction, map: "persona_usuario_fk")
   rol                    Rol                      @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_usuario_fk")
 }
@@ -844,8 +852,49 @@ model InventarioProducto {
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime?     @default(now()) @map("updated_at")
   deletedAt             DateTime?     @map("deleted_at")
-  
-  // Relaciones
   producto              Producto      @relation(fields: [idProducto], references: [idProducto], onDelete: NoAction, onUpdate: NoAction, map: "inventario_producto_producto_fk")
   ordenProduccion       OrdenProduccion? @relation(fields: [idOrdenProduccion], references: [idOrdenProduccion], onDelete: NoAction, onUpdate: NoAction, map: "inventario_producto_orden_produccion_fk")
+}
+
+model Formula {
+  idFormula     Int              @id @default(autoincrement()) @map("id_formula")
+  idProducto    Int              @map("id_producto")
+  nombre        String           @db.VarChar(100)
+  descripcion   String?          @db.Text
+  rendimiento   Int
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime?         @default(now()) @map("updated_at")
+  deletedAt     DateTime?         @map("deleted_at")
+  producto      Producto         @relation(fields: [idProducto], references: [idProducto])
+  FormulaDetalle FormulaDetalle[]
+  Produccion    Produccion[]
+}
+
+model FormulaDetalle {
+  idFormulaDetalle Int          @id @default(autoincrement()) @map("id_formula_detalle")
+  idFormula       Int           @map("id_formula")
+  idMateriaPrima  Int           @map("id_materia_prima")
+  cantidad        Float
+  unidadMedida    String        @map("unidad_medida") @db.VarChar(20)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime?       @default(now()) @map("updated_at")
+  deletedAt     DateTime?       @map("deleted_at")
+  formula         Formula       @relation(fields: [idFormula], references: [idFormula])
+  materiaPrima    MateriaPrima  @relation(fields: [idMateriaPrima], references: [idMateriaPrima])
+}
+
+model Produccion {
+  idProduccion     Int          @id @default(autoincrement()) @map("id_produccion")
+  idFormula        Int          @map("id_formula")
+  idProducto       Int          @map("id_producto")
+  cantidadProducida Int         @map("cantidad_producida")
+  fechaProduccion  DateTime     @default(now()) @map("fecha_produccion")
+  idUsuario        Int          @map("id_usuario")
+  observaciones    String?      @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime?       @default(now()) @map("updated_at")
+  deletedAt     DateTime?       @map("deleted_at")
+  formula          Formula      @relation(fields: [idFormula], references: [idFormula])
+  producto         Producto     @relation(fields: [idProducto], references: [idProducto])
+  usuario          Usuario      @relation(fields: [idUsuario], references: [idUsuario])
 }
