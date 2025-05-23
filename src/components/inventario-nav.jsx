@@ -1,34 +1,40 @@
 "use client"
 
-import { Box, Tabs, Tab } from "@mui/material"
+import { Box, Tab, Tabs } from "@mui/material"
 import { useRouter } from "next/navigation"
 
-export default function InventarioNav({ activeTab = "materias" }) {
+const InventarioNav = ({ activeTab }) => {
   const router = useRouter()
 
   const handleChange = (event, newValue) => {
     switch (newValue) {
-      case "materias":
+      case "materiasprimas":
         router.push("/inventario/materiaprima")
         break
       case "productos":
         router.push("/inventario/productos")
         break
       case "movimientos":
-        router.push("/inventario")
+        router.push("/inventario/movimientos")
         break
       case "reportes":
-        router.push("/inventario/reporte")
+        router.push("/inventario/reportes")
         break
       default:
-        router.push("/inventario/materiaprima")
+        router.push("/inventario")
     }
   }
 
   return (
     <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-      <Tabs value={activeTab} onChange={handleChange} aria-label="inventario navigation tabs">
-        <Tab label="Materias Primas" value="materias" />
+      <Tabs
+        value={activeTab}
+        onChange={handleChange}
+        variant="scrollable"
+        scrollButtons="auto"
+        aria-label="navegación de inventario"
+      >
+        <Tab label="Materias Primas" value="materiasprimas" />
         <Tab label="Productos" value="productos" />
         <Tab label="Movimientos" value="movimientos" />
         <Tab label="Reportes" value="reportes" />
@@ -36,3 +42,5 @@ export default function InventarioNav({ activeTab = "materias" }) {
     </Box>
   )
 }
+
+export default InventarioNav

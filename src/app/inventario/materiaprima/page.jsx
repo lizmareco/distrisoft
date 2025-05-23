@@ -225,7 +225,7 @@ export default function MateriaPrimaPage() {
         Stock de Materias Primas
       </Typography>
 
-      <InventarioNav activeTab="materias" />
+      <InventarioNav activeTab="materiasprimas" />
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box component="form" onSubmit={handleSearch}>

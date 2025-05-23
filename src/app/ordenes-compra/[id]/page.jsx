@@ -302,16 +302,27 @@ export default function VerOrdenCompraPage({ params }) {
       const nuevoEstadoObj = estados.find((e) => e.idEstadoOrdenCompra === Number(estadoId))
       const cambioARecibido = nuevoEstadoObj && nuevoEstadoObj.descEstadoOrdenCompra === "RECIBIDO"
 
+      // Preparar el cuerpo de la solicitud
+      const requestBody = {
+        observacion: observacion.trim(),
+        idEstadoOrdenCompra: estadoId,
+      }
+
+      // Si se está cambiando a RECIBIDO, incluir un array vacío de recepcionItems
+      // para que el backend sepa que debe procesar la recepción completa
+      if (cambioARecibido) {
+        requestBody.recepcionItems = []
+      }
+
+      console.log("Enviando solicitud con cuerpo:", requestBody)
+
       const response = await fetch(`/api/ordenes-compra/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({
-          observacion: observacion.trim(),
-          idEstadoOrdenCompra: estadoId,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
@@ -702,7 +713,9 @@ export default function VerOrdenCompraPage({ params }) {
                         <TableCell>{item.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
                         <TableCell align="right">{item.cantidad}</TableCell>
                         <TableCell>{item.unidadMedida}</TableCell>
-                        <TableCell>{format(new Date(item.fechaIngreso), "dd/MM/yyyy HH:mm", { locale: es })}</TableCell>
+                        <TableCell>
+                          {format(new Date(item.fechaMovimiento), "dd/MM/yyyy HH:mm", { locale: es })}
+                        </TableCell>
                         <TableCell>{item.observacion || "-"}</TableCell>
                       </TableRow>
                     ))}

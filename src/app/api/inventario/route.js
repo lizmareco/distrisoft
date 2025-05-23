@@ -1,51 +1,42 @@
 import { NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/prisma/client"
+import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
-import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 
-const prisma = new PrismaClient()
 const authController = new AuthController()
 const auditoriaService = new AuditoriaService()
 
-console.log("API Inventario: Endpoint cargado")
-
+// GET - Obtener registros de inventario
 export async function GET(request) {
-  console.log("API Inventario - Iniciando solicitud GET")
-  console.log("API Inventario: Headers recibidos:", Object.fromEntries(request.headers.entries()))
-
   try {
+    console.log("API: Consultando registros de inventario")
+
     // BYPASS DE AUTENTICACIÓN PARA DESARROLLO
-    // Esto permitirá que la API funcione sin token en modo desarrollo
     let token = null
     let userData = null
 
     if (process.env.NODE_ENV === "development") {
       console.log("Modo desarrollo: Bypass de autenticación activado")
-
-      // Verificar si hay un token real primero
       token = await authController.hasAccessToken(request)
 
       if (!token) {
         console.log("Usando token especial de desarrollo")
         token = "dev-mode-bypass-token"
-
-        // Crear un usuario ficticio para auditorías en modo desarrollo
         userData = {
-          idUsuario: 1, // ID de usuario para desarrollo
+          idUsuario: 1,
           nombre: "Usuario",
           apellido: "Desarrollo",
           correo: "desarrollo@example.com",
           rol: "ADMINISTRADOR",
           usuario: "desarrollo",
-          permisos: ["*"], // Todos los permisos
+          permisos: ["*"],
         }
       } else {
         console.log("Token real encontrado en modo desarrollo")
         userData = await authController.getUserFromToken(token)
       }
     } else {
-      // Verificación normal de token para producción
       token = await authController.hasAccessToken(request)
       if (token) {
         userData = await authController.getUserFromToken(token)
@@ -53,244 +44,270 @@ export async function GET(request) {
     }
 
     if (!token) {
-      console.log("API Inventario - No autorizado: Token no encontrado")
+      console.log("API: No autorizado: Token no encontrado")
       return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    // Registrar auditoría de acceso al inventario
-    if (userData) {
-      await auditoriaService.registrarAuditoria(
-        "Inventario",
-        "CONSULTA",
-        `Consulta de inventario por usuario ${userData.usuario || userData.nombreUsuario || "desconocido"}`,
-        userData.idUsuario,
-        request,
-        { filtros: Object.fromEntries(new URL(request.url).searchParams) },
-      )
     }
 
     // Extraer parámetros de búsqueda
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get("search") || ""
-    const idMateriaPrima = searchParams.get("idMateriaPrima")
-      ? Number.parseInt(searchParams.get("idMateriaPrima"))
-      : null
-    const idOrdenCompra = searchParams.get("idOrdenCompra") ? Number.parseInt(searchParams.get("idOrdenCompra")) : null
+    const search = searchParams.get("search")
+    const materiaPrimaId = searchParams.get("materiaPrimaId")
+    const ordenCompraId = searchParams.get("ordenCompraId")
+    const tipoMovimiento = searchParams.get("tipoMovimiento")
+    const fechaDesde = searchParams.get("fechaDesde")
+    const fechaHasta = searchParams.get("fechaHasta")
+    const page = Number.parseInt(searchParams.get("page") || "1")
+    const limit = Number.parseInt(searchParams.get("limit") || "10")
+    const skip = (page - 1) * limit
 
     // Construir condiciones de búsqueda
     const where = {
       deletedAt: null,
     }
 
-    // Filtrar por materia prima si se proporciona
-    if (idMateriaPrima) {
-      where.idMateriaPrima = idMateriaPrima
+    if (materiaPrimaId) {
+      where.idMateriaPrima = Number.parseInt(materiaPrimaId)
     }
 
-    // Filtrar por orden de compra si se proporciona
-    if (idOrdenCompra) {
-      where.idOrdenCompra = idOrdenCompra
+    if (ordenCompraId) {
+      where.idOrdenCompra = Number.parseInt(ordenCompraId)
     }
 
-    // Verificar si existen las tablas necesarias
-    let tablesExist = true
-    const missingTables = {}
-
-    try {
-      // Verificar si existe la tabla MateriaPrima
-      await prisma.$queryRaw`SELECT 1 FROM "MateriaPrima" LIMIT 1`
-    } catch (error) {
-      console.error("Error al verificar tabla MateriaPrima:", error.message)
-      tablesExist = false
-      missingTables.MateriaPrima = "NO EXISTE"
+    if (tipoMovimiento !== null && tipoMovimiento !== undefined) {
+      // Si tipoMovimiento está presente pero vacío, no aplicar filtro
+      if (tipoMovimiento !== "") {
+        where.tipoMovimiento = tipoMovimiento.toUpperCase()
+      }
+      // Si tipoMovimiento es vacío, no añadir filtro (traer todos)
     }
 
-    try {
-      // Verificar si existe la tabla Inventario
-      await prisma.$queryRaw`SELECT 1 FROM "Inventario" LIMIT 1`
-    } catch (error) {
-      console.error("Error al verificar tabla Inventario:", error.message)
-      tablesExist = false
-      missingTables.Inventario = "NO EXISTE"
+    if (fechaDesde || fechaHasta) {
+      where.fechaMovimiento = {}
+      if (fechaDesde) {
+        where.fechaMovimiento.gte = new Date(fechaDesde)
+      }
+      if (fechaHasta) {
+        where.fechaMovimiento.lte = new Date(fechaHasta)
+      }
     }
 
-    // Si alguna tabla no existe, devolver información de diagnóstico
-    if (!tablesExist) {
-      return NextResponse.json(
-        {
-          error: "Error de base de datos: Tablas no encontradas",
-          details: missingTables,
+    // Si hay término de búsqueda, buscar en materias primas relacionadas
+    if (search) {
+      where.materiaPrima = {
+        nombreMateriaPrima: {
+          contains: search,
+          mode: "insensitive",
         },
-        { status: HTTP_STATUS_CODES.internalServerError },
-      )
+      }
     }
+
+    // Contar total de registros para paginación
+    const totalRegistros = await prisma.inventario.count({ where })
+
+    // Modificar la consulta findMany para eliminar la inclusión de usuario que no existe en el modelo
 
     // Buscar registros de inventario
-    const inventario = await prisma.inventario.findMany({
+    const movimientos = await prisma.inventario.findMany({
       where,
       include: {
-        materiaPrima: true,
-        ordenCompra: {
-          select: {
-            idOrdenCompra: true,
+        materiaPrima: {
+          include: {
+            estadoMateriaPrima: true,
           },
         },
+        ordenCompra: {
+          include: {
+            estadoOrdenCompra: true,
+          },
+        },
+        // Eliminar esta parte ya que no existe la relación usuario en el modelo Inventario
+        // usuario: {
+        //   select: {
+        //     idUsuario: true,
+        //     nombre: true,
+        //     apellido: true,
+        //     usuario: true,
+        //   },
+        // },
       },
       orderBy: {
-        fechaIngreso: "desc",
+        fechaMovimiento: "desc",
       },
+      skip,
+      take: limit,
     })
 
-    // Filtrar por término de búsqueda si se proporciona
-    const filteredInventario = search
-      ? inventario.filter(
-          (item) =>
-            (item.materiaPrima &&
-              item.materiaPrima.nombreMateriaPrima &&
-              item.materiaPrima.nombreMateriaPrima.toLowerCase().includes(search.toLowerCase())) ||
-            (item.materiaPrima &&
-              item.materiaPrima.descMateriaPrima &&
-              item.materiaPrima.descMateriaPrima.toLowerCase().includes(search.toLowerCase())) ||
-            (item.observacion && item.observacion.toLowerCase().includes(search.toLowerCase())),
-        )
-      : inventario
+    console.log(`API: Se encontraron ${movimientos.length} registros de inventario`)
 
-    console.log(`API Inventario - Se encontraron ${filteredInventario.length} registros`)
-    return NextResponse.json(filteredInventario, { status: HTTP_STATUS_CODES.ok })
-  } catch (error) {
-    console.error("Error en API de inventario:", error)
+    // Registrar auditoría solo si se encontraron resultados (evitar registros innecesarios)
+    if (movimientos.length > 0 && userData) {
+      await auditoriaService.registrarAuditoria({
+        entidad: "Inventario",
+        idRegistro: 0,
+        accion: "CONSULTA",
+        valorAnterior: null,
+        valorNuevo: { filtros: Object.fromEntries(searchParams) },
+        idUsuario: userData.idUsuario,
+        request,
+      })
+    }
+
     return NextResponse.json(
       {
-        error: "Error al cargar inventario",
-        details: error.message,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+        movimientos,
+        meta: {
+          total: totalRegistros,
+          page,
+          limit,
+          totalPages: Math.ceil(totalRegistros / limit),
+        },
       },
+      { status: HTTP_STATUS_CODES.ok },
+    )
+  } catch (error) {
+    console.error("API: Error al consultar inventario:", error)
+    return NextResponse.json(
+      { message: "Error al consultar inventario", error: error.message },
       { status: HTTP_STATUS_CODES.internalServerError },
     )
   }
 }
 
+// POST - Crear un nuevo registro de inventario
 export async function POST(request) {
-  console.log("API Inventario - Iniciando solicitud POST")
-
   try {
-    // BYPASS DE AUTENTICACIÓN PARA DESARROLLO
-    // Esto permitirá que la API funcione sin token en modo desarrollo
-    let token = null
-    let userData = null
+    console.log("API: Creando nuevo registro de inventario")
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("Modo desarrollo: Bypass de autenticación activado")
-
-      // Verificar si hay un token real primero
-      token = await authController.hasAccessToken(request)
-
-      if (!token) {
-        console.log("Usando token especial de desarrollo")
-        token = "dev-mode-bypass-token"
-
-        // Crear un usuario ficticio para auditorías en modo desarrollo
-        userData = {
-          idUsuario: 1, // ID de usuario para desarrollo
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "desarrollo",
-          permisos: ["*"], // Todos los permisos
-        }
-      } else {
-        console.log("Token real encontrado en modo desarrollo")
-        userData = await authController.getUserFromToken(token)
-      }
-    } else {
-      // Verificación normal de token para producción
-      token = await authController.hasAccessToken(request)
-      if (token) {
-        userData = await authController.getUserFromToken(token)
-      }
-    }
-
-    if (!token) {
-      console.log("API Inventario - No autorizado: Token no encontrado")
+    // Verificar autenticación
+    const token = await authController.hasAccessToken(request)
+    if (!token && process.env.NODE_ENV !== "development") {
       return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
     }
 
+    const userData = token ? await authController.getUserFromToken(token) : { idUsuario: 1, usuario: "desarrollo" }
+
     // Obtener datos del cuerpo de la solicitud
     const data = await request.json()
-    console.log("API Inventario - Datos recibidos:", data)
 
-    // Validar datos requeridos
-    if (!data.idMateriaPrima || !data.cantidad || !data.unidadMedida) {
+    if (!data.idMateriaPrima || !data.cantidad || !data.tipoMovimiento) {
       return NextResponse.json(
         {
           error: "Datos incompletos",
-          details: "Se requiere idMateriaPrima, cantidad y unidadMedida",
+          details: "Se requiere idMateriaPrima, cantidad y tipoMovimiento",
         },
         { status: HTTP_STATUS_CODES.badRequest },
       )
     }
 
-    // Verificar si existe la materia prima
+    // Verificar que la materia prima existe
     const materiaPrima = await prisma.materiaPrima.findUnique({
-      where: {
-        idMateriaPrima: Number(data.idMateriaPrima),
-        deletedAt: null,
-      },
+      where: { idMateriaPrima: data.idMateriaPrima, deletedAt: null },
     })
 
     if (!materiaPrima) {
-      return NextResponse.json(
-        {
-          error: "Materia prima no encontrada",
-          details: `No se encontró la materia prima con ID ${data.idMateriaPrima}`,
-        },
-        { status: HTTP_STATUS_CODES.notFound },
-      )
+      return NextResponse.json({ error: "Materia prima no encontrada" }, { status: HTTP_STATUS_CODES.notFound })
     }
 
-    // Crear registro de inventario
-    const nuevoInventario = await prisma.inventario.create({
-      data: {
-        idMateriaPrima: Number(data.idMateriaPrima),
-        cantidad: Number(data.cantidad),
-        unidadMedida: data.unidadMedida,
-        fechaIngreso: data.fechaIngreso ? new Date(data.fechaIngreso) : new Date(),
-        idOrdenCompra: data.idOrdenCompra ? Number(data.idOrdenCompra) : null,
-        observacion: data.observacion || "Ingreso manual",
-      },
-      include: {
-        materiaPrima: true,
-      },
+    // Iniciar transacción
+    const resultado = await prisma.$transaction(async (tx) => {
+      // Calcular nuevo stock
+      const stockActual = Number.parseFloat(materiaPrima.stockActual || 0)
+      const cantidadAjuste = Number.parseFloat(data.cantidad)
+
+      // Determinar el ajuste según el tipo de movimiento
+      let nuevoStock
+      if (data.tipoMovimiento.toUpperCase() === "ENTRADA") {
+        nuevoStock = stockActual + cantidadAjuste
+      } else if (data.tipoMovimiento.toUpperCase() === "SALIDA") {
+        nuevoStock = stockActual - cantidadAjuste
+        // Verificar que el stock no quede negativo
+        if (nuevoStock < 0) {
+          throw new Error("Stock insuficiente para realizar la salida")
+        }
+      } else {
+        throw new Error("Tipo de movimiento inválido. Debe ser ENTRADA o SALIDA")
+      }
+
+      // Si no hay cambio real en el stock, no hacer nada
+      if (stockActual === nuevoStock) {
+        return {
+          materiaPrimaActualizada: materiaPrima,
+          movimiento: null,
+          cambioRealizado: false,
+        }
+      }
+
+      // Actualizar stock de la materia prima
+      const materiaPrimaActualizada = await tx.materiaPrima.update({
+        where: { idMateriaPrima: data.idMateriaPrima },
+        data: {
+          stockActual: nuevoStock,
+          updatedAt: new Date(),
+        },
+      })
+
+      // Crear registro de movimiento en inventario
+      const movimiento = await tx.inventario.create({
+        data: {
+          idMateriaPrima: data.idMateriaPrima,
+          cantidad: cantidadAjuste,
+          unidadMedida: data.unidadMedida || "Unidad",
+          tipoMovimiento: data.tipoMovimiento.toUpperCase(),
+          fechaMovimiento: data.fechaMovimiento ? new Date(data.fechaMovimiento) : new Date(),
+          idOrdenCompra: data.idOrdenCompra || null,
+          motivo: data.motivo || `Ajuste manual de stock: ${data.tipoMovimiento.toUpperCase()}`,
+          observacion: data.observacion || null,
+        },
+        include: {
+          materiaPrima: true,
+          ordenCompra: true,
+        },
+      })
+
+      return {
+        materiaPrimaActualizada,
+        movimiento,
+        cambioRealizado: true,
+        stockAnterior: stockActual,
+        stockNuevo: nuevoStock,
+      }
     })
 
-    // Registrar auditoría de creación de inventario
-    if (userData) {
+    // Registrar la acción en auditoría solo si hubo un cambio real
+    if (resultado.cambioRealizado) {
       await auditoriaService.registrarCreacion(
         "Inventario",
-        "CREAR",
-        `Creación de registro de inventario ID: ${nuevoInventario.idInventario}`,
+        resultado.movimiento.idInventario,
+        {
+          idMateriaPrima: resultado.movimiento.idMateriaPrima,
+          cantidad: resultado.movimiento.cantidad,
+          tipoMovimiento: resultado.movimiento.tipoMovimiento,
+          materiaPrima: resultado.movimiento.materiaPrima.nombreMateriaPrima,
+          stockAnterior: resultado.stockAnterior,
+          nuevoStock: resultado.stockNuevo,
+        },
         userData.idUsuario,
         request,
-        {
-          idMateriaPrima: nuevoInventario.idMateriaPrima,
-          cantidad: nuevoInventario.cantidad,
-          unidadMedida: nuevoInventario.unidadMedida,
-          materiaPrima: nuevoInventario.materiaPrima.nombreMateriaPrima,
-        },
       )
+
+      console.log(`API: Movimiento de inventario creado con ID: ${resultado.movimiento.idInventario}`)
+    } else {
+      console.log("API: No hubo cambio real en el stock, no se creó movimiento")
     }
 
-    console.log("API Inventario - Registro creado:", nuevoInventario)
-    return NextResponse.json(nuevoInventario, { status: HTTP_STATUS_CODES.created })
-  } catch (error) {
-    console.error("Error en API de inventario (POST):", error)
     return NextResponse.json(
       {
-        error: "Error al crear registro de inventario",
-        details: error.message,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+        mensaje: resultado.cambioRealizado ? "Movimiento registrado correctamente" : "No hubo cambios en el stock",
+        materiaPrima: resultado.materiaPrimaActualizada,
+        movimiento: resultado.movimiento,
+        cambioRealizado: resultado.cambioRealizado,
       },
+      { status: resultado.cambioRealizado ? HTTP_STATUS_CODES.created : HTTP_STATUS_CODES.ok },
+    )
+  } catch (error) {
+    console.error("API: Error al crear registro de inventario:", error)
+    return NextResponse.json(
+      { message: "Error al crear registro de inventario", error: error.message },
       { status: HTTP_STATUS_CODES.internalServerError },
     )
   }

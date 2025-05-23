@@ -66,17 +66,6 @@ export async function GET(request) {
       },
     })
 
-    // Solo registrar auditoría si se encontraron resultados (evitar registros innecesarios)
-    if (materiasPrimas.length > 0) {
-      await auditoriaService.registrarAuditoria({
-        entidad: "MateriaPrima",
-        idRegistro: "stock",
-        accion: "CONSULTAR",
-        valorAnterior: null,
-        valorNuevo: { query, idEstado },
-        idUsuario: userData.idUsuario,
-      })
-    }
 
     console.log(`API MateriaPrima/stock - Se encontraron ${materiasPrimas.length} materias primas con stock`)
 
