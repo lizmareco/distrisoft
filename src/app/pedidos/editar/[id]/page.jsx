@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -89,7 +90,8 @@ export default function EditarPedidoPage({ params }) {
   const [cargandoProductos, setCargandoProductos] = useState(false)
 
   // Obtener el ID del pedido de los parámetros de la URL
-  const pedidoId = params ? String(params.id || "") : ""
+  const resolvedParams = React.use(params)
+  const pedidoId = resolvedParams ? String(resolvedParams.id || "") : ""
 
   // Función para formatear fechas para visualización
   const formatearFechaVisual = (fechaStr) => {

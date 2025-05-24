@@ -7,7 +7,8 @@ export async function GET(request, { params }) {
   try {
     // Extraer y convertir el ID de manera segura
     // En Next.js 13+ con App Router, podemos acceder a params directamente
-    const paramId = params ? String(params.id || "0") : "0"
+    const resolvedParams = await params
+    const paramId = resolvedParams ? String(resolvedParams.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
@@ -127,7 +128,9 @@ export async function PUT(request, { params }) {
   let idPedido
   try {
     // Extraer y convertir el ID de manera segura
-    const paramId = params ? String(params.id || "0") : "0"
+    const resolvedParams = await params
+    const paramId = resolvedParams ? String(resolvedParams.id || "0") : "0"
+
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
@@ -238,7 +241,8 @@ export async function DELETE(request, { params }) {
   let idPedido
   try {
     // Extraer y convertir el ID de manera segura
-    const paramId = params ? String(params.id || "0") : "0"
+    const resolvedParams = await params
+    const paramId = resolvedParams ? String(resolvedParams.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
