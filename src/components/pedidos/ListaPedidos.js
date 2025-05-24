@@ -28,7 +28,6 @@ import {
   Tooltip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
-import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import VisibilityIcon from "@mui/icons-material/Visibility"
 import SearchIcon from "@mui/icons-material/Search"
@@ -46,6 +45,13 @@ export default function ListaPedidos() {
     mensaje: "",
     tipo: "success",
   })
+
+  // Función para verificar si un pedido está en estado pendiente
+  const esPedidoPendiente = (pedido) => {
+    if (!pedido || !pedido.estadoPedido) return false
+    const idEstado = pedido.estadoPedido.idEstadoPedido
+    return idEstado === 1 || idEstado === "1"
+  }
 
   // Cargar pedidos
   useEffect(() => {
@@ -82,13 +88,17 @@ export default function ListaPedidos() {
     router.push(`/pedidos/${id}`)
   }
 
-  // Navegar a la página de editar pedido
-  const irAEditarPedido = (id) => {
-    router.push(`/pedidos/editar/${id}`)
-  }
-
-  // Abrir diálogo de confirmación para eliminar
+  // Abrir diálogo de confirmación para eliminar (solo si está pendiente)
   const confirmarEliminar = (pedido) => {
+    if (!esPedidoPendiente(pedido)) {
+      setSnackbar({
+        abierto: true,
+        mensaje: `No se puede eliminar el pedido #${pedido.idPedido} porque está en estado "${pedido.estadoPedido?.descEstadoPedido}". Solo se pueden eliminar pedidos pendientes.`,
+        tipo: "warning",
+      })
+      return
+    }
+
     setPedidoAEliminar(pedido)
     setDialogoAbierto(true)
   }
@@ -102,6 +112,17 @@ export default function ListaPedidos() {
   // Eliminar pedido
   const eliminarPedido = async () => {
     if (!pedidoAEliminar) return
+
+    // Verificar una vez más que el pedido esté pendiente
+    if (!esPedidoPendiente(pedidoAEliminar)) {
+      setSnackbar({
+        abierto: true,
+        mensaje: "No se puede eliminar este pedido porque ya no está en estado pendiente.",
+        tipo: "error",
+      })
+      cerrarDialogo()
+      return
+    }
 
     try {
       const respuesta = await fetch(`/api/pedidos/${pedidoAEliminar.idPedido}`, {
@@ -163,9 +184,6 @@ export default function ListaPedidos() {
     try {
       if (!fechaStr) return "No definida"
 
-      // Imprimir el formato exacto para depuración
-      console.log("Formato de fecha recibido:", fechaStr)
-
       // Si la fecha ya viene en formato YYYY-MM-DD, simplemente invertir el orden
       if (typeof fechaStr === "string" && fechaStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
         const [año, mes, dia] = fechaStr.split("-")
@@ -210,6 +228,21 @@ export default function ListaPedidos() {
 
   return (
     <>
+      <Typography
+        variant="h4"
+        component="h1"
+        sx={{
+          fontSize: "28px",
+          fontWeight: 400,
+          color: "#333",
+          mb: 3,
+          borderBottom: "1px solid #eaeaea",
+          paddingBottom: "8px",
+        }}
+      >
+        Lista Pedidos
+      </Typography>
+
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <TextField
           variant="outlined"
@@ -253,58 +286,80 @@ export default function ListaPedidos() {
                 </TableCell>
               </TableRow>
             ) : (
-              pedidosFiltrados.map((pedido) => (
-                <TableRow key={pedido.idPedido}>
-                  <TableCell>{pedido.idPedido}</TableCell>
-                  <TableCell>{formatearFecha(pedido.fechaPedido)}</TableCell>
-                  <TableCell>{formatearFecha(pedido.fechaEntrega)}</TableCell>
-                  <TableCell>
-                    {pedido.cliente ? (
-                      pedido.cliente.persona ? (
-                        `${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido}`
+              pedidosFiltrados.map((pedido) => {
+                const puedeEliminar = esPedidoPendiente(pedido)
+
+                return (
+                  <TableRow key={pedido.idPedido}>
+                    <TableCell>{pedido.idPedido}</TableCell>
+                    <TableCell>{formatearFecha(pedido.fechaPedido)}</TableCell>
+                    <TableCell>{formatearFecha(pedido.fechaEntrega)}</TableCell>
+                    <TableCell>
+                      {pedido.cliente ? (
+                        pedido.cliente.persona ? (
+                          `${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido}`
+                        ) : (
+                          "Cliente sin persona"
+                        )
                       ) : (
-                        "Cliente sin persona"
-                      )
-                    ) : (
-                      <Typography variant="caption" color="error">
-                        Sin asignar
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
-                      color={getEstadoColor(pedido.estadoPedido)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {pedido.observacion ? (
-                      <Tooltip title={pedido.observacion}>
-                        <Typography noWrap sx={{ maxWidth: 150 }}>
-                          {pedido.observacion}
+                        <Typography variant="caption" color="error">
+                          Sin asignar
                         </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
+                        color={getEstadoColor(pedido.estadoPedido)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {pedido.observacion ? (
+                        <Tooltip title={pedido.observacion}>
+                          <Typography noWrap sx={{ maxWidth: 150 }}>
+                            {pedido.observacion}
+                          </Typography>
+                        </Tooltip>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          Sin observaciones
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}</TableCell>
+                    <TableCell>
+                      {/* Botón Ver detalles - siempre habilitado */}
+                      <IconButton color="info" onClick={() => irAVerPedido(pedido.idPedido)} title="Ver detalles">
+                        <VisibilityIcon />
+                      </IconButton>
+
+                      {/* Botón Eliminar - solo habilitado si está pendiente */}
+                      <Tooltip
+                        title={
+                          puedeEliminar
+                            ? "Eliminar pedido"
+                            : `No se puede eliminar. Estado: ${pedido.estadoPedido?.descEstadoPedido || "Desconocido"}`
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            color="error"
+                            onClick={() => confirmarEliminar(pedido)}
+                            disabled={!puedeEliminar}
+                            sx={{
+                              opacity: puedeEliminar ? 1 : 0.5,
+                              cursor: puedeEliminar ? "pointer" : "not-allowed",
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </span>
                       </Tooltip>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        Sin observaciones
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}</TableCell>
-                  <TableCell>
-                    <IconButton color="info" onClick={() => irAVerPedido(pedido.idPedido)} title="Ver detalles">
-                      <VisibilityIcon />
-                    </IconButton>
-                    <IconButton color="primary" onClick={() => irAEditarPedido(pedido.idPedido)} title="Editar">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton color="error" onClick={() => confirmarEliminar(pedido)} title="Eliminar">
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

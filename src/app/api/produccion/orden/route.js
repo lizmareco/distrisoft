@@ -6,21 +6,20 @@ import AuditoriaService from "@/src/backend/services/auditoria-service";
 
 export async function POST(request) {
   try {
-    // Verificar autenticación usando los métodos correctos
+    // Verificar autenticación
     const authController = new AuthController();
     const token = await authController.hasAccessToken(request);
     
-    let idUsuario = 1; // Usuario por defecto para desarrollo
+    let userData = null;
     
     if (!token && process.env.NODE_ENV !== "development") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     
-    // Si hay token, obtener el usuario
     if (token) {
-      const userData = await authController.getUserFromToken(token);
-      if (userData) {
-        idUsuario = userData.idUsuario;
+      userData = await authController.getUserFromToken(token);
+      if (!userData) {
+        return NextResponse.json({ error: "Token inválido" }, { status: 401 });
       }
     }
 
@@ -87,8 +86,8 @@ export async function POST(request) {
         data: {
           idPedido,
           operadorEncargado,
-          fechaInicioProd: fechaInicioProd ? new Date(fechaInicioProd) : new Date(),
-          fechaFinProd: fechaFinProd ? new Date(fechaFinProd) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días después por defecto
+          fechaInicioProd: fechaInicioProd ? new Date(fechaInicioProd) : null,
+          fechaFinProd: fechaFinProd ? new Date(fechaFinProd) : null,
           idEstadoOrdenProd: estadoPendiente.idEstadoOrdenProd
         }
       });
@@ -114,7 +113,8 @@ export async function POST(request) {
       "OrdenProduccion",
       ordenProduccion.idOrdenProduccion,
       ordenProduccion,
-      idUsuario
+      userData ? userData.idUsuario : 1,
+      request
     );
 
     return NextResponse.json({

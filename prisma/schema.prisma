@@ -494,7 +494,8 @@ model OrdenProduccion {
   estadoOrdenProd     EstadoOrdenProd     @relation(fields: [idEstadoOrdenProd], references: [idEstadoOrdenProd], onDelete: NoAction, onUpdate: NoAction, map: "estado_orden_prod_orden_produccion_fk")
   pedidoCliente       PedidoCliente       @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_orden_produccion_fk")
   usuario             Usuario             @relation(fields: [operadorEncargado], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_orden_produccion_fk")
-  inventarioProducto  InventarioProducto[] 
+  inventarioProducto  InventarioProducto[]
+  producciones        Produccion[]
 }
 
 model PedidoCliente {
@@ -897,4 +898,6 @@ model Produccion {
   formula          Formula      @relation(fields: [idFormula], references: [idFormula])
   producto         Producto     @relation(fields: [idProducto], references: [idProducto])
   usuario          Usuario      @relation(fields: [idUsuario], references: [idUsuario])
+  ordenProduccion  OrdenProduccion? @relation(fields: [idOrdenProduccion], references: [idOrdenProduccion])
+  idOrdenProduccion Int?        @map("id_orden_produccion")
 }

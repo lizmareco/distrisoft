@@ -400,7 +400,7 @@ export async function DELETE(request, { params }) {
       await auditoriaService.registrarAuditoria({
         entidad: "PedidoCliente",
         idRegistro: idPedido,
-        accion: "ELIMINACION",
+        accion: "ELIMINAR",
         valorAnterior: valorAnterior,
         valorNuevo: { deletedAt: pedidoEliminado.deletedAt },
         idUsuario: userData.idUsuario,

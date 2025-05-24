@@ -1,3 +1,4 @@
+import { Box, Container, Typography } from '@mui/material';
 import ListaPedidos from "../../components/pedidos/ListaPedidos"
 
 export const metadata = {
@@ -7,9 +8,10 @@ export const metadata = {
 
 export default function PedidosPage() {
   return (
-    <div>
-      <h1>Gestión de Pedidos</h1>
+    <Container maxWidth="xl">
+      <Box sx={{ py: 4 }}>
       <ListaPedidos />
-    </div>
+    </Box>
+    </Container>
   )
 }

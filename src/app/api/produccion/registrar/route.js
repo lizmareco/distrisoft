@@ -6,11 +6,11 @@ import AuditoriaService from "@/src/backend/services/auditoria-service";
 
 export async function POST(request) {
   try {
-    // Verificar autenticación usando los métodos correctos
+    // Verificar autenticación
     const authController = new AuthController();
     const token = await authController.hasAccessToken(request);
     
-    let idUsuario = 1; // Usuario por defecto para desarrollo
+    let userData = null;
     
     if (!token && process.env.NODE_ENV !== "development") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -18,9 +18,9 @@ export async function POST(request) {
     
     // Si hay token, obtener el usuario
     if (token) {
-      const userData = await authController.getUserFromToken(token);
-      if (userData) {
-        idUsuario = userData.idUsuario;
+      userData = await authController.getUserFromToken(token);
+      if (!userData) {
+        return NextResponse.json({ error: "Token inválido" }, { status: 401 });
       }
     }
 
@@ -96,9 +96,10 @@ export async function POST(request) {
           idFormula,
           idProducto,
           cantidadProducida,
-          idUsuario,
+          idUsuario: userData ? userData.idUsuario : 1,
           observaciones,
-          fechaProduccion: new Date()
+          fechaProduccion: new Date(),
+          idOrdenProduccion: idOrdenProduccion
         }
       });
       
@@ -155,11 +156,31 @@ export async function POST(request) {
 
     // Registrar en auditoría
     const auditoriaService = new AuditoriaService();
-    await auditoriaService.registrarCreacion(
+    
+    // Construir el objeto valorNuevo
+    const valorNuevo = {
+      idFormula: resultado.produccion.idFormula,
+      idProducto: resultado.produccion.idProducto,
+      cantidadProducida: resultado.produccion.cantidadProducida,
+      observaciones: resultado.produccion.observaciones,
+      movimientosInventario: resultado.movimientosInventario.map(m => ({
+        idMateriaPrima: m.idMateriaPrima,
+        cantidad: m.cantidad,
+        tipoMovimiento: m.idTipoMovimiento
+      })),
+      movimientoProducto: {
+        idProducto: resultado.movimientoProducto.idProducto,
+        cantidad: resultado.movimientoProducto.cantidad,
+        tipoMovimiento: resultado.movimientoProducto.idTipoMovimiento
+      }
+    };
+    
+    await auditoriaService.registrarAuditoria(
       "Produccion",
       resultado.produccion.idProduccion,
-      resultado.produccion,
-      idUsuario
+      valorNuevo,
+      userData ? userData.idUsuario : 1,
+      request
     );
 
     return NextResponse.json({
