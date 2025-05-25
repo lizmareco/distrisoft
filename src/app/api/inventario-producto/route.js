@@ -90,7 +90,7 @@ export async function GET(request) {
       }
     }
 
-    // Buscar registros de inventario de productos
+    // Buscar registros de inventario de productos (SIN incluir usuario)
     const movimientos = await prisma.inventarioProducto.findMany({
       where,
       include: {
@@ -104,14 +104,18 @@ export async function GET(request) {
         ordenProduccion: {
           include: {
             estadoOrdenProd: true,
-          },
-        },
-        usuario: {
-          select: {
-            idUsuario: true,
-            nombre: true,
-            apellido: true,
-            usuario: true,
+            usuario: {
+              select: {
+                idUsuario: true,
+                nombreUsuario: true,
+                persona: {
+                  select: {
+                    nombre: true,
+                    apellido: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -262,7 +266,8 @@ export async function POST(request) {
           nuevoStock: resultado.stockNuevo,
         },
         userData.idUsuario,
-        request,
+        auditoriaService.obtenerDireccionIP(request),
+        auditoriaService.obtenerInfoNavegador(request),
       )
 
       console.log(`API: Movimiento de inventario creado con ID: ${resultado.movimiento.idInventarioProducto}`)

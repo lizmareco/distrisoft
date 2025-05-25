@@ -82,15 +82,17 @@ export default function MovimientosPage() {
       // Construir parámetros de consulta
       const params = new URLSearchParams()
 
-      // Solo añadir el tipo de movimiento si no es "TODOS"
+      // Verificar si hay filtros específicos
+      const hayFiltrosEspecificos = (filtroTipo && filtroTipo !== "TODOS") || filtroFechaDesde || filtroFechaHasta
+
+      // Si no hay filtros específicos, agregar loadAll=true
+      if (!hayFiltrosEspecificos) {
+        params.append("loadAll", "true")
+      }
+
       // Manejar el tipo de movimiento
-      if (filtroTipo) {
-        if (filtroTipo === "TODOS") {
-          // Añadir un parámetro explícito para indicar que se deben traer todos los tipos
-          params.append("tipoMovimiento", "")
-        } else {
-          params.append("tipoMovimiento", filtroTipo)
-        }
+      if (filtroTipo && filtroTipo !== "TODOS") {
+        params.append("tipoMovimiento", filtroTipo)
       }
 
       // Añadir fechas para filtro BETWEEN en fechaMovimiento
@@ -131,12 +133,11 @@ export default function MovimientosPage() {
       // Obtener datos según la pestaña activa
       let url = valorTab === "materiasprimas" ? "/api/inventario" : "/api/inventario-producto"
 
-      // Siempre realizar la búsqueda, incluso si no hay filtros específicos
-      if (params.toString()) {
-        url += `?${params.toString()}`
-      }
+      // Siempre agregar parámetros
+      url += `?${params.toString()}`
 
       console.log("URL de consulta:", url)
+      console.log("Hay filtros específicos:", hayFiltrosEspecificos)
 
       const respuesta = await fetch(url)
       if (!respuesta.ok) {
@@ -201,7 +202,8 @@ export default function MovimientosPage() {
     setFiltroFechaDesde(null)
     setFiltroFechaHasta(null)
     setPage(0)
-    // No realizar búsqueda automática después de limpiar
+    setMovimientos([])
+    setBusquedaRealizada(false)
   }
 
   const handleChangePage = (event, newPage) => {

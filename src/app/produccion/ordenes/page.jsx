@@ -189,7 +189,17 @@ export default function ListaOrdenesProduccionPage() {
       })
 
       if (!respuesta.ok) {
-        throw new Error("Error al actualizar estado")
+        const errorData = await respuesta.json()
+        throw new Error(errorData.error || "Error al actualizar estado")
+      }
+
+      const resultado = await respuesta.json()
+
+      // Mostrar mensaje de éxito específico
+      if (Number.parseInt(nuevoEstado) === 2) {
+        setError(null)
+        // Podrías agregar un snackbar de éxito aquí
+        console.log("Orden finalizada exitosamente")
       }
 
       // Recargar órdenes manteniendo la página actual
@@ -216,6 +226,11 @@ export default function ListaOrdenesProduccionPage() {
   const getEstadoNombre = (idEstado) => {
     const estado = estados.find((e) => e.id === idEstado)
     return estado?.nombre || "Desconocido"
+  }
+
+  // Verificar si una orden puede ser editada
+  const puedeEditarEstado = (orden) => {
+    return orden.idEstadoOrdenProd !== 2 // No editar si ya está finalizada
   }
 
   return (
@@ -410,14 +425,15 @@ export default function ListaOrdenesProduccionPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => abrirDialogoEstado(orden)}
-                      disabled={orden.idEstadoOrdenProd === 2}
-                    >
-                      Cambiar Estado
-                    </Button>
+                    {puedeEditarEstado(orden) ? (
+                      <Button size="small" startIcon={<EditIcon />} onClick={() => abrirDialogoEstado(orden)}>
+                        Cambiar Estado
+                      </Button>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        Finalizada
+                      </Typography>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -459,8 +475,17 @@ export default function ListaOrdenesProduccionPage() {
             </Select>
           </FormControl>
           {nuevoEstado === 2 && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Al cambiar a "FINALIZADO", se registrará automáticamente la fecha de finalización.
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+                Al cambiar a "FINALIZADO" se realizarán las siguientes acciones:
+              </Typography>
+              <Typography variant="body2" component="div">
+                • Se registrará la fecha de finalización
+                <br />• El pedido cambiará a estado "LISTO PARA ENTREGA"
+                <br />• Se sumará el stock de productos terminados
+                <br />• Se registrarán los movimientos de entrada
+                <br />• <strong>Esta acción NO se puede deshacer</strong>
+              </Typography>
             </Alert>
           )}
         </DialogContent>
@@ -470,6 +495,7 @@ export default function ListaOrdenesProduccionPage() {
             onClick={actualizarEstado}
             variant="contained"
             disabled={guardando || nuevoEstado === ordenSeleccionada?.idEstadoOrdenProd}
+            color={nuevoEstado === 2 ? "warning" : "primary"}
           >
             {guardando ? <CircularProgress size={20} /> : "Actualizar"}
           </Button>

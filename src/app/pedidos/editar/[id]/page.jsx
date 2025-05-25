@@ -1,5 +1,6 @@
 "use client"
 
+import { use } from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -44,6 +45,7 @@ import SearchIcon from "@mui/icons-material/Search"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 
 export default function EditarPedidoPage({ params }) {
+  const { id } = use(params)
   const router = useRouter()
   const [pedido, setPedido] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -89,7 +91,7 @@ export default function EditarPedidoPage({ params }) {
   const [cargandoProductos, setCargandoProductos] = useState(false)
 
   // Obtener el ID del pedido de los parámetros de la URL
-  const pedidoId = params ? String(params.id || "") : ""
+  const pedidoId = id ? String(id) : ""
 
   // Función para formatear fechas para visualización
   const formatearFechaVisual = (fechaStr) => {

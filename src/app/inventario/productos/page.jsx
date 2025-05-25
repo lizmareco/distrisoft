@@ -181,7 +181,12 @@ export default function ProductosInventarioPage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || "Error al actualizar stock")
+        setSnackbar({
+          open: true,
+          message: errorData.error || errorData.mensaje || "Error al actualizar stock",
+          severity: "error",
+        })
+        return
       }
 
       const data = await response.json()

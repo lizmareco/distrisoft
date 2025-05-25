@@ -78,8 +78,6 @@ export async function GET(request) {
 
     console.log(`API: Se encontraron ${productos.length} productos`)
 
-    // NO registramos auditoría para consultas como solicitó el usuario
-
     return NextResponse.json({ productos })
   } catch (error) {
     console.error("Error al obtener stock de productos:", error)
@@ -114,17 +112,35 @@ export async function POST(request) {
       return NextResponse.json({ error: "Se requiere idProducto y cantidad" }, { status: 400 })
     }
 
+    // Verificar que el producto existe y está activo ANTES de la transacción
+    const producto = await prisma.producto.findUnique({
+      where: { idProducto, deletedAt: null },
+      include: { estadoProducto: true },
+    })
+
+    if (!producto) {
+      return NextResponse.json(
+        {
+          error: "Producto no encontrado",
+          mensaje: `El producto con ID ${idProducto} no existe o ha sido eliminado`,
+        },
+        { status: 404 },
+      )
+    }
+
+    // Validar que el producto esté activo (ID 1)
+    if (producto.idEstadoProducto !== 1) {
+      return NextResponse.json(
+        {
+          error: "No se puede modificar el stock",
+          mensaje: `No se puede modificar el stock. El producto debe estar en estado ACTIVO. Estado actual: ${producto.estadoProducto?.descEstadoProducto || "Desconocido"}`,
+        },
+        { status: 400 },
+      )
+    }
+
     // Iniciar transacción
     const resultado = await prisma.$transaction(async (tx) => {
-      // Obtener producto actual
-      const producto = await tx.producto.findUnique({
-        where: { idProducto, deletedAt: null },
-      })
-
-      if (!producto) {
-        throw new Error(`Producto con ID ${idProducto} no encontrado`)
-      }
-
       // Calcular nuevo stock
       const stockAnterior = Number.parseFloat(producto.stockActual || 0)
       const nuevoStock = stockAnterior + Number.parseFloat(cantidad)
@@ -152,20 +168,21 @@ export async function POST(request) {
 
     // Registrar auditoría solo si hubo un cambio real
     if (resultado.cambioRealizado) {
-      await auditoriaService.registrarEvento(
-        "Inventario",
-        "ACTUALIZAR_STOCK_PRODUCTO",
-        `Actualización de stock del producto ID: ${idProducto}, Stock anterior: ${resultado.stockAnterior}, Nuevo stock: ${resultado.productoActualizado.stockActual}, Ajuste: ${cantidad}, Observación: ${observacion || "N/A"}`,
-        1, // Usuario ficticio para desarrollo
-        request,
-        {
+      await auditoriaService.registrarAuditoria({
+        entidad: "Producto",
+        idRegistro: idProducto,
+        accion: "ACTUALIZAR_STOCK_PRODUCTO",
+        valorAnterior: { stockActual: resultado.stockAnterior },
+        valorNuevo: {
           idProducto,
           stockAnterior: resultado.stockAnterior,
           nuevoStock: resultado.productoActualizado.stockActual,
           ajuste: cantidad,
-          observacion,
+          observacion: observacion || "N/A",
         },
-      )
+        idUsuario: 1, // Usuario ficticio para desarrollo
+        request: request,
+      })
     }
 
     return NextResponse.json({
@@ -208,18 +225,35 @@ export async function PUT(request) {
       return NextResponse.json({ error: "Se requiere idProducto y cantidad" }, { status: 400 })
     }
 
+    // Verificar que el producto existe y está activo ANTES de la transacción
+    const producto = await prisma.producto.findUnique({
+      where: { idProducto, deletedAt: null },
+      include: { estadoProducto: true, unidadMedida: true },
+    })
+
+    if (!producto) {
+      return NextResponse.json(
+        {
+          error: "Producto no encontrado",
+          mensaje: `El producto con ID ${idProducto} no existe o ha sido eliminado`,
+        },
+        { status: 404 },
+      )
+    }
+
+    // Validar que el producto esté activo (ID 1)
+    if (producto.idEstadoProducto !== 1) {
+      return NextResponse.json(
+        {
+          error: "No se puede registrar movimiento",
+          mensaje: `No se puede registrar movimiento. El producto debe estar en estado ACTIVO. Estado actual: ${producto.estadoProducto?.descEstadoProducto || "Desconocido"}`,
+        },
+        { status: 400 },
+      )
+    }
+
     // Iniciar transacción
     const resultado = await prisma.$transaction(async (tx) => {
-      // Obtener producto actual
-      const producto = await tx.producto.findUnique({
-        where: { idProducto, deletedAt: null },
-        include: { unidadMedida: true },
-      })
-
-      if (!producto) {
-        throw new Error(`Producto con ID ${idProducto} no encontrado`)
-      }
-
       // Calcular nuevo stock
       const stockAnterior = Number.parseFloat(producto.stockActual || 0)
       const nuevoStock = stockAnterior + Number.parseFloat(cantidad)
@@ -247,21 +281,22 @@ export async function PUT(request) {
 
     // Registrar auditoría solo si hubo un cambio real
     if (resultado.cambioRealizado) {
-      await auditoriaService.registrarEvento(
-        "Inventario",
-        "REGISTRAR_MOVIMIENTO_PRODUCTO",
-        `Registro de movimiento para producto ID: ${idProducto}, Stock anterior: ${resultado.stockAnterior}, Nuevo stock: ${resultado.productoActualizado.stockActual}, Ajuste: ${cantidad}, Orden Producción: ${idOrdenProduccion || "N/A"}, Observación: ${observacion || "N/A"}`,
-        1, // Usuario ficticio para desarrollo
-        request,
-        {
+      await auditoriaService.registrarAuditoria({
+        entidad: "Producto",
+        idRegistro: idProducto,
+        accion: "REGISTRAR_MOVIMIENTO_PRODUCTO",
+        valorAnterior: { stockActual: resultado.stockAnterior },
+        valorNuevo: {
           idProducto,
           stockAnterior: resultado.stockAnterior,
           nuevoStock: resultado.productoActualizado.stockActual,
           ajuste: cantidad,
-          idOrdenProduccion,
-          observacion,
+          idOrdenProduccion: idOrdenProduccion || null,
+          observacion: observacion || "N/A",
         },
-      )
+        idUsuario: 1, // Usuario ficticio para desarrollo
+        request: request,
+      })
     }
 
     return NextResponse.json({

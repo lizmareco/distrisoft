@@ -172,9 +172,14 @@ export default function MateriaPrimaPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Error al actualizar stock")
-      }
+  const errorData = await response.json()
+  setSnackbar({
+    open: true,
+    message: errorData.error || errorData.mensaje || "Error al actualizar stock",
+    severity: "error",
+  })
+  return
+}
 
       const data = await response.json()
 

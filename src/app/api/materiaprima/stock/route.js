@@ -66,7 +66,6 @@ export async function GET(request) {
       },
     })
 
-
     console.log(`API MateriaPrima/stock - Se encontraron ${materiasPrimas.length} materias primas con stock`)
 
     // Log detallado para depuración
@@ -110,19 +109,44 @@ export async function POST(request) {
       return NextResponse.json({ error: "Se requiere idMateriaPrima y cantidad" }, { status: 400 })
     }
 
-    // Iniciar transacción
+    // Verificar materia prima y su estado ANTES de la transacción
+    const materiaPrimaVerificacion = await prisma.materiaPrima.findUnique({
+      where: {
+        idMateriaPrima,
+        deletedAt: null,
+      },
+      include: {
+        estadoMateriaPrima: true,
+      },
+    })
+
+    if (!materiaPrimaVerificacion) {
+      return NextResponse.json({ error: `Materia prima con ID ${idMateriaPrima} no encontrada` }, { status: 404 })
+    }
+
+    // Validar que la materia prima esté activa
+    if (materiaPrimaVerificacion.estadoMateriaPrima?.descEstadoMateriaPrima !== "ACTIVO") {
+      return NextResponse.json(
+        {
+          error: "No se puede modificar el stock",
+          mensaje: `La materia prima debe estar en estado ACTIVO. Estado actual: ${materiaPrimaVerificacion.estadoMateriaPrima?.descEstadoMateriaPrima || "Desconocido"}`,
+        },
+        { status: 400 },
+      )
+    }
+
+    // Iniciar transacción (ahora sin la validación de estado)
     const resultado = await prisma.$transaction(async (tx) => {
-      // Obtener materia prima actual
+      // Obtener materia prima actual (ya sabemos que existe y está activa)
       const materiaPrima = await tx.materiaPrima.findUnique({
         where: {
           idMateriaPrima,
           deletedAt: null,
         },
+        include: {
+          estadoMateriaPrima: true,
+        },
       })
-
-      if (!materiaPrima) {
-        throw new Error(`Materia prima con ID ${idMateriaPrima} no encontrada`)
-      }
 
       // Calcular nuevo stock
       const stockActual = Number.parseFloat(materiaPrima.stockActual || 0)
@@ -158,9 +182,11 @@ export async function POST(request) {
         data: {
           idMateriaPrima,
           cantidad: cantidadAjuste,
-          unidadMedida: "Unidad", // Valor por defecto, ajustar según necesidad
+          unidadMedida: "Unidad",
+          fechaMovimiento: new Date(),
+          tipoMovimiento: cantidadAjuste > 0 ? "ENTRADA" : "SALIDA",
+          motivo: "Ajuste manual de stock",
           observacion: observacion || `Ajuste manual de stock: ${cantidadAjuste > 0 ? "Entrada" : "Salida"}`,
-          fechaIngreso: new Date(),
         },
       })
 
@@ -180,8 +206,13 @@ export async function POST(request) {
         idRegistro: idMateriaPrima,
         accion: "ACTUALIZAR_STOCK",
         valorAnterior: { stockActual: resultado.stockAnterior },
-        valorNuevo: { stockActual: resultado.stockNuevo, ajuste: cantidad, observacion },
-        idUsuario: 1, // Usuario ficticio para desarrollo
+        valorNuevo: {
+          stockActual: resultado.stockNuevo,
+          ajuste: cantidad,
+          observacion: observacion || "Ajuste manual",
+        },
+        idUsuario: 1,
+        request,
       })
 
       console.log(`API MateriaPrima/stock - Stock actualizado correctamente para ID: ${idMateriaPrima}`)
