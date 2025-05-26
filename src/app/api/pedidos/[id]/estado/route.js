@@ -119,7 +119,7 @@ export async function PUT(request, { params }) {
       estadoPedido: pedidoExistente.estadoPedido,
     }
 
-    // INICIAR TRANSACCIÓN para actualizar estado y procesar inventario
+    // INICIAR TRANSACCIÓN para actualizar estado, procesar inventario y facturas
     const resultado = await prisma.$transaction(async (tx) => {
       // Actualizar el estado del pedido
       const pedidoActualizado = await tx.pedidoCliente.update({
@@ -146,6 +146,96 @@ export async function PUT(request, { params }) {
       })
 
       const movimientosInventario = []
+      const facturasActualizadas = []
+
+      // ACTUALIZAR ESTADOS DE FACTURAS RELACIONADAS
+      if (nuevoEstadoId === 4) {
+        // Pedido cambia a "Enviado" → Facturas cambian a "Enviado" (ID 2)
+        console.log(`API: Actualizando facturas a estado "Enviado" para pedido ${idPedido}`)
+
+        const facturasContado = await tx.facturaClienteContado.updateMany({
+          where: {
+            idPedido,
+            idEstadoFactuCliente: 1, // Solo las que están en "Emitida"
+            deletedAt: null,
+          },
+          data: {
+            idEstadoFactuCliente: 2, // Cambiar a "Enviado"
+            updatedAt: new Date(),
+          },
+        })
+
+        const facturasCredito = await tx.facturaClienteCredito.updateMany({
+          where: {
+            idPedido,
+            idEstadoFactuCliente: 1, // Solo las que están en "Emitida"
+            deletedAt: null,
+          },
+          data: {
+            idEstadoFactuCliente: 2, // Cambiar a "Enviado"
+            updatedAt: new Date(),
+          },
+        })
+
+        facturasActualizadas.push({
+          tipo: "contado",
+          cantidad: facturasContado.count,
+          estadoAnterior: "Emitida",
+          estadoNuevo: "Enviado",
+        })
+
+        facturasActualizadas.push({
+          tipo: "credito",
+          cantidad: facturasCredito.count,
+          estadoAnterior: "Emitida",
+          estadoNuevo: "Enviado",
+        })
+
+        console.log(`API: Facturas actualizadas - Contado: ${facturasContado.count}, Crédito: ${facturasCredito.count}`)
+      } else if (nuevoEstadoId === 5) {
+        // Pedido cambia a "Entregado" → Facturas cambian a "Cobrado" (ID 3)
+        console.log(`API: Actualizando facturas a estado "Cobrado" para pedido ${idPedido}`)
+
+        const facturasContado = await tx.facturaClienteContado.updateMany({
+          where: {
+            idPedido,
+            idEstadoFactuCliente: { in: [1, 2] }, // "Emitida" o "Enviado"
+            deletedAt: null,
+          },
+          data: {
+            idEstadoFactuCliente: 3, // Cambiar a "Cobrado"
+            updatedAt: new Date(),
+          },
+        })
+
+        const facturasCredito = await tx.facturaClienteCredito.updateMany({
+          where: {
+            idPedido,
+            idEstadoFactuCliente: { in: [1, 2] }, // "Emitida" o "Enviado"
+            deletedAt: null,
+          },
+          data: {
+            idEstadoFactuCliente: 3, // Cambiar a "Cobrado"
+            updatedAt: new Date(),
+          },
+        })
+
+        facturasActualizadas.push({
+          tipo: "contado",
+          cantidad: facturasContado.count,
+          estadoAnterior: "Emitida/Enviado",
+          estadoNuevo: "Cobrado",
+        })
+
+        facturasActualizadas.push({
+          tipo: "credito",
+          cantidad: facturasCredito.count,
+          estadoAnterior: "Emitida/Enviado",
+          estadoNuevo: "Cobrado",
+        })
+
+        console.log(`API: Facturas actualizadas - Contado: ${facturasContado.count}, Crédito: ${facturasCredito.count}`)
+      }
 
       // Si el nuevo estado es "Entregado" (ID 5), procesar salidas de inventario
       if (nuevoEstadoId === 5) {
@@ -217,10 +307,11 @@ export async function PUT(request, { params }) {
       return {
         pedidoActualizado,
         movimientosInventario,
+        facturasActualizadas,
       }
     })
 
-    // Registrar auditoría
+    // Registrar auditoría del pedido
     if (userData) {
       await auditoriaService.registrarAuditoria({
         entidad: "PedidoCliente",
@@ -231,10 +322,32 @@ export async function PUT(request, { params }) {
           idEstadoPedido: resultado.pedidoActualizado.idEstadoPedido,
           estadoPedido: resultado.pedidoActualizado.estadoPedido,
           movimientosInventario: resultado.movimientosInventario,
+          facturasActualizadas: resultado.facturasActualizadas,
         },
         idUsuario: userData.idUsuario,
         request,
       })
+    }
+
+    // Registrar auditoría específica para facturas actualizadas
+    for (const facturaInfo of resultado.facturasActualizadas) {
+      if (facturaInfo.cantidad > 0 && userData) {
+        await auditoriaService.registrarAuditoria({
+          entidad: facturaInfo.tipo === "contado" ? "FacturaClienteContado" : "FacturaClienteCredito",
+          idRegistro: `pedido-${idPedido}`,
+          accion: "CAMBIO_ESTADO_AUTOMATICO",
+          valorAnterior: {
+            estadoAnterior: facturaInfo.estadoAnterior,
+          },
+          valorNuevo: {
+            estadoNuevo: facturaInfo.estadoNuevo,
+            cantidadFacturas: facturaInfo.cantidad,
+            motivoCambio: `Cambio automático por estado de pedido: ${resultado.pedidoActualizado.estadoPedido.descEstadoPedido}`,
+          },
+          idUsuario: userData.idUsuario,
+          request,
+        })
+      }
     }
 
     console.log(`API: Estado del pedido ${idPedido} actualizado correctamente`)
@@ -245,6 +358,16 @@ export async function PUT(request, { params }) {
       pedido: resultado.pedidoActualizado,
       estadoAnterior: valorAnterior.idEstadoPedido,
       estadoNuevo: resultado.pedidoActualizado.idEstadoPedido,
+    }
+
+    // Incluir información de facturas actualizadas
+    if (resultado.facturasActualizadas.length > 0) {
+      const facturasConCambios = resultado.facturasActualizadas.filter((f) => f.cantidad > 0)
+      if (facturasConCambios.length > 0) {
+        respuesta.facturasActualizadas = facturasConCambios
+        const totalFacturas = facturasConCambios.reduce((sum, f) => sum + f.cantidad, 0)
+        respuesta.mensaje += ` y se actualizaron ${totalFacturas} factura(s) relacionada(s)`
+      }
     }
 
     // Incluir información de movimientos si se procesaron

@@ -41,6 +41,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility"
 import SearchIcon from "@mui/icons-material/Search"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import ClearIcon from "@mui/icons-material/Clear"
+import ReceiptIcon from "@mui/icons-material/Receipt"
 
 export default function ListaPedidos() {
   const router = useRouter()
@@ -61,7 +62,7 @@ export default function ListaPedidos() {
     estado: "",
     fechaDesde: "",
     fechaHasta: "",
-    busquedaCliente: "", // Para buscar cliente por texto
+    busquedaCliente: "",
   })
   const [clientesBusqueda, setClientesBusqueda] = useState([])
   const [estados, setEstados] = useState([])
@@ -82,6 +83,48 @@ export default function ListaPedidos() {
   const [pedidoACambiar, setPedidoACambiar] = useState(null)
   const [dialogoCancelar, setDialogoCancelar] = useState(false)
   const [pedidoACancelar, setPedidoACancelar] = useState(null)
+
+  // Estados para diálogo de facturación
+  const [dialogoFacturacion, setDialogoFacturacion] = useState(false)
+  const [pedidoAFacturar, setPedidoAFacturar] = useState(null)
+  const [tipoFactura, setTipoFactura] = useState("")
+  const [cargandoFactura, setCargandoFactura] = useState(false)
+  const [configuracionFactura, setConfiguracionFactura] = useState({
+    metodoPago: 1,
+    observaciones: "",
+  })
+
+  // Función para verificar si un pedido ya tiene facturas
+  const verificarFacturasExistentes = async (idPedido) => {
+    try {
+      const respuesta = await fetch(`/api/pedidos/${idPedido}/facturas`)
+      if (respuesta.ok) {
+        const datos = await respuesta.json()
+        return datos.tieneFacturas || false
+      }
+      return false
+    } catch (error) {
+      console.error("Error al verificar facturas:", error)
+      return false
+    }
+  }
+
+  // Actualizar el estado para incluir información de facturas
+  const [pedidosConFacturas, setPedidosConFacturas] = useState(new Set())
+
+  // Función para cargar información de facturas para los pedidos
+  const cargarInfoFacturas = async (pedidosList) => {
+    const pedidosConFacturasSet = new Set()
+
+    for (const pedido of pedidosList) {
+      const tieneFacturas = await verificarFacturasExistentes(pedido.idPedido)
+      if (tieneFacturas) {
+        pedidosConFacturasSet.add(pedido.idPedido)
+      }
+    }
+
+    setPedidosConFacturas(pedidosConFacturasSet)
+  }
 
   // Cargar estados al inicializar
   useEffect(() => {
@@ -129,9 +172,103 @@ export default function ListaPedidos() {
       }
     }
 
-    const timeoutId = setTimeout(buscarClientes, 300) // Debounce de 300ms
+    const timeoutId = setTimeout(buscarClientes, 300)
     return () => clearTimeout(timeoutId)
   }, [filtros.busquedaCliente])
+
+  // Función para abrir diálogo de facturación
+  const abrirDialogoFacturacion = (pedido) => {
+    setPedidoAFacturar(pedido)
+    setTipoFactura("")
+    setConfiguracionFactura({
+      metodoPago: 1,
+      observaciones: `Factura generada desde pedido #${pedido.idPedido}`,
+    })
+    setDialogoFacturacion(true)
+  }
+
+  // Función para generar factura
+  const generarFactura = async () => {
+    if (!pedidoAFacturar || !tipoFactura) {
+      setSnackbar({
+        abierto: true,
+        mensaje: "Debe seleccionar el tipo de factura",
+        tipo: "warning",
+      })
+      return
+    }
+
+    setCargandoFactura(true)
+
+    try {
+      const datosFactura = {
+        tipo: tipoFactura,
+        idCliente: pedidoAFacturar.cliente.idCliente,
+        idPedido: pedidoAFacturar.idPedido,
+        observacion: configuracionFactura.observaciones,
+        operador: 1, // TODO: Obtener del usuario autenticado
+      }
+
+      // Agregar campos específicos según el tipo
+      if (tipoFactura === "contado") {
+        datosFactura.idMetodoPago = configuracionFactura.metodoPago
+      }
+
+      const respuesta = await fetch("/api/finanzas/facturas-clientes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(datosFactura),
+      })
+
+      if (!respuesta.ok) {
+        const errorData = await respuesta.json()
+        throw new Error(errorData.error || "Error al generar factura")
+      }
+
+      const resultado = await respuesta.json()
+
+      // Actualizar el estado para marcar este pedido como facturado
+      setPedidosConFacturas((prev) => new Set([...prev, pedidoAFacturar.idPedido]))
+
+      setSnackbar({
+        abierto: true,
+        mensaje: `Factura ${tipoFactura} generada exitosamente. El pedido mantiene su estado actual para permitir la entrega física.`,
+        tipo: "success",
+      })
+
+      // Cerrar diálogo
+      setDialogoFacturacion(false)
+      setPedidoAFacturar(null)
+      setTipoFactura("")
+    } catch (error) {
+      console.error("Error al generar factura:", error)
+      setSnackbar({
+        abierto: true,
+        mensaje: error.message || "Error al generar factura",
+        tipo: "error",
+      })
+    } finally {
+      setCargandoFactura(false)
+    }
+  }
+
+  // Función para manejar cambios en la configuración
+  const handleConfiguracionChange = (campo, valor) => {
+    setConfiguracionFactura((prev) => ({
+      ...prev,
+      [campo]: valor,
+    }))
+  }
+
+  // Función para manejar cambios en los filtros
+  const handleFiltroChange = (campo, valor) => {
+    setFiltros((prev) => ({
+      ...prev,
+      [campo]: valor,
+    }))
+  }
 
   // Función para cancelar pedido (cambiar a estado 6)
   const confirmarCancelarPedido = (pedido) => {
@@ -270,79 +407,6 @@ export default function ListaPedidos() {
     }
   }
 
-  // Función para renderizar botones de acción según el estado
-  const renderBotonesAccion = (pedido) => {
-    const idEstado = pedido.estadoPedido?.idEstadoPedido
-
-    return (
-      <Box sx={{ display: "flex", gap: 1 }}>
-        {/* Botón Ver detalles - siempre habilitado */}
-        <IconButton color="info" onClick={() => irAVerPedido(pedido.idPedido)} title="Ver detalles">
-          <VisibilityIcon />
-        </IconButton>
-
-        {/* Botón Eliminar - solo si está pendiente */}
-        {idEstado === 1 && (
-          <Tooltip title="Eliminar pedido">
-            <IconButton color="error" onClick={() => confirmarEliminar(pedido)}>
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        )}
-
-        {/* Botón Cancelar - solo si está pendiente */}
-        {idEstado === 1 && (
-          <Button
-            variant="outlined"
-            color="error"
-            size="small"
-            onClick={() => confirmarCancelarPedido(pedido)}
-            sx={{ minWidth: "auto", px: 1 }}
-          >
-            CANCELAR
-          </Button>
-        )}
-
-        {/* Botón Cambiar Estado - para estados 3 y 4 */}
-        {(idEstado === 3 || idEstado === 4) && (
-          <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            onClick={() => confirmarCambiarEstado(pedido)}
-            sx={{ minWidth: "auto", px: 1 }}
-          >
-            CAMBIAR ESTADO
-          </Button>
-        )}
-      </Box>
-    )
-  }
-
-  // Función para verificar si un pedido está en estado pendiente
-  const esPedidoPendiente = (pedido) => {
-    if (!pedido || !pedido.estadoPedido) return false
-    const idEstado = pedido.estadoPedido.idEstadoPedido
-    return idEstado === 1 || idEstado === "1"
-  }
-
-  // Manejar cambios en los filtros
-  const handleFiltroChange = (campo, valor) => {
-    setFiltros((prev) => ({
-      ...prev,
-      [campo]: valor,
-    }))
-
-    // Si se selecciona un cliente del dropdown, limpiar la búsqueda
-    if (campo === "cliente" && valor) {
-      setFiltros((prev) => ({
-        ...prev,
-        busquedaCliente: "",
-      }))
-      setClientesBusqueda([])
-    }
-  }
-
   // Aplicar filtros y buscar pedidos
   const aplicarFiltros = async (nuevaPagina = 1) => {
     // Validar que al menos un filtro esté seleccionado
@@ -373,8 +437,6 @@ export default function ListaPedidos() {
       params.append("pagina", nuevaPagina.toString())
       params.append("limite", paginacion.registrosPorPagina.toString())
 
-      console.log("Enviando parámetros:", params.toString()) // Para depuración
-
       const respuesta = await fetch(`/api/pedidos/buscar?${params.toString()}`)
 
       if (!respuesta.ok) {
@@ -382,7 +444,6 @@ export default function ListaPedidos() {
       }
 
       const datos = await respuesta.json()
-      console.log("Datos recibidos en aplicarFiltros:", datos) // Para depuración
 
       setPedidos(datos.pedidos || [])
       setPaginacion({
@@ -392,6 +453,9 @@ export default function ListaPedidos() {
         totalRegistros: datos.totalRegistros || 0,
       })
       setFiltrosAplicados(true)
+
+      // Cargar información de facturas
+      await cargarInfoFacturas(datos.pedidos || [])
 
       setSnackbar({
         abierto: true,
@@ -421,7 +485,6 @@ export default function ListaPedidos() {
       params.append("pagina", nuevaPagina.toString())
       params.append("limite", paginacion.registrosPorPagina.toString())
 
-      // Cambiar esta línea para usar la API de búsqueda sin filtros
       const respuesta = await fetch(`/api/pedidos/buscar?${params.toString()}`)
 
       if (!respuesta.ok) {
@@ -429,7 +492,6 @@ export default function ListaPedidos() {
       }
 
       const datos = await respuesta.json()
-      console.log("Datos recibidos en mostrarTodos:", datos) // Para depuración
 
       setPedidos(datos.pedidos || [])
       setPaginacion({
@@ -439,6 +501,9 @@ export default function ListaPedidos() {
         totalRegistros: datos.totalRegistros || 0,
       })
       setFiltrosAplicados(true)
+
+      // Cargar información de facturas
+      await cargarInfoFacturas(datos.pedidos || [])
 
       setSnackbar({
         abierto: true,
@@ -451,6 +516,84 @@ export default function ListaPedidos() {
     } finally {
       setCargando(false)
     }
+  }
+
+  // Función para renderizar botones de acción según el estado
+  const renderBotonesAccion = (pedido) => {
+    const idEstado = pedido.estadoPedido?.idEstadoPedido
+    const tieneFacturas = pedidosConFacturas.has(pedido.idPedido)
+
+    return (
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+        {/* Botón Ver detalles - siempre habilitado */}
+        <IconButton color="info" onClick={() => irAVerPedido(pedido.idPedido)} title="Ver detalles">
+          <VisibilityIcon />
+        </IconButton>
+
+        {/* Botón Eliminar - solo si está pendiente y no tiene facturas */}
+        {idEstado === 1 && !tieneFacturas && (
+          <Tooltip title="Eliminar pedido">
+            <IconButton color="error" onClick={() => confirmarEliminar(pedido)}>
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+
+        {/* Botón Cancelar - solo si está pendiente y no tiene facturas */}
+        {idEstado === 1 && !tieneFacturas && (
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            onClick={() => confirmarCancelarPedido(pedido)}
+            sx={{ minWidth: "auto", px: 1 }}
+          >
+            CANCELAR
+          </Button>
+        )}
+
+        {/* Mostrar FACTURADO si ya tiene facturas */}
+        {tieneFacturas && (
+          <Chip
+            label="FACTURADO"
+            color="success"
+            size="small"
+            sx={{
+              fontWeight: "bold",
+              backgroundColor: "#4caf50",
+              color: "white",
+            }}
+          />
+        )}
+
+        {/* Botón Generar Factura - solo si está listo para entrega y NO tiene facturas */}
+        {idEstado === 3 && !tieneFacturas && (
+          <Button
+            variant="contained"
+            color="success"
+            size="small"
+            onClick={() => abrirDialogoFacturacion(pedido)}
+            startIcon={<ReceiptIcon />}
+            sx={{ minWidth: "auto", px: 1 }}
+          >
+            FACTURAR
+          </Button>
+        )}
+
+        {/* Botón Cambiar Estado - para estados 3 y 4 */}
+        {(idEstado === 3 || idEstado === 4) && (
+          <Button
+            variant="outlined"
+            color="primary"
+            size="small"
+            onClick={() => confirmarCambiarEstado(pedido)}
+            sx={{ minWidth: "auto", px: 1 }}
+          >
+            CAMBIAR ESTADO
+          </Button>
+        )}
+      </Box>
+    )
   }
 
   // Manejar cambio de página
@@ -615,6 +758,13 @@ export default function ListaPedidos() {
   // Cerrar snackbar
   const cerrarSnackbar = () => {
     setSnackbar({ ...snackbar, abierto: false })
+  }
+
+  // Función para verificar si un pedido está en estado pendiente
+  const esPedidoPendiente = (pedido) => {
+    if (!pedido || !pedido.estadoPedido) return false
+    const idEstado = pedido.estadoPedido.idEstadoPedido
+    return idEstado === 1 || idEstado === "1"
   }
 
   return (
@@ -911,7 +1061,7 @@ export default function ListaPedidos() {
         </Box>
       )}
 
-      {/* Diálogos existentes */}
+      {/* Diálogo de confirmación para eliminar */}
       <Dialog open={dialogoAbierto} onClose={cerrarDialogo}>
         <DialogTitle>Confirmar eliminación</DialogTitle>
         <DialogContent>
@@ -930,6 +1080,7 @@ export default function ListaPedidos() {
         </DialogActions>
       </Dialog>
 
+      {/* Diálogo para cancelar pedido */}
       <Dialog open={dialogoCancelar} onClose={() => setDialogoCancelar(false)}>
         <DialogTitle>Confirmar cancelación</DialogTitle>
         <DialogContent>
@@ -948,6 +1099,7 @@ export default function ListaPedidos() {
         </DialogActions>
       </Dialog>
 
+      {/* Diálogo para cambiar estado */}
       <Dialog open={dialogoCambiarEstado} onClose={() => setDialogoCambiarEstado(false)}>
         <DialogTitle>Cambiar Estado del Pedido</DialogTitle>
         <DialogContent>
@@ -976,6 +1128,115 @@ export default function ListaPedidos() {
         </DialogActions>
       </Dialog>
 
+      {/* Diálogo para generar factura */}
+      <Dialog open={dialogoFacturacion} onClose={() => setDialogoFacturacion(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Generar Factura</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            <strong>Pedido #{pedidoAFacturar?.idPedido}</strong> - Cliente:{" "}
+            {pedidoAFacturar && formatearNombreCliente(pedidoAFacturar.cliente)}
+          </DialogContentText>
+          <DialogContentText sx={{ mb: 2 }}>
+            <strong>Monto Total: ₲ {pedidoAFacturar?.montoTotal?.toLocaleString("es-PY") || "0"}</strong>
+          </DialogContentText>
+
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Tipo de Factura:
+          </Typography>
+
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6}>
+              <Button
+                variant={tipoFactura === "contado" ? "contained" : "outlined"}
+                color="primary"
+                onClick={() => setTipoFactura("contado")}
+                sx={{ width: "100%", p: 2, textAlign: "left" }}
+              >
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Factura al Contado
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Pago inmediato al momento de la entrega
+                  </Typography>
+                </Box>
+              </Button>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Button
+                variant={tipoFactura === "credito" ? "contained" : "outlined"}
+                color="secondary"
+                onClick={() => setTipoFactura("credito")}
+                sx={{ width: "100%", p: 2, textAlign: "left" }}
+                disabled
+              >
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    Factura a Crédito
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Próximamente disponible
+                  </Typography>
+                </Box>
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Configuración específica para contado */}
+          {tipoFactura === "contado" && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Configuración de Factura al Contado:
+              </Typography>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Método de Pago</InputLabel>
+                    <Select
+                      value={configuracionFactura.metodoPago}
+                      onChange={(e) => handleConfiguracionChange("metodoPago", e.target.value)}
+                      label="Método de Pago"
+                    >
+                      <MenuItem value={1}>Efectivo</MenuItem>
+                      <MenuItem value={2}>Transferencia</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Observaciones"
+                    multiline
+                    rows={2}
+                    value={configuracionFactura.observaciones}
+                    onChange={(e) => handleConfiguracionChange("observaciones", e.target.value)}
+                    size="small"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setDialogoFacturacion(false)} disabled={cargandoFactura}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={generarFactura}
+            variant="contained"
+            disabled={!tipoFactura || cargandoFactura}
+            startIcon={cargandoFactura ? <CircularProgress size={20} /> : <ReceiptIcon />}
+          >
+            {cargandoFactura ? "Generando..." : "Generar Factura"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar para mensajes */}
       <Snackbar open={snackbar.abierto} autoHideDuration={6000} onClose={cerrarSnackbar}>
         <Alert onClose={cerrarSnackbar} severity={snackbar.tipo} sx={{ width: "100%" }}>
           {snackbar.mensaje}

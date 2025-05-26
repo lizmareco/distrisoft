@@ -297,14 +297,12 @@ model EstadoProducto {
 model FacturaClienteContado {
   nroFacClienteContado Int                @id(map: "factura_cliente_contado_pk") @map("nro_fac_cliente_contado")
   fechaEmision         DateTime           @map("fecha_emision") @db.Timestamp(6)
-  timbrado             Int                @map("timbrado")
   idCliente            Int                @map("id_cliente")
   idPedido             Int                @map("id_pedido")
   operador             Int                @map("operador")
   idImpuesto           Int                @map("id_impuesto")
   montoTotalFactura    Float              @map("monto_total_factura")
   observacion          String             @map("observacion") @db.VarChar
-  descuento            Float              @map("descuento")
   idMetodoPago         Int                @map("id_metodo_pago")
   idEstadoFactuCliente Int                @map("id_estado_factu_cliente")
   createdAt            DateTime           @default(now()) @map("created_at")
@@ -317,6 +315,7 @@ model FacturaClienteContado {
   pedidoCliente        PedidoCliente      @relation(fields: [idPedido], references: [idPedido], onDelete: NoAction, onUpdate: NoAction, map: "pedido_cliente_factura_cliente_contado_fk")
   usuario              Usuario            @relation(fields: [operador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_factura_cliente_contado_fk")
   nota                 Nota[]
+  detalleFactura       DetalleFacturaClienteContado[]
 }
 
 model FacturaClienteCredito {
@@ -327,12 +326,10 @@ model FacturaClienteCredito {
   fechaEmision          String                  @map("fecha_emision") @db.VarChar
   idPedido              Int                     @map("id_pedido")
   idCliente             Int                     @map("id_cliente")
-  timbrado              Int                     @map("timbrado")
   operador              Int                     @map("operador")
   saldoRestante         Float                   @map("saldo_restante")
   plazoPago             Int                     @map("plazo_pago")
   fechaVencimiento      DateTime                @map("fecha_vencimiento") @db.Timestamp(6)
-  descuento             Float                   @map("descuento")
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
@@ -394,6 +391,7 @@ model Impuestos {
   deletedAt             DateTime?               @map("deleted_at")
   facturaClienteContado FacturaClienteContado[]
   facturaClienteCredito FacturaClienteCredito[]
+  detalleFacturaClienteContado DetalleFacturaClienteContado[]
 }
 
 model Informe {
@@ -587,6 +585,7 @@ model Producto {
   inventarioProducto        InventarioProducto[]       
   formulas            Formula[]
   produccion          Produccion[]
+  detalleFacturaClienteContado DetalleFacturaClienteContado[]
 }
 
 model Proveedor {
@@ -900,4 +899,22 @@ model Produccion {
   usuario          Usuario      @relation(fields: [idUsuario], references: [idUsuario])
   ordenProduccion  OrdenProduccion? @relation(fields: [idOrdenProduccion], references: [idOrdenProduccion])
   idOrdenProduccion Int?        @map("id_orden_produccion")
+}
+
+model DetalleFacturaClienteContado {
+  idDetalleFactura      Int                   @id @default(autoincrement()) @map("id_detalle_factura")
+  nroFacClienteContado  Int                   @map("nro_fac_cliente_contado")
+  idProducto            Int                   @map("id_producto")
+  cantidad              Int                   @map("cantidad")
+  precioUnitario        Float                 @map("precio_unitario")
+  idImpuesto            Int                   @map("id_impuesto")
+  subtotal              Float                 @map("subtotal")
+  montoImpuesto         Float                 @map("monto_impuesto")
+  totalLinea            Float                 @map("total_linea")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime?             @default(now()) @map("updated_at")
+  deletedAt             DateTime?             @map("deleted_at")
+  facturaClienteContado FacturaClienteContado @relation(fields: [nroFacClienteContado], references: [nroFacClienteContado], onDelete: NoAction, onUpdate: NoAction)
+  producto              Producto              @relation(fields: [idProducto], references: [idProducto], onDelete: NoAction, onUpdate: NoAction)
+  impuesto              Impuestos             @relation(fields: [idImpuesto], references: [idImpuesto], onDelete: NoAction, onUpdate: NoAction)
 }
