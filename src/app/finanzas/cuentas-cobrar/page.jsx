@@ -1,163 +1,54 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState } from "react"
 import {
   Box,
   Container,
   Typography,
-  Grid,
   Card,
   CardContent,
-  Button,
   Chip,
-  Tab,
-  Tabs,
-  Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  TextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  CircularProgress,
-  Pagination,
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Snackbar,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
   Alert,
+  CircularProgress,
+  Pagination,
+  Snackbar,
   Accordion,
   AccordionSummary,
   AccordionDetails,
 } from "@mui/material"
 import {
-  Receipt,
-  TrendingUp,
-  TrendingDown,
-  MonetizationOn,
-  Assignment,
   Payment,
-  Visibility as VisibilityIcon,
-  Print as PrintIcon,
-  Search as SearchIcon,
-  Dashboard as DashboardIcon,
-  Close as CloseIcon,
-  ExpandMore,
   Warning,
   CheckCircle,
   Schedule,
+  ExpandMore,
+  Search,
   AccountBalance,
+  TrendingDown,
+  Receipt,
+  History,
 } from "@mui/icons-material"
+import VisorFactura from "@/src/components/facturas/VisorFactura"
+import HistorialPagos from "@/src/components/pagos/HistorialPagos"
 
-function TabPanel({ children, value, index, ...other }) {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`finanzas-tabpanel-${index}`}
-      aria-labelledby={`finanzas-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  )
-}
-
-export default function FinanzasPage() {
-  const router = useRouter()
-  const [tabValue, setTabValue] = useState(0)
-
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue)
-  }
-
-  const irADashboard = () => {
-    // TODO: Implementar navegación al dashboard financiero
-    console.log("Ir al dashboard financiero")
-  }
-
-  const irACuentasPorCobrar = () => {
-    router.push("/finanzas/cuentas-cobrar")
-  }
-
-  return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
-          Gestión Financiera
-        </Typography>
-        <Box sx={{ display: "flex", gap: 2 }}>
-          <Button variant="outlined" startIcon={<TrendingUp />} onClick={irACuentasPorCobrar} color="primary">
-            Cuentas por Cobrar
-          </Button>
-          <Button variant="outlined" startIcon={<DashboardIcon />} onClick={irADashboard} color="primary">
-            Dashboard Financiero
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Navegación por pestañas */}
-      <Paper sx={{ width: "100%", mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab label="Facturación Clientes" icon={<Receipt />} />
-          <Tab label="Facturas Proveedores" icon={<Assignment />} />
-          <Tab label="Resumen Cuentas por Cobrar" icon={<TrendingUp />} />
-          <Tab label="Cuentas por Pagar" icon={<TrendingDown />} />
-          <Tab label="Gestión de Caja" icon={<MonetizationOn />} />
-          <Tab label="Pagos" icon={<Payment />} />
-        </Tabs>
-      </Paper>
-
-      {/* Contenido de las pestañas */}
-      <TabPanel value={tabValue} index={0}>
-        <FacturacionClientes />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={1}>
-        <FacturasProveedores />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={2}>
-        <ResumenCuentasPorCobrar />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={3}>
-        <CuentasPorPagar />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={4}>
-        <GestionCaja />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={5}>
-        <GestionPagos />
-      </TabPanel>
-    </Container>
-  )
-}
-
-// Componente para Facturación de Clientes con funcionalidad completa
-function FacturacionClientes() {
-  const [facturas, setFacturas] = useState([])
+export default function CuentasPorCobrarPage() {
+  const [cuentasPorCobrar, setCuentasPorCobrar] = useState([])
   const [cargando, setCargando] = useState(false)
+  const [resumen, setResumen] = useState(null)
   const [filtros, setFiltros] = useState({
-    tipo: "",
     estado: "",
+    cliente: "",
     fechaDesde: "",
     fechaHasta: "",
   })
@@ -170,25 +61,41 @@ function FacturacionClientes() {
     registrosPorPagina: 10,
   })
 
-  // Estados para visualización de factura
+  // Estados para diálogo de pago
+  const [openPagoDialog, setOpenPagoDialog] = useState(false)
+  const [cuentaSeleccionada, setCuentaSeleccionada] = useState(null)
+  const [cargandoPago, setCargandoPago] = useState(false)
+  const [datosPago, setDatosPago] = useState({
+    montoPago: "",
+    idMetodoPago: 1,
+    comprobantePago: "",
+    observaciones: "",
+  })
+
+  // Estados para diálogos adicionales
+  const [openVisorFactura, setOpenVisorFactura] = useState(false)
+  const [openHistorialPagos, setOpenHistorialPagos] = useState(false)
   const [facturaSeleccionada, setFacturaSeleccionada] = useState(null)
-  const [dialogoVisualizacion, setDialogoVisualizacion] = useState(false)
-  const [cargandoFactura, setCargandoFactura] = useState(false)
+
+  // Agregar después de los estados para diálogos adicionales
+
+  // Estados para snackbar
   const [snackbar, setSnackbar] = useState({
     abierto: false,
     mensaje: "",
     tipo: "success",
   })
 
-  // Nuevo estado para controlar si se ha realizado una búsqueda
+  // Estado para búsqueda realizada
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
 
-  const cargarFacturas = async (nuevaPagina = paginacion.pagina) => {
+  // Cargar cuentas por cobrar
+  const cargarCuentasPorCobrar = async (nuevaPagina = paginacion.pagina) => {
     setCargando(true)
     try {
       const params = new URLSearchParams()
-      if (filtros.tipo) params.append("tipo", filtros.tipo)
       if (filtros.estado) params.append("estado", filtros.estado)
+      if (filtros.cliente) params.append("cliente", filtros.cliente)
       if (filtros.fechaDesde) params.append("fechaDesde", filtros.fechaDesde)
       if (filtros.fechaHasta) params.append("fechaHasta", filtros.fechaHasta)
 
@@ -196,10 +103,11 @@ function FacturacionClientes() {
       params.append("pagina", nuevaPagina.toString())
       params.append("limite", paginacion.registrosPorPagina.toString())
 
-      const respuesta = await fetch(`/api/finanzas/facturas-clientes?${params.toString()}`)
+      const respuesta = await fetch(`/api/finanzas/cuentas-cobrar?${params.toString()}`)
       if (respuesta.ok) {
         const datos = await respuesta.json()
-        setFacturas(datos.data || [])
+        setCuentasPorCobrar(datos.data || [])
+        setResumen(datos.resumen)
 
         if (datos.meta) {
           setPaginacion((prev) => ({
@@ -211,8 +119,8 @@ function FacturacionClientes() {
         }
       }
     } catch (error) {
-      console.error("Error al cargar facturas:", error)
-      mostrarSnackbar("Error al cargar facturas", "error")
+      console.error("Error al cargar cuentas por cobrar:", error)
+      mostrarSnackbar("Error al cargar cuentas por cobrar", "error")
     } finally {
       setCargando(false)
     }
@@ -221,59 +129,86 @@ function FacturacionClientes() {
   const handleBuscar = () => {
     setBusquedaRealizada(true)
     setPaginacion((prev) => ({ ...prev, pagina: 1 }))
-    cargarFacturas(1)
+    cargarCuentasPorCobrar(1)
   }
 
   const handleCambioPagina = (event, nuevaPagina) => {
     if (busquedaRealizada) {
       setPaginacion((prev) => ({ ...prev, pagina: nuevaPagina }))
-      cargarFacturas(nuevaPagina)
+      cargarCuentasPorCobrar(nuevaPagina)
     }
   }
 
-  const verFactura = async (factura) => {
-    setCargandoFactura(true)
+  const handleRegistrarPago = (cuenta) => {
+    setCuentaSeleccionada(cuenta)
+    setDatosPago({
+      montoPago: "",
+      idMetodoPago: 1,
+      comprobantePago: "",
+      observaciones: `Pago de factura #${cuenta.nroFactura}`,
+    })
+    setOpenPagoDialog(true)
+  }
+
+  const handleClosePagoDialog = () => {
+    setOpenPagoDialog(false)
+    setCuentaSeleccionada(null)
+    setDatosPago({
+      montoPago: "",
+      idMetodoPago: 1,
+      comprobantePago: "",
+      observaciones: "",
+    })
+  }
+
+  const registrarPago = async () => {
+    if (!cuentaSeleccionada || !datosPago.montoPago) {
+      mostrarSnackbar("Debe ingresar el monto del pago", "warning")
+      return
+    }
+
+    const montoPago = Number.parseFloat(datosPago.montoPago)
+    if (montoPago <= 0) {
+      mostrarSnackbar("El monto debe ser mayor a cero", "warning")
+      return
+    }
+
+    if (montoPago > cuentaSeleccionada.saldoRestante) {
+      mostrarSnackbar("El monto no puede ser mayor al saldo restante", "warning")
+      return
+    }
+
+    setCargandoPago(true)
     try {
-      const respuesta = await fetch(`/api/finanzas/facturas-clientes/${factura.nroFactura}`)
+      const respuesta = await fetch("/api/finanzas/pagos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nroFactura: cuentaSeleccionada.nroFactura,
+          montoPago: montoPago,
+          idMetodoPago: datosPago.idMetodoPago,
+          comprobantePago: datosPago.comprobantePago,
+          observaciones: datosPago.observaciones,
+        }),
+      })
+
       if (respuesta.ok) {
-        const datos = await respuesta.json()
-        setFacturaSeleccionada(datos.data)
-        setDialogoVisualizacion(true)
+        const resultado = await respuesta.json()
+        mostrarSnackbar("Pago registrado exitosamente", "success")
+        handleClosePagoDialog()
+        // Recargar la lista
+        cargarCuentasPorCobrar()
       } else {
-        mostrarSnackbar("Error al cargar detalles de la factura", "error")
+        const error = await respuesta.json()
+        mostrarSnackbar(error.error || "Error al registrar pago", "error")
       }
     } catch (error) {
-      console.error("Error al cargar factura:", error)
-      mostrarSnackbar("Error al cargar detalles de la factura", "error")
+      console.error("Error al registrar pago:", error)
+      mostrarSnackbar("Error al registrar pago", "error")
     } finally {
-      setCargandoFactura(false)
-    }
-  }
-
-  const imprimirFactura = async (factura) => {
-    try {
-      mostrarSnackbar("Generando PDF...", "info")
-
-      const respuesta = await fetch(`/api/finanzas/facturas-clientes/${factura.nroFactura}/pdf`)
-
-      if (respuesta.ok) {
-        const blob = await respuesta.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-        link.download = `factura-${factura.nroFactura}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-
-        mostrarSnackbar("PDF generado exitosamente", "success")
-      } else {
-        mostrarSnackbar("Error al generar PDF", "error")
-      }
-    } catch (error) {
-      console.error("Error al generar PDF:", error)
-      mostrarSnackbar("Error al generar PDF", "error")
+      setCargandoPago(false)
     }
   }
 
@@ -289,454 +224,493 @@ function FacturacionClientes() {
     setSnackbar({ ...snackbar, abierto: false })
   }
 
-  const getEstadoColor = (estado) => {
-    switch (estado?.toLowerCase()) {
-      case "emitida":
-        return "primary"
-      case "enviado":
-        return "info"
-      case "cobrado":
-        return "success"
-      case "cancelada":
-        return "error"
-      default:
-        return "default"
-    }
+  const getEstadoColor = (estado, diasVencido) => {
+    if (estado === "Cobrada") return "success"
+    if (diasVencido > 0) return "error"
+    if (diasVencido > -7) return "warning"
+    return "info"
   }
 
-  const getTipoColor = (tipo) => {
-    return tipo === "contado" ? "success" : "warning"
+  const getEstadoIcon = (estado, diasVencido) => {
+    if (estado === "Cobrada") return <CheckCircle />
+    if (diasVencido > 0) return <Warning />
+    if (diasVencido > -7) return <Schedule />
+    return <CheckCircle />
   }
 
-  const getEstadoCuentaIcon = (factura) => {
-    if (factura.tipo === "contado") return <CheckCircle color="success" />
-    if (factura.diasVencido > 0) return <Warning color="error" />
-    if (factura.diasVencido > -7) return <Schedule color="warning" />
-    return <CheckCircle color="success" />
+  const formatearFecha = (fecha) => {
+    return new Date(fecha).toLocaleDateString("es-PY")
+  }
+
+  const handlePagoRapido = (cuenta, monto) => {
+    setCuentaSeleccionada(cuenta)
+    setDatosPago({
+      montoPago: monto.toString(),
+      idMetodoPago: 1,
+      comprobantePago: "",
+      observaciones: `Pago ${monto === cuenta.saldoRestante ? "total" : "parcial"} de factura #${cuenta.nroFactura}`,
+    })
+    setOpenPagoDialog(true)
+  }
+
+  const handleVerFactura = (cuenta) => {
+    setFacturaSeleccionada(cuenta.nroFactura)
+    setOpenVisorFactura(true)
+  }
+
+  const handleVerHistorial = (cuenta) => {
+    setFacturaSeleccionada(cuenta.nroFactura)
+    setOpenHistorialPagos(true)
   }
 
   return (
-    <Grid container spacing={3}>
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Cuentas por Cobrar
+      </Typography>
+
+      {/* Resumen */}
+      {resumen && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center">
+                  <AccountBalance color="primary" sx={{ mr: 2 }} />
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Total por Cobrar
+                    </Typography>
+                    <Typography variant="h4" color="primary">
+                      ₲ {resumen.totalPorCobrar.toLocaleString("es-PY")}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center">
+                  <Schedule color="warning" sx={{ mr: 2 }} />
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Cuentas Pendientes
+                    </Typography>
+                    <Typography variant="h4" color="warning.main">
+                      {resumen.totalCuentas}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center">
+                  <Warning color="error" sx={{ mr: 2 }} />
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Cuentas Vencidas
+                    </Typography>
+                    <Typography variant="h4" color="error.main">
+                      {resumen.cuentasVencidas}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box display="flex" alignItems="center">
+                  <TrendingDown color="error" sx={{ mr: 2 }} />
+                  <Box>
+                    <Typography color="textSecondary" gutterBottom>
+                      Monto Vencido
+                    </Typography>
+                    <Typography variant="h4" color="error.main">
+                      ₲ {resumen.montoVencido.toLocaleString("es-PY")}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Alertas */}
+      {resumen && resumen.cuentasVencidas > 0 && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          Tienes {resumen.cuentasVencidas} cuentas vencidas por un monto de ₲{" "}
+          {resumen.montoVencido.toLocaleString("es-PY")} que requieren atención inmediata.
+        </Alert>
+      )}
+
       {/* Filtros */}
-      <Grid item xs={12}>
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Filtros de Búsqueda
+          </Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Buscar Cliente"
+                value={filtros.cliente}
+                onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })}
+                placeholder="Nombre o apellido..."
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Estado</InputLabel>
+                <Select
+                  value={filtros.estado}
+                  onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })}
+                  label="Estado"
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  <MenuItem value="vigente">Vigente</MenuItem>
+                  <MenuItem value="vencida">Vencida</MenuItem>
+                  <MenuItem value="cobrada">Cobrada</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                label="Fecha Desde"
+                type="date"
+                size="small"
+                value={filtros.fechaDesde}
+                onChange={(e) => setFiltros({ ...filtros, fechaDesde: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                label="Fecha Hasta"
+                type="date"
+                size="small"
+                value={filtros.fechaHasta}
+                onChange={(e) => setFiltros({ ...filtros, fechaHasta: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button
+                variant="contained"
+                onClick={handleBuscar}
+                disabled={cargando}
+                fullWidth
+                startIcon={cargando ? <CircularProgress size={20} /> : <Search />}
+              >
+                {cargando ? "Buscando..." : "Buscar"}
+              </Button>
+            </Grid>
+            <Grid item xs={12} md={1}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setFiltros({ estado: "", cliente: "", fechaDesde: "", fechaHasta: "" })
+                  setBusquedaRealizada(false)
+                  setCuentasPorCobrar([])
+                }}
+                fullWidth
+              >
+                Limpiar
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Información de paginación */}
+      {busquedaRealizada && (
+        <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="body2" color="text.secondary">
+            Mostrando {cuentasPorCobrar.length} de {paginacion.totalRegistros} cuentas
+            {paginacion.totalPaginas > 1 && ` (Página ${paginacion.pagina} de ${paginacion.totalPaginas})`}
+          </Typography>
+          {paginacion.totalPaginas > 1 && (
+            <Pagination
+              count={paginacion.totalPaginas}
+              page={paginacion.pagina}
+              onChange={handleCambioPagina}
+              color="primary"
+              size="small"
+            />
+          )}
+        </Box>
+      )}
+
+      {/* Lista de cuentas por cobrar */}
+      {cargando ? (
+        <Box display="flex" justifyContent="center" p={3}>
+          <CircularProgress />
+        </Box>
+      ) : !busquedaRealizada ? (
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Filtros de Búsqueda
+            <Typography variant="body1" color="text.secondary" align="center">
+              Use los filtros y haga clic en "Buscar" para ver las cuentas por cobrar.
             </Typography>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Tipo</InputLabel>
+          </CardContent>
+        </Card>
+      ) : cuentasPorCobrar.length === 0 ? (
+        <Card>
+          <CardContent>
+            <Typography variant="body1" color="text.secondary" align="center">
+              No se encontraron cuentas por cobrar con los criterios seleccionados.
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : (
+        <Box>
+          {cuentasPorCobrar.map((cuenta) => (
+            <Accordion key={cuenta.idCuentaCobrar} sx={{ mb: 1 }}>
+              <AccordionSummary expandIcon={<ExpandMore />}>
+                <Grid container alignItems="center" spacing={2}>
+                  <Grid item xs={1}>
+                    {getEstadoIcon(cuenta.estadoCuenta, cuenta.diasVencido)}
+                  </Grid>
+                  <Grid item xs={2}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Factura #{cuenta.nroFactura}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatearFecha(cuenta.fechaEmision)}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Typography variant="body2">{cuenta.cliente}</Typography>
+                  </Grid>
+                  <Grid item xs={2}>
+                    <Typography variant="body2">Vence: {formatearFecha(cuenta.fechaVencimiento)}</Typography>
+                    {cuenta.diasVencido > 0 && (
+                      <Typography variant="caption" color="error">
+                        {cuenta.diasVencido} días vencida
+                      </Typography>
+                    )}
+                  </Grid>
+                  <Grid item xs={2}>
+                    <Typography variant="body2" fontWeight="bold">
+                      ₲ {cuenta.montoOriginal.toLocaleString("es-PY")}
+                    </Typography>
+                    <Typography variant="body2" color="error" fontWeight="bold">
+                      Saldo: ₲ {cuenta.saldoRestante.toLocaleString("es-PY")}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={1}>
+                    <Chip
+                      label={cuenta.estadoCuenta}
+                      color={getEstadoColor(cuenta.estadoCuenta, cuenta.diasVencido)}
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={1}>
+                    <Box
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRegistrarPago(cuenta)
+                      }}
+                      sx={{
+                        cursor: cuenta.saldoRestante === 0 ? "default" : "pointer",
+                        opacity: cuenta.saldoRestante === 0 ? 0.5 : 1,
+                        display: "flex",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Payment color={cuenta.saldoRestante === 0 ? "disabled" : "primary"} fontSize="small" />
+                    </Box>
+                  </Grid>
+                </Grid>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Detalles de la Cuenta por Cobrar
+                  </Typography>
+
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2">
+                        <strong>Cliente:</strong> {cuenta.cliente}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Estado de Factura:</strong> {cuenta.estadoFactura}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Estado de Cuenta:</strong> {cuenta.estadoCuenta}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2">
+                        <strong>Monto Original:</strong> ₲ {cuenta.montoOriginal.toLocaleString("es-PY")}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Total Pagos:</strong> ₲ {cuenta.totalPagos.toLocaleString("es-PY")}
+                      </Typography>
+                      <Typography variant="body2" color="error" fontWeight="bold">
+                        <strong>Saldo Restante:</strong> ₲ {cuenta.saldoRestante.toLocaleString("es-PY")}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+
+                  {cuenta.ultimoPago && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Último Pago:
+                      </Typography>
+                      <Typography variant="body2">
+                        {formatearFecha(cuenta.ultimoPago.fecha)} - ₲ {cuenta.ultimoPago.monto.toLocaleString("es-PY")}{" "}
+                        ({cuenta.ultimoPago.metodoPago})
+                      </Typography>
+                    </Box>
+                  )}
+
+                  <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<Payment />}
+                      onClick={() => handleRegistrarPago(cuenta)}
+                      disabled={cuenta.saldoRestante === 0}
+                    >
+                      Registrar Pago
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handlePagoRapido(cuenta, cuenta.saldoRestante)}
+                      disabled={cuenta.saldoRestante === 0}
+                      startIcon={<Payment />}
+                    >
+                      Pago Total
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handlePagoRapido(cuenta, cuenta.saldoRestante / 2)}
+                      disabled={cuenta.saldoRestante === 0}
+                      startIcon={<Payment />}
+                    >
+                      50%
+                    </Button>
+                    <Button variant="outlined" startIcon={<Receipt />} onClick={() => handleVerFactura(cuenta)}>
+                      Ver Factura
+                    </Button>
+                    <Button variant="outlined" startIcon={<History />} onClick={() => handleVerHistorial(cuenta)}>
+                      Historial de Pagos
+                    </Button>
+                  </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          ))}
+        </Box>
+      )}
+
+      {/* Paginación inferior */}
+      {busquedaRealizada && paginacion.totalPaginas > 1 && (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+          <Pagination
+            count={paginacion.totalPaginas}
+            page={paginacion.pagina}
+            onChange={handleCambioPagina}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
+      )}
+
+      {/* Dialog para registrar pago */}
+      <Dialog open={openPagoDialog} onClose={handleClosePagoDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Registrar Pago</DialogTitle>
+        <DialogContent>
+          {cuentaSeleccionada && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <Alert severity="info">
+                  <Typography variant="body2">
+                    <strong>Factura Nro. {cuentaSeleccionada.nroFactura}</strong>
+                    <br />
+                    Cliente: {cuentaSeleccionada.cliente}
+                    <br />
+                    Saldo pendiente: ₲ {cuentaSeleccionada.saldoRestante.toLocaleString("es-PY")}
+                  </Typography>
+                </Alert>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Monto del Pago"
+                  type="number"
+                  value={datosPago.montoPago}
+                  onChange={(e) => setDatosPago({ ...datosPago, montoPago: e.target.value })}
+                  inputProps={{
+                    max: cuentaSeleccionada.saldoRestante,
+                    min: 0,
+                    step: "0.01",
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Método de Pago</InputLabel>
                   <Select
-                    value={filtros.tipo}
-                    onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
-                    label="Tipo"
+                    value={datosPago.idMetodoPago}
+                    onChange={(e) => setDatosPago({ ...datosPago, idMetodoPago: e.target.value })}
+                    label="Método de Pago"
                   >
-                    <MenuItem value="">Todos</MenuItem>
-                    <MenuItem value="contado">Contado</MenuItem>
-                    <MenuItem value="credito">Crédito</MenuItem>
+                    <MenuItem value={1}>Efectivo</MenuItem>
+                    <MenuItem value={2}>Transferencia Bancaria</MenuItem>
+                    <MenuItem value={3}>Cheque</MenuItem>
+                    <MenuItem value={4}>Tarjeta de Crédito</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Estado</InputLabel>
-                  <Select
-                    value={filtros.estado}
-                    onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })}
-                    label="Estado"
-                  >
-                    <MenuItem value="">Todos</MenuItem>
-                    <MenuItem value="emitida">Emitida</MenuItem>
-                    <MenuItem value="enviado">Enviado</MenuItem>
-                    <MenuItem value="cobrado">Cobrado</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Fecha Desde"
-                  type="date"
-                  size="small"
-                  value={filtros.fechaDesde}
-                  onChange={(e) => setFiltros({ ...filtros, fechaDesde: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
+                  label="Comprobante de Pago"
+                  value={datosPago.comprobantePago}
+                  onChange={(e) => setDatosPago({ ...datosPago, comprobantePago: e.target.value })}
+                  placeholder="Número de comprobante, referencia, etc."
                 />
               </Grid>
-              <Grid item xs={12} md={2}>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Fecha Hasta"
-                  type="date"
-                  size="small"
-                  value={filtros.fechaHasta}
-                  onChange={(e) => setFiltros({ ...filtros, fechaHasta: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
+                  label="Observaciones"
+                  multiline
+                  rows={3}
+                  value={datosPago.observaciones}
+                  onChange={(e) => setDatosPago({ ...datosPago, observaciones: e.target.value })}
                 />
-              </Grid>
-              <Grid item xs={12} md={2}>
-                <Button
-                  variant="contained"
-                  onClick={handleBuscar}
-                  disabled={cargando}
-                  fullWidth
-                  startIcon={cargando ? <CircularProgress size={20} /> : <SearchIcon />}
-                >
-                  {cargando ? "Buscando..." : "Buscar"}
-                </Button>
               </Grid>
             </Grid>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      {/* Lista de Facturas */}
-      <Grid item xs={12}>
-        <Card>
-          <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6">Facturas de Clientes</Typography>
-              {paginacion.totalRegistros > 0 && (
-                <Typography variant="body2" color="textSecondary">
-                  Mostrando {(paginacion.pagina - 1) * paginacion.registrosPorPagina + 1} -{" "}
-                  {Math.min(paginacion.pagina * paginacion.registrosPorPagina, paginacion.totalRegistros)} de{" "}
-                  {paginacion.totalRegistros} facturas
-                </Typography>
-              )}
-            </Box>
-
-            {cargando ? (
-              <Box display="flex" justifyContent="center" p={3}>
-                <CircularProgress />
-              </Box>
-            ) : !busquedaRealizada ? (
-              <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 3 }}>
-                Utilice los filtros y haga clic en "Buscar" para ver las facturas.
-              </Typography>
-            ) : facturas.length === 0 ? (
-              <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 3 }}>
-                No se encontraron facturas con los criterios seleccionados.
-              </Typography>
-            ) : (
-              <>
-                {/* Lista expandible de facturas */}
-                <Box>
-                  {facturas.map((factura) => (
-                    <Card key={factura.nroFactura} sx={{ mb: 1, position: "relative" }}>
-                      {/* Header de la factura - NO es un botón */}
-                      <CardContent sx={{ pb: 1 }}>
-                        <Grid container alignItems="center" spacing={2}>
-                          <Grid item xs={1}>
-                            {getEstadoCuentaIcon(factura)}
-                          </Grid>
-                          <Grid item xs={2}>
-                            <Typography variant="subtitle1" fontWeight="bold">
-                              #{factura.nroFactura}
-                            </Typography>
-                            <Chip label={factura.tipo.toUpperCase()} color={getTipoColor(factura.tipo)} size="small" />
-                          </Grid>
-                          <Grid item xs={2}>
-                            <Typography variant="body2">
-                              {new Date(factura.fechaEmision).toLocaleDateString("es-PY")}
-                            </Typography>
-                            {factura.fechaVencimiento && (
-                              <Typography variant="caption" color="textSecondary">
-                                Vence: {new Date(factura.fechaVencimiento).toLocaleDateString("es-PY")}
-                              </Typography>
-                            )}
-                          </Grid>
-                          <Grid item xs={3}>
-                            <Typography variant="body2">{factura.cliente}</Typography>
-                          </Grid>
-                          <Grid item xs={2}>
-                            <Typography variant="body2" fontWeight="bold">
-                              ₲ {factura.montoTotal.toLocaleString("es-PY")}
-                            </Typography>
-                            {factura.tipo === "credito" && factura.saldoRestante > 0 && (
-                              <Typography variant="caption" color="error">
-                                Saldo: ₲ {factura.saldoRestante.toLocaleString("es-PY")}
-                              </Typography>
-                            )}
-                          </Grid>
-                          <Grid item xs={1}>
-                            <Chip label={factura.estado} color={getEstadoColor(factura.estado)} size="small" />
-                          </Grid>
-                          <Grid item xs={1}>
-                            {/* Botones de acción */}
-                            <Box sx={{ display: "flex", gap: 0.5 }}>
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                title="Ver detalles"
-                                onClick={() => verFactura(factura)}
-                              >
-                                <VisibilityIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                color="secondary"
-                                title="Imprimir PDF"
-                                onClick={() => imprimirFactura(factura)}
-                              >
-                                <PrintIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Grid>
-                        </Grid>
-                      </CardContent>
-
-                      {/* Accordion para detalles */}
-                      <Accordion sx={{ boxShadow: "none", "&:before": { display: "none" } }}>
-                        <AccordionSummary
-                          expandIcon={<ExpandMore />}
-                          sx={{
-                            minHeight: "auto",
-                            "& .MuiAccordionSummary-content": {
-                              margin: "8px 0",
-                              justifyContent: "center",
-                            },
-                          }}
-                        >
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Box>
-                            <Typography variant="h6" gutterBottom>
-                              Detalles de la Factura #{factura.nroFactura}
-                            </Typography>
-
-                            {factura.observacion && (
-                              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                <strong>Observaciones:</strong> {factura.observacion}
-                              </Typography>
-                            )}
-
-                            {factura.metodoPago && (
-                              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                <strong>Método de Pago:</strong> {factura.metodoPago}
-                              </Typography>
-                            )}
-
-                            {factura.tipo === "credito" && (
-                              <Box sx={{ mb: 2 }}>
-                                <Typography variant="body2" color="text.secondary">
-                                  <strong>Estado de Cuenta:</strong> {factura.estadoCuenta}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  <strong>Total Pagos:</strong> ₲ {factura.totalPagos?.toLocaleString("es-PY") || "0"}
-                                </Typography>
-                                {factura.diasVencido > 0 && (
-                                  <Typography variant="body2" color="error">
-                                    <strong>Días Vencido:</strong> {factura.diasVencido} días
-                                  </Typography>
-                                )}
-                              </Box>
-                            )}
-                          </Box>
-                        </AccordionDetails>
-                      </Accordion>
-                    </Card>
-                  ))}
-                </Box>
-
-                {/* Paginación */}
-                {paginacion.totalPaginas > 1 && (
-                  <Box display="flex" justifyContent="center" mt={3}>
-                    <Pagination
-                      count={paginacion.totalPaginas}
-                      page={paginacion.pagina}
-                      onChange={handleCambioPagina}
-                      color="primary"
-                      showFirstButton
-                      showLastButton
-                    />
-                  </Box>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
-
-      {/* Diálogo para visualizar factura */}
-      <Dialog open={dialogoVisualizacion} onClose={() => setDialogoVisualizacion(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">
-              Factura #{facturaSeleccionada?.nroFactura} ({facturaSeleccionada?.tipo?.toUpperCase()})
-            </Typography>
-            <IconButton onClick={() => setDialogoVisualizacion(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {facturaSeleccionada && (
-            <Box>
-              {/* Información básica */}
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Cliente:</strong> {facturaSeleccionada.cliente.nombre}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Documento:</strong> {facturaSeleccionada.cliente.documento || "N/A"}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Dirección:</strong> {facturaSeleccionada.cliente.direccion || "N/A"}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2">
-                    <strong>Fecha Emisión:</strong>{" "}
-                    {new Date(facturaSeleccionada.fechaEmision).toLocaleDateString("es-PY")}
-                  </Typography>
-                  {facturaSeleccionada.fechaVencimiento && (
-                    <Typography variant="body2">
-                      <strong>Fecha Vencimiento:</strong>{" "}
-                      {new Date(facturaSeleccionada.fechaVencimiento).toLocaleDateString("es-PY")}
-                    </Typography>
-                  )}
-                  <Typography variant="body2">
-                    <strong>Estado:</strong> {facturaSeleccionada.estado}
-                  </Typography>
-                  {facturaSeleccionada.metodoPago && (
-                    <Typography variant="body2">
-                      <strong>Método de Pago:</strong> {facturaSeleccionada.metodoPago}
-                    </Typography>
-                  )}
-                </Grid>
-              </Grid>
-
-              {/* Información de cuenta por cobrar para facturas a crédito */}
-              {facturaSeleccionada.cuentaPorCobrar && (
-                <Card sx={{ mb: 3, bgcolor: "grey.50" }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Estado de Cuenta por Cobrar
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={4}>
-                        <Typography variant="body2">
-                          <strong>Saldo Restante:</strong>
-                        </Typography>
-                        <Typography variant="h6" color="error">
-                          ₲ {facturaSeleccionada.cuentaPorCobrar.saldoRestante.toLocaleString("es-PY")}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="body2">
-                          <strong>Días Vencido:</strong>
-                        </Typography>
-                        <Typography
-                          variant="h6"
-                          color={facturaSeleccionada.cuentaPorCobrar.diasVencido > 0 ? "error" : "success"}
-                        >
-                          {facturaSeleccionada.cuentaPorCobrar.diasVencido} días
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Typography variant="body2">
-                          <strong>Estado:</strong>
-                        </Typography>
-                        <Typography variant="h6">{facturaSeleccionada.cuentaPorCobrar.estadoCuenta}</Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Tabla de productos */}
-              <TableContainer component={Paper} sx={{ mb: 2 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Cantidad</TableCell>
-                      <TableCell>Descripción</TableCell>
-                      <TableCell align="right">Precio Unit.</TableCell>
-                      <TableCell align="right">Subtotal</TableCell>
-                      <TableCell align="right">IVA</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {facturaSeleccionada.detalles?.map((detalle, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{detalle.cantidad}</TableCell>
-                        <TableCell>{detalle.descripcion}</TableCell>
-                        <TableCell align="right">₲ {detalle.precioUnitario.toLocaleString("es-PY")}</TableCell>
-                        <TableCell align="right">₲ {detalle.subtotal.toLocaleString("es-PY")}</TableCell>
-                        <TableCell align="right">
-                          ₲ {detalle.montoImpuesto.toLocaleString("es-PY")}
-                          <Typography variant="caption" display="block">
-                            ({detalle.impuesto})
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                          ₲ {detalle.totalLinea.toLocaleString("es-PY")}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* Historial de pagos para facturas a crédito */}
-              {facturaSeleccionada.pagos && facturaSeleccionada.pagos.length > 0 && (
-                <Card sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Historial de Pagos
-                    </Typography>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Fecha</TableCell>
-                            <TableCell>Monto</TableCell>
-                            <TableCell>Método</TableCell>
-                            <TableCell>Comprobante</TableCell>
-                            <TableCell>Operador</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {facturaSeleccionada.pagos.map((pago) => (
-                            <TableRow key={pago.idPago}>
-                              <TableCell>{new Date(pago.fechaPago).toLocaleDateString("es-PY")}</TableCell>
-                              <TableCell>₲ {pago.montoPago.toLocaleString("es-PY")}</TableCell>
-                              <TableCell>{pago.metodoPago}</TableCell>
-                              <TableCell>{pago.comprobantePago || "N/A"}</TableCell>
-                              <TableCell>{pago.operador}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Total */}
-              <Box sx={{ textAlign: "right", mt: 2 }}>
-                <Typography variant="h5" fontWeight="bold">
-                  TOTAL: ₲ {facturaSeleccionada.montoTotal.toLocaleString("es-PY")}
-                </Typography>
-              </Box>
-            </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogoVisualizacion(false)}>Cerrar</Button>
+          <Button onClick={handleClosePagoDialog} disabled={cargandoPago}>
+            Cancelar
+          </Button>
           <Button
             variant="contained"
-            startIcon={<PrintIcon />}
-            onClick={() => {
-              imprimirFactura(facturaSeleccionada)
-              setDialogoVisualizacion(false)
-            }}
+            onClick={registrarPago}
+            disabled={cargandoPago}
+            startIcon={cargandoPago ? <CircularProgress size={20} /> : <Payment />}
           >
-            Imprimir PDF
+            {cargandoPago ? "Registrando..." : "Registrar Pago"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -747,199 +721,19 @@ function FacturacionClientes() {
           {snackbar.mensaje}
         </Alert>
       </Snackbar>
-    </Grid>
-  )
-}
 
-// Componente para resumen de cuentas por cobrar
-function ResumenCuentasPorCobrar() {
-  const [resumen, setResumen] = useState(null)
-  const [cargando, setCargando] = useState(false)
-  const router = useRouter()
+      {/* Diálogos adicionales */}
+      <VisorFactura
+        open={openVisorFactura}
+        onClose={() => setOpenVisorFactura(false)}
+        nroFactura={facturaSeleccionada}
+      />
 
-  useEffect(() => {
-    cargarResumen()
-  }, [])
-
-  const cargarResumen = async () => {
-    setCargando(true)
-    try {
-      const respuesta = await fetch("/api/finanzas/cuentas-cobrar?limite=5")
-      if (respuesta.ok) {
-        const datos = await respuesta.json()
-        setResumen(datos.resumen)
-      }
-    } catch (error) {
-      console.error("Error al cargar resumen:", error)
-    } finally {
-      setCargando(false)
-    }
-  }
-
-  const irACuentasPorCobrar = () => {
-    router.push("/finanzas/cuentas-cobrar")
-  }
-
-  if (cargando) {
-    return (
-      <Box display="flex" justifyContent="center" p={3}>
-        <CircularProgress />
-      </Box>
-    )
-  }
-
-  return (
-    <Grid container spacing={3}>
-      {/* Tarjetas de resumen */}
-      <Grid item xs={12} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <AccountBalance color="primary" sx={{ mr: 2 }} />
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Total por Cobrar
-                </Typography>
-                <Typography variant="h4" color="primary">
-                  ₲ {resumen?.totalPorCobrar?.toLocaleString("es-PY") || "0"}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid item xs={12} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <Schedule color="warning" sx={{ mr: 2 }} />
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Cuentas Pendientes
-                </Typography>
-                <Typography variant="h4" color="warning.main">
-                  {resumen?.totalCuentas || 0}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid item xs={12} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <Warning color="error" sx={{ mr: 2 }} />
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Cuentas Vencidas
-                </Typography>
-                <Typography variant="h4" color="error.main">
-                  {resumen?.cuentasVencidas || 0}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid item xs={12} md={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center">
-              <TrendingDown color="error" sx={{ mr: 2 }} />
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Monto Vencido
-                </Typography>
-                <Typography variant="h4" color="error.main">
-                  ₲ {resumen?.montoVencido?.toLocaleString("es-PY") || "0"}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      {/* Botón para ir a la página completa */}
-      <Grid item xs={12}>
-        <Card>
-          <CardContent>
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-              <Typography variant="h6">Gestión Completa de Cuentas por Cobrar</Typography>
-              <Button variant="contained" onClick={irACuentasPorCobrar} startIcon={<TrendingUp />}>
-                Ver Todas las Cuentas
-              </Button>
-            </Box>
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              Acceda a la gestión completa de cuentas por cobrar, registro de pagos y seguimiento detallado.
-            </Typography>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  )
-}
-
-// Componentes simplificados para las otras pestañas
-function FacturasProveedores() {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Facturas de Proveedores
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Gestión de facturas de proveedores - Próximamente disponible
-        </Typography>
-      </CardContent>
-    </Card>
-  )
-}
-
-function CuentasPorPagar() {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Cuentas por Pagar
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Gestión de facturas pendientes de pago - Próximamente disponible
-        </Typography>
-      </CardContent>
-    </Card>
-  )
-}
-
-function GestionCaja() {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Gestión de Caja
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Control de caja y movimientos - Próximamente disponible
-        </Typography>
-      </CardContent>
-    </Card>
-  )
-}
-
-function GestionPagos() {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Gestión de Pagos
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Registro de pagos y cobros - Próximamente disponible
-        </Typography>
-      </CardContent>
-    </Card>
+      <HistorialPagos
+        open={openHistorialPagos}
+        onClose={() => setOpenHistorialPagos(false)}
+        nroFactura={facturaSeleccionada}
+      />
+    </Container>
   )
 }

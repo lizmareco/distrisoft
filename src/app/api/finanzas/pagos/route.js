@@ -205,6 +205,17 @@ export async function POST(request) {
         },
       })
 
+      // Si el saldo llega a 0, actualizar también el estado de la factura a "Cobrada"
+      if (nuevoSaldoRestante <= 0) {
+        await prisma.facturaCliente.update({
+          where: { nroFactura: nroFacturaInt },
+          data: {
+            idEstadoFactuCliente: 3, // 3 = Cobrada
+            updatedAt: new Date(),
+          },
+        })
+      }
+
       return { nuevoPago, nuevoSaldoRestante }
     })
 

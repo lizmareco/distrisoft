@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    const estado = searchParams.get("estado") // "vigente", "vencida", "cobrada"
+    const estado = searchParams.get("estado") // "vigente", "vencida", "cobrada", "cancelada"
     const cliente = searchParams.get("cliente")
     const fechaDesde = searchParams.get("fechaDesde")
     const fechaHasta = searchParams.get("fechaHasta")
@@ -18,16 +18,17 @@ export async function GET(request) {
 
     const whereClause = {
       deletedAt: null,
-      saldoRestante: {
-        gt: 0, // Solo cuentas con saldo pendiente
-      },
     }
 
     // Filtros
     if (estado) {
-      whereClause.estadoCuenta = {
-        descEstadoCuenta: estado,
+      const estadoMap = {
+        vigente: 1,
+        vencida: 2,
+        cobrada: 3,
+        cancelada: 4,
       }
+      whereClause.idEstadoCuenta = estadoMap[estado.toLowerCase()]
     }
 
     if (cliente) {
@@ -134,31 +135,51 @@ export async function GET(request) {
 async function actualizarDiasVencidos() {
   const hoy = new Date()
 
-  await prisma.cuentaPorCobrar.updateMany({
+  // Obtener todas las cuentas por cobrar activas
+  const cuentas = await prisma.cuentaPorCobrar.findMany({
     where: {
       deletedAt: null,
-      saldoRestante: { gt: 0 },
-    },
-    data: {
-      diasVencido: {
-        // Calcular días vencidos (negativo si aún no vence, positivo si ya venció)
-        set: prisma.$queryRaw`EXTRACT(DAY FROM (CURRENT_DATE - fecha_vencimiento))`,
-      },
+      idEstadoCuenta: { in: [1, 2] }, // Solo vigentes y vencidas
     },
   })
 
-  // Actualizar estados según días vencidos
-  await prisma.cuentaPorCobrar.updateMany({
-    where: {
-      deletedAt: null,
-      saldoRestante: { gt: 0 },
-      diasVencido: { gt: 0 },
-      idEstadoCuenta: 1, // Vigente
-    },
-    data: {
-      idEstadoCuenta: 2, // Vencida
-    },
-  })
+  // Actualizar cada cuenta individualmente
+  for (const cuenta of cuentas) {
+    const fechaVencimiento = new Date(cuenta.fechaVencimiento)
+    const diferenciaDias = Math.floor((hoy - fechaVencimiento) / (1000 * 60 * 60 * 24))
+
+    let nuevoEstadoCuenta = cuenta.idEstadoCuenta
+    let nuevoEstadoFactura = null
+
+    // Determinar nuevo estado basado en días vencidos y saldo
+    if (cuenta.saldoRestante <= 0) {
+      nuevoEstadoCuenta = 3 // Cobrada
+      nuevoEstadoFactura = 3 // Factura también cobrada
+    } else if (diferenciaDias > 0 && cuenta.idEstadoCuenta === 1) {
+      nuevoEstadoCuenta = 2 // Vencida
+    }
+
+    // Actualizar cuenta por cobrar
+    await prisma.cuentaPorCobrar.update({
+      where: { idCuentaCobrar: cuenta.idCuentaCobrar },
+      data: {
+        diasVencido: diferenciaDias,
+        idEstadoCuenta: nuevoEstadoCuenta,
+        updatedAt: new Date(),
+      },
+    })
+
+    // Actualizar factura si es necesario
+    if (nuevoEstadoFactura) {
+      await prisma.facturaCliente.update({
+        where: { nroFactura: cuenta.nroFactura },
+        data: {
+          idEstadoFactuCliente: nuevoEstadoFactura,
+          updatedAt: new Date(),
+        },
+      })
+    }
+  }
 }
 
 // Función auxiliar para calcular resumen
