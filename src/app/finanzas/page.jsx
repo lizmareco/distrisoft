@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Box,
@@ -19,19 +19,9 @@ import {
   Select,
   MenuItem,
   TextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   IconButton,
   CircularProgress,
   Pagination,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Snackbar,
   Alert,
 } from "@mui/material"
@@ -46,8 +36,12 @@ import {
   Print as PrintIcon,
   Search as SearchIcon,
   Dashboard as DashboardIcon,
-  Close as CloseIcon,
+  Warning,
+  CheckCircle,
+  Schedule,
+  AccountBalance,
 } from "@mui/icons-material"
+import VistaPreviaFactura from "../../components/facturas/VistaPrevia"
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -82,9 +76,11 @@ export default function FinanzasPage() {
         <Typography variant="h4" component="h1">
           Gestión Financiera
         </Typography>
-        <Button variant="outlined" startIcon={<DashboardIcon />} onClick={irADashboard} color="primary">
-          Dashboard Financiero
-        </Button>
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Button variant="outlined" startIcon={<DashboardIcon />} onClick={irADashboard} color="primary">
+            Dashboard Financiero
+          </Button>
+        </Box>
       </Box>
 
       {/* Navegación por pestañas */}
@@ -99,8 +95,7 @@ export default function FinanzasPage() {
         >
           <Tab label="Facturación Clientes" icon={<Receipt />} />
           <Tab label="Facturas Proveedores" icon={<Assignment />} />
-          <Tab label="Cuentas por Cobrar" icon={<TrendingUp />} />
-          <Tab label="Cuentas por Pagar" icon={<TrendingDown />} />
+          <Tab label="Resumen Cuentas por Cobrar" icon={<TrendingUp />} />
           <Tab label="Gestión de Caja" icon={<MonetizationOn />} />
           <Tab label="Pagos" icon={<Payment />} />
         </Tabs>
@@ -116,25 +111,21 @@ export default function FinanzasPage() {
       </TabPanel>
 
       <TabPanel value={tabValue} index={2}>
-        <CuentasPorCobrar />
+        <ResumenCuentasPorCobrar />
       </TabPanel>
 
       <TabPanel value={tabValue} index={3}>
-        <CuentasPorPagar />
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={4}>
         <GestionCaja />
       </TabPanel>
 
-      <TabPanel value={tabValue} index={5}>
+      <TabPanel value={tabValue} index={4}>
         <GestionPagos />
       </TabPanel>
     </Container>
   )
 }
 
-// Componente para Facturación de Clientes con funcionalidad completa
+// Componente para Facturación de Clientes con vista previa
 function FacturacionClientes() {
   const [facturas, setFacturas] = useState([])
   const [cargando, setCargando] = useState(false)
@@ -153,9 +144,9 @@ function FacturacionClientes() {
     registrosPorPagina: 10,
   })
 
-  // Estados para visualización de factura
-  const [facturaSeleccionada, setFacturaSeleccionada] = useState(null)
-  const [dialogoVisualizacion, setDialogoVisualizacion] = useState(false)
+  // Estados para vista previa
+  const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false)
+  const [facturaParaPrevia, setFacturaParaPrevia] = useState(null)
   const [cargandoFactura, setCargandoFactura] = useState(false)
   const [snackbar, setSnackbar] = useState({
     abierto: false,
@@ -165,12 +156,6 @@ function FacturacionClientes() {
 
   // Nuevo estado para controlar si se ha realizado una búsqueda
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
-
-  // Cargar facturas al inicializar
-  // Comentar esta línea para evitar carga automática
-  // useEffect(() => {
-  //   cargarFacturas()
-  // }, [paginacion.pagina])
 
   const cargarFacturas = async (nuevaPagina = paginacion.pagina) => {
     setCargando(true)
@@ -223,17 +208,12 @@ function FacturacionClientes() {
   const verFactura = async (factura) => {
     setCargandoFactura(true)
     try {
-      const respuesta = await fetch(`/api/finanzas/facturas-clientes/${factura.nroFactura}?tipo=${factura.tipo}`)
-      if (respuesta.ok) {
-        const datos = await respuesta.json()
-        setFacturaSeleccionada(datos.data)
-        setDialogoVisualizacion(true)
-      } else {
-        mostrarSnackbar("Error al cargar detalles de la factura", "error")
-      }
+      // Simplemente pasar el ID de la factura al componente de vista previa
+      setFacturaParaPrevia(factura.nroFactura)
+      setVistaPreviaAbierta(true)
     } catch (error) {
       console.error("Error al cargar factura:", error)
-      mostrarSnackbar("Error al cargar detalles de la factura", "error")
+      mostrarSnackbar(`Error al cargar detalles de la factura: ${error.message}`, "error")
     } finally {
       setCargandoFactura(false)
     }
@@ -243,14 +223,14 @@ function FacturacionClientes() {
     try {
       mostrarSnackbar("Generando PDF...", "info")
 
-      const respuesta = await fetch(`/api/finanzas/facturas-clientes/${factura.nroFactura}/pdf?tipo=${factura.tipo}`)
+      const respuesta = await fetch(`/api/finanzas/facturas-clientes/${factura.nroFactura}/pdf`)
 
       if (respuesta.ok) {
         const blob = await respuesta.blob()
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.href = url
-        link.download = `factura-${factura.nroFactura}.pdf`
+        link.download = `factura-001-001-${String(factura.nroFactura).padStart(7, "0")}.pdf`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
@@ -295,6 +275,13 @@ function FacturacionClientes() {
 
   const getTipoColor = (tipo) => {
     return tipo === "contado" ? "success" : "warning"
+  }
+
+  const getEstadoCuentaIcon = (factura) => {
+    if (factura.tipo === "contado") return <CheckCircle color="success" />
+    if (factura.diasVencido > 0) return <Warning color="error" />
+    if (factura.diasVencido > -7) return <Schedule color="warning" />
+    return <CheckCircle color="success" />
   }
 
   return (
@@ -403,50 +390,58 @@ function FacturacionClientes() {
               </Typography>
             ) : (
               <>
-                <TableContainer component={Paper} sx={{ mt: 2 }}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Nro. Factura</TableCell>
-                        <TableCell>Tipo</TableCell>
-                        <TableCell>Fecha Emisión</TableCell>
-                        <TableCell>Cliente</TableCell>
-                        <TableCell>Monto Total</TableCell>
-                        <TableCell>Estado</TableCell>
-                        <TableCell>Acciones</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {facturas.map((factura) => (
-                        <TableRow key={`${factura.tipo}-${factura.nroFactura}`}>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="bold">
-                              #{factura.nroFactura}
+                {/* Lista simple de facturas */}
+                <Box>
+                  {facturas.map((factura) => (
+                    <Card key={factura.nroFactura} sx={{ mb: 1, position: "relative" }}>
+                      <CardContent sx={{ pb: 1 }}>
+                        <Grid container alignItems="center" spacing={2}>
+                          <Grid item xs={1}>
+                            {getEstadoCuentaIcon(factura)}
+                          </Grid>
+                          <Grid item xs={2}>
+                            <Typography variant="subtitle1" fontWeight="bold">
+                              #001-001-{String(factura.nroFactura).padStart(7, "0")}
                             </Typography>
-                          </TableCell>
-                          <TableCell>
                             <Chip label={factura.tipo.toUpperCase()} color={getTipoColor(factura.tipo)} size="small" />
-                          </TableCell>
-                          <TableCell>{new Date(factura.fechaEmision).toLocaleDateString("es-PY")}</TableCell>
-                          <TableCell>{factura.cliente}</TableCell>
-                          <TableCell>
+                          </Grid>
+                          <Grid item xs={2}>
+                            <Typography variant="body2">
+                              {new Date(factura.fechaEmision).toLocaleDateString("es-PY")}
+                            </Typography>
+                            {factura.fechaVencimiento && (
+                              <Typography variant="caption" color="textSecondary">
+                                Vence: {new Date(factura.fechaVencimiento).toLocaleDateString("es-PY")}
+                              </Typography>
+                            )}
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Typography variant="body2">{factura.cliente}</Typography>
+                          </Grid>
+                          <Grid item xs={2}>
                             <Typography variant="body2" fontWeight="bold">
                               ₲ {factura.montoTotal.toLocaleString("es-PY")}
                             </Typography>
-                          </TableCell>
-                          <TableCell>
+                            {factura.tipo === "credito" && factura.saldoRestante > 0 && (
+                              <Typography variant="caption" color="error">
+                                Saldo: ₲ {factura.saldoRestante.toLocaleString("es-PY")}
+                              </Typography>
+                            )}
+                          </Grid>
+                          <Grid item xs={1}>
                             <Chip label={factura.estado} color={getEstadoColor(factura.estado)} size="small" />
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: "flex", gap: 1 }}>
+                          </Grid>
+                          <Grid item xs={1}>
+                            {/* Botones de acción */}
+                            <Box sx={{ display: "flex", gap: 0.5 }}>
                               <IconButton
                                 size="small"
                                 color="primary"
-                                title="Ver detalles"
+                                title="Vista previa"
                                 onClick={() => verFactura(factura)}
                                 disabled={cargandoFactura}
                               >
-                                {cargandoFactura ? <CircularProgress size={20} /> : <VisibilityIcon />}
+                                <VisibilityIcon fontSize="small" />
                               </IconButton>
                               <IconButton
                                 size="small"
@@ -454,15 +449,15 @@ function FacturacionClientes() {
                                 title="Imprimir PDF"
                                 onClick={() => imprimirFactura(factura)}
                               >
-                                <PrintIcon />
+                                <PrintIcon fontSize="small" />
                               </IconButton>
                             </Box>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
 
                 {/* Paginación */}
                 {paginacion.totalPaginas > 1 && (
@@ -483,271 +478,14 @@ function FacturacionClientes() {
         </Card>
       </Grid>
 
-      {/* Diálogo para visualizar factura */}
-      <Dialog open={dialogoVisualizacion} onClose={() => setDialogoVisualizacion(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">Factura #{facturaSeleccionada?.nroFactura}</Typography>
-            <IconButton onClick={() => setDialogoVisualizacion(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {facturaSeleccionada && (
-            <Box>
-              {/* Encabezado de la factura */}
-              <Box sx={{ border: "2px solid #000", p: 2, mb: 2, position: "relative", minHeight: 120 }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                  <Box
-                    sx={{
-                      width: 100,
-                      height: 100,
-                      mr: 2,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <img
-                      src="/logo.png"
-                      alt="Logo Las Niñas"
-                      style={{
-                        width: "100px",
-                        height: "100px",
-                        objectFit: "contain",
-                        filter: "grayscale(100%)",
-                      }}
-                    />
-                  </Box>
-                  <Box sx={{ flex: 1, textAlign: "center", pr: "200px" }}>
-                    <Typography variant="h5" fontWeight="bold">
-                      DISTRIBUIDORA 'LAS NIÑAS'
-                    </Typography>
-                    <Typography variant="body2">de Victor Manuel Barreto Barrios</Typography>
-                    <Typography variant="body2">ELABORACIÓN DE COMIDAS Y PLATOS PREPARADOS</Typography>
-                    <Typography variant="body2">COMERCIO AL POR MAYOR DE COMESTIBLES, EXCEPTO CARNES</Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      NATALICIO TALAVERA C/ TTE ROJAS NRO 277 - LUQUE
-                    </Typography>
-                    <Typography variant="body2">TELÉFONO: (0993) 540-258</Typography>
-                  </Box>
-                </Box>
-
-                {/* Cuadro unificado en la esquina superior derecha */}
-                <Box
-                  sx={{
-                    position: "absolute",
-                    top: 16,
-                    right: 16,
-                    border: "2px solid #000",
-                    p: 2,
-                    bgcolor: "#f5f5f5",
-                    width: 180,
-                  }}
-                >
-                  <Box sx={{ mb: 1, pb: 1, borderBottom: "1px solid #000" }}>
-                    <Typography variant="body2" fontWeight="bold">
-                      R.U.C.
-                    </Typography>
-                    <Typography variant="h6" fontWeight="bold">
-                      4006624-0
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ mb: 1, pb: 1, borderBottom: "1px solid #000" }}>
-                    <Typography variant="body2" fontWeight="bold">
-                      TIMBRADO Nº
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      17184746
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ mb: 1, pb: 1, borderBottom: "1px solid #000" }}>
-                    <Typography variant="body2" fontWeight="bold">
-                      FACTURA
-                    </Typography>
-                    <Typography variant="body1" fontWeight="bold">
-                      Nº 001-001-{String(facturaSeleccionada.nroFactura).padStart(7, "0")}
-                    </Typography>
-                  </Box>
-
-                  <Box>
-                    <Typography variant="body2" fontWeight="bold">
-                      CONDICIÓN DE VENTA
-                    </Typography>
-                    <Box sx={{ display: "flex", justifyContent: "space-around", mt: 1 }}>
-                      <Box>
-                        <input type="checkbox" checked={facturaSeleccionada.tipo === "contado"} readOnly />
-                        <Typography variant="body2" component="span" sx={{ ml: 0.5 }}>
-                          CONTADO
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <input type="checkbox" checked={facturaSeleccionada.tipo === "credito"} readOnly />
-                        <Typography variant="body2" component="span" sx={{ ml: 0.5 }}>
-                          CRÉDITO
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                </Box>
-              </Box>
-
-              {/* Información de la factura */}
-              <Grid container spacing={2} sx={{ mb: 2 }}>
-                <Grid item xs={8}>
-                  <Box sx={{ border: "1px solid #000", p: 2, height: "100%" }}>
-                    <Typography variant="body2" fontWeight="bold">
-                      FECHA DE EMISIÓN:
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 1 }}>
-                      {new Date(facturaSeleccionada.fechaEmision).toLocaleDateString("es-PY")}
-                    </Typography>
-
-                    <Typography variant="body2" fontWeight="bold">
-                      NOMBRE O RAZÓN SOCIAL:
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 1 }}>
-                      {facturaSeleccionada.cliente.nombre}
-                    </Typography>
-
-                    <Typography variant="body2" fontWeight="bold">
-                      R.U.C.:
-                    </Typography>
-                    <Typography variant="body1" sx={{ mb: 1 }}>
-                      {facturaSeleccionada.cliente.documento || "N/A"}
-                    </Typography>
-
-                    <Typography variant="body2" fontWeight="bold">
-                      DIRECCIÓN:
-                    </Typography>
-                    <Typography variant="body1">{facturaSeleccionada.cliente.direccion || "N/A"}</Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={4}>
-                  {/* Espacio vacío para mantener el layout */}
-                </Grid>
-              </Grid>
-
-              {/* Tabla de productos */}
-              <TableContainer sx={{ border: "1px solid #000", mb: 2 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ border: "1px solid #000", fontWeight: "bold", textAlign: "center" }}>
-                        CANT.
-                      </TableCell>
-                      <TableCell sx={{ border: "1px solid #000", fontWeight: "bold", textAlign: "center" }}>
-                        DESCRIPCIÓN
-                      </TableCell>
-                      <TableCell sx={{ border: "1px solid #000", fontWeight: "bold", textAlign: "center" }}>
-                        PRECIO UNITARIO
-                      </TableCell>
-                      <TableCell sx={{ border: "1px solid #000", fontWeight: "bold", textAlign: "center" }}>
-                        EXENTAS
-                      </TableCell>
-                      <TableCell sx={{ border: "1px solid #000", fontWeight: "bold", textAlign: "center" }}>
-                        5%
-                      </TableCell>
-                      <TableCell sx={{ border: "1px solid #000", fontWeight: "bold", textAlign: "center" }}>
-                        10%
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {facturaSeleccionada.detalles?.map((detalle, index) => (
-                      <TableRow key={index}>
-                        <TableCell sx={{ border: "1px solid #000", textAlign: "center" }}>{detalle.cantidad}</TableCell>
-                        <TableCell sx={{ border: "1px solid #000" }}>{detalle.descripcion}</TableCell>
-                        <TableCell sx={{ border: "1px solid #000", textAlign: "right" }}>
-                          ₲ {detalle.precioUnitario.toLocaleString("es-PY")}
-                        </TableCell>
-                        <TableCell sx={{ border: "1px solid #000", textAlign: "right" }}></TableCell>
-                        <TableCell sx={{ border: "1px solid #000", textAlign: "right" }}></TableCell>
-                        <TableCell sx={{ border: "1px solid #000", textAlign: "right" }}>
-                          ₲ {detalle.subtotal.toLocaleString("es-PY")}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {/* Totales */}
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Box sx={{ border: "1px solid #000", p: 2 }}>
-                    <Typography variant="body2" fontWeight="bold" sx={{ mb: 1 }}>
-                      LIQUIDACIÓN DEL I.V.A.
-                    </Typography>
-                    {(() => {
-                      // Solo calcular IVA 10%
-                      const subtotalIva10 = facturaSeleccionada.detalles?.reduce((sum, d) => sum + d.subtotal, 0) || 0
-                      const ivaCalculado10 = subtotalIva10 * 0.1
-                      const totalIva = ivaCalculado10
-
-                      return (
-                        <>
-                          <Typography variant="body2">Sub Total Exentas: ₲ 0</Typography>
-                          <Typography variant="body2">Sub Total 5%: ₲ 0</Typography>
-                          <Typography variant="body2">
-                            Sub Total 10%: ₲ {subtotalIva10.toLocaleString("es-PY")}
-                          </Typography>
-                          <hr />
-                          <Typography variant="body2">I.V.A. 5%: ₲ 0</Typography>
-                          <Typography variant="body2">
-                            I.V.A. 10%: ₲ {ivaCalculado10.toLocaleString("es-PY")}
-                          </Typography>
-                          <Typography variant="body2" fontWeight="bold">
-                            TOTAL I.V.A.: ₲ {totalIva.toLocaleString("es-PY")}
-                          </Typography>
-                        </>
-                      )
-                    })()}
-                  </Box>
-                </Grid>
-                <Grid item xs={6}>
-                  <Box sx={{ border: "1px solid #000", p: 2, height: "100%" }}>
-                    <Typography variant="body1" fontWeight="bold">
-                      TOTAL GENERAL Gs.
-                    </Typography>
-                    <Box
-                      sx={{
-                        border: "2px solid #000",
-                        p: 1,
-                        textAlign: "center",
-                        bgcolor: "#f5f5f5",
-                        mt: 1,
-                      }}
-                    >
-                      <Typography variant="h6" fontWeight="bold">
-                        ₲ {facturaSeleccionada.montoTotal.toLocaleString("es-PY")}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogoVisualizacion(false)}>Cerrar</Button>
-          <Button
-            variant="contained"
-            startIcon={<PrintIcon />}
-            onClick={() => {
-              imprimirFactura(facturaSeleccionada)
-              setDialogoVisualizacion(false)
-            }}
-          >
-            Imprimir PDF
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Vista previa de factura */}
+      {facturaParaPrevia && (
+        <VistaPreviaFactura
+          open={vistaPreviaAbierta}
+          onClose={() => setVistaPreviaAbierta(false)}
+          facturaId={facturaParaPrevia}
+        />
+      )}
 
       {/* Snackbar para mensajes */}
       <Snackbar open={snackbar.abierto} autoHideDuration={6000} onClose={cerrarSnackbar}>
@@ -755,6 +493,138 @@ function FacturacionClientes() {
           {snackbar.mensaje}
         </Alert>
       </Snackbar>
+    </Grid>
+  )
+}
+
+// Componente para resumen de cuentas por cobrar
+function ResumenCuentasPorCobrar() {
+  const [resumen, setResumen] = useState(null)
+  const [cargando, setCargando] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    cargarResumen()
+  }, [])
+
+  const cargarResumen = async () => {
+    setCargando(true)
+    try {
+      const respuesta = await fetch("/api/finanzas/cuentas-cobrar?limite=5")
+      if (respuesta.ok) {
+        const datos = await respuesta.json()
+        setResumen(datos.resumen)
+      }
+    } catch (error) {
+      console.error("Error al cargar resumen:", error)
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const irACuentasPorCobrar = () => {
+    router.push("/finanzas/cuentas-cobrar")
+  }
+
+  if (cargando) {
+    return (
+      <Box display="flex" justifyContent="center" p={3}>
+        <CircularProgress />
+      </Box>
+    )
+  }
+
+  return (
+    <Grid container spacing={3}>
+      {/* Tarjetas de resumen */}
+      <Grid item xs={12} md={3}>
+        <Card>
+          <CardContent>
+            <Box display="flex" alignItems="center">
+              <AccountBalance color="primary" sx={{ mr: 2 }} />
+              <Box>
+                <Typography color="textSecondary" gutterBottom>
+                  Total por Cobrar
+                </Typography>
+                <Typography variant="h4" color="primary">
+                  ₲ {resumen?.totalPorCobrar?.toLocaleString("es-PY") || "0"}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={3}>
+        <Card>
+          <CardContent>
+            <Box display="flex" alignItems="center">
+              <Schedule color="warning" sx={{ mr: 2 }} />
+              <Box>
+                <Typography color="textSecondary" gutterBottom>
+                  Cuentas Pendientes
+                </Typography>
+                <Typography variant="h4" color="warning.main">
+                  {resumen?.totalCuentas || 0}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={3}>
+        <Card>
+          <CardContent>
+            <Box display="flex" alignItems="center">
+              <Warning color="error" sx={{ mr: 2 }} />
+              <Box>
+                <Typography color="textSecondary" gutterBottom>
+                  Cuentas Vencidas
+                </Typography>
+                <Typography variant="h4" color="error.main">
+                  {resumen?.cuentasVencidas || 0}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={3}>
+        <Card>
+          <CardContent>
+            <Box display="flex" alignItems="center">
+              <TrendingDown color="error" sx={{ mr: 2 }} />
+              <Box>
+                <Typography color="textSecondary" gutterBottom>
+                  Monto Vencido
+                </Typography>
+                <Typography variant="h4" color="error.main">
+                  ₲ {resumen?.montoVencido?.toLocaleString("es-PY") || "0"}
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* Botón para ir a la página completa */}
+      <Grid item xs={12}>
+        <Card>
+          <CardContent>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6">Gestión Completa de Cuentas por Cobrar</Typography>
+              <Button variant="contained" onClick={irACuentasPorCobrar} startIcon={<TrendingUp />}>
+                Ver Todas las Cuentas
+              </Button>
+            </Box>
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+              Acceda a la gestión completa de cuentas por cobrar, registro de pagos y seguimiento detallado.
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
     </Grid>
   )
 }
@@ -769,36 +639,6 @@ function FacturasProveedores() {
         </Typography>
         <Typography variant="body2" color="textSecondary">
           Gestión de facturas de proveedores - Próximamente disponible
-        </Typography>
-      </CardContent>
-    </Card>
-  )
-}
-
-function CuentasPorCobrar() {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Cuentas por Cobrar
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Gestión de facturas pendientes de cobro - Próximamente disponible
-        </Typography>
-      </CardContent>
-    </Card>
-  )
-}
-
-function CuentasPorPagar() {
-  return (
-    <Card>
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Cuentas por Pagar
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Gestión de facturas pendientes de pago - Próximamente disponible
         </Typography>
       </CardContent>
     </Card>

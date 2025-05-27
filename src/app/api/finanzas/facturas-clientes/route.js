@@ -7,7 +7,7 @@ const prisma = new PrismaClient()
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    const tipo = searchParams.get("tipo")
+    const tipo = searchParams.get("tipo") // "contado", "credito", o null para todos
     const estado = searchParams.get("estado")
     const cliente = searchParams.get("cliente")
     const fechaDesde = searchParams.get("fechaDesde")
@@ -22,7 +22,14 @@ export async function GET(request) {
       deletedAt: null,
     }
 
-    // Filtros
+    // Filtro por tipo de factura
+    if (tipo === "contado") {
+      whereClause.esContado = true
+    } else if (tipo === "credito") {
+      whereClause.esContado = false
+    }
+
+    // Filtros adicionales
     if (cliente) {
       whereClause.cliente = {
         persona: {
@@ -34,6 +41,10 @@ export async function GET(request) {
       }
     }
 
+    if (estado) {
+      whereClause.estadoFactuCliente = { descEstFactCliente: estado }
+    }
+
     if (fechaDesde && fechaHasta) {
       whereClause.fechaEmision = {
         gte: new Date(fechaDesde),
@@ -41,141 +52,65 @@ export async function GET(request) {
       }
     }
 
-    // Consultar facturas de contado y crédito por separado
-    let facturasContado = []
-    let facturasCredito = []
-    let totalContado = 0
-    let totalCredito = 0
+    // Contar total de facturas
+    const totalFacturas = await prisma.facturaCliente.count({
+      where: whereClause,
+    })
 
-    if (!tipo || tipo === "contado") {
-      const whereContado = {
-        ...whereClause,
-        ...(estado && { estadoFactuCliente: { descEstFactCliente: estado } }),
-      }
-
-      // Contar total de facturas contado
-      totalContado = await prisma.facturaClienteContado.count({
-        where: whereContado,
-      })
-
-      facturasContado = await prisma.facturaClienteContado.findMany({
-        where: whereContado,
-        include: {
-          cliente: {
-            include: {
-              persona: true,
-            },
+    // Obtener facturas con paginación
+    const facturas = await prisma.facturaCliente.findMany({
+      where: whereClause,
+      include: {
+        cliente: {
+          include: {
+            persona: true,
           },
-          estadoFactuCliente: true,
-          metodoPago: true,
-          pedidoCliente: true,
         },
-        orderBy: {
-          fechaEmision: "desc",
-        },
-        skip: tipo === "contado" ? skip : 0,
-        take: tipo === "contado" ? limite : undefined,
-      })
-    }
-
-    if (!tipo || tipo === "credito") {
-      const whereCredito = {
-        ...whereClause,
-        ...(estado && { estadoFactuCliente: { descEstFactCliente: estado } }),
-      }
-
-      // Contar total de facturas crédito
-      totalCredito = await prisma.facturaClienteCredito.count({
-        where: whereCredito,
-      })
-
-      facturasCredito = await prisma.facturaClienteCredito.findMany({
-        where: whereCredito,
-        include: {
-          cliente: {
-            include: {
-              persona: true,
-            },
+        estadoFactuCliente: true,
+        metodoPago: true,
+        pedidoCliente: true,
+        cuentaPorCobrar: {
+          include: {
+            estadoCuenta: true,
           },
-          estadoFactuCliente: true,
-          pedidoCliente: true,
-          detallePagoFacCliente: true,
         },
-        orderBy: {
-          fechaEmision: "desc",
-        },
-        skip: tipo === "credito" ? skip : 0,
-        take: tipo === "credito" ? limite : undefined,
-      })
-    }
+        pagos: true,
+      },
+      orderBy: {
+        fechaEmision: "desc",
+      },
+      skip,
+      take: limite,
+    })
 
     // Formatear respuesta
-    let facturas = [
-      ...facturasContado.map((f) => ({
-        nroFactura: f.nroFacClienteContado,
-        tipo: "contado",
-        fechaEmision: f.fechaEmision,
-        cliente: `${f.cliente.persona.nombre} ${f.cliente.persona.apellido}`,
-        montoTotal: Number.parseFloat(f.montoTotalFactura),
-        estado: f.estadoFactuCliente.descEstFactCliente,
-        metodoPago: f.metodoPago?.descMetodoPago,
-        observacion: f.observacion,
-        detalles: [], // Temporalmente vacío
-      })),
-      ...facturasCredito.map((f) => ({
-        nroFactura: f.nroFacClienteCredito,
-        tipo: "credito",
-        fechaEmision: f.fechaEmision,
-        fechaVencimiento: f.fechaVencimiento,
-        cliente: `${f.cliente.persona.nombre} ${f.cliente.persona.apellido}`,
-        montoTotal: Number.parseFloat(f.montoTotalFactura),
-        saldoRestante: f.saldoRestante,
-        plazoPago: f.plazoPago,
-        estado: f.estadoFactuCliente.descEstFactCliente,
-        observacion: f.observacion,
-        pagos: f.detallePagoFacCliente,
-      })),
-    ]
+    const facturasFormateadas = facturas.map((f) => ({
+      nroFactura: f.nroFactura,
+      tipo: f.esContado ? "contado" : "credito",
+      fechaEmision: f.fechaEmision,
+      fechaVencimiento: f.fechaVencimiento,
+      cliente: `${f.cliente.persona.nombre} ${f.cliente.persona.apellido}`,
+      montoTotal: Number.parseFloat(f.montoTotalFactura),
+      estado: f.estadoFactuCliente.descEstFactCliente,
+      metodoPago: f.metodoPago?.descMetodoPago,
+      observacion: f.observacion,
+      // Información específica para crédito
+      saldoRestante: f.cuentaPorCobrar?.saldoRestante || 0,
+      diasVencido: f.cuentaPorCobrar?.diasVencido || 0,
+      estadoCuenta: f.cuentaPorCobrar?.estadoCuenta?.descEstadoCuenta,
+      totalPagos: f.pagos?.reduce((sum, pago) => sum + pago.montoPago, 0) || 0,
+    }))
 
-    // Si no hay filtro de tipo, necesitamos paginar el resultado combinado
-    if (!tipo) {
-      // Ordenar por fecha de emisión descendente
-      facturas.sort((a, b) => new Date(b.fechaEmision) - new Date(a.fechaEmision))
-
-      const totalFacturas = totalContado + totalCredito
-      const totalPaginas = Math.ceil(totalFacturas / limite)
-
-      // Aplicar paginación al resultado combinado
-      facturas = facturas.slice(skip, skip + limite)
-
-      return NextResponse.json({
-        success: true,
-        data: facturas,
-        meta: {
-          page: pagina,
-          limit: limite,
-          total: totalFacturas,
-          totalPages: totalPaginas,
-          totalContado,
-          totalCredito,
-        },
-      })
-    }
-
-    // Para filtros específicos de tipo
-    const total = tipo === "contado" ? totalContado : totalCredito
-    const totalPaginas = Math.ceil(total / limite)
+    const totalPaginas = Math.ceil(totalFacturas / limite)
 
     return NextResponse.json({
       success: true,
-      data: facturas,
+      data: facturasFormateadas,
       meta: {
         page: pagina,
         limit: limite,
-        total: total,
+        total: totalFacturas,
         totalPages: totalPaginas,
-        totalContado,
-        totalCredito,
       },
     })
   } catch (error) {
@@ -188,12 +123,12 @@ export async function POST(request) {
   try {
     const data = await request.json()
     const {
-      tipo,
+      tipo, // "contado" o "credito"
       idCliente,
       idPedido,
       observacion = "",
       idMetodoPago, // Solo para contado
-      plazoPago, // Solo para crédito
+      plazoPago, // Solo para crédito (días)
       fechaVencimiento, // Solo para crédito
       operador = 1, // TODO: Obtener del token de autenticación
     } = data
@@ -201,6 +136,20 @@ export async function POST(request) {
     // Validaciones
     if (!tipo || !idCliente || !idPedido) {
       return NextResponse.json({ success: false, error: "Faltan campos requeridos" }, { status: 400 })
+    }
+
+    if (tipo === "contado" && !idMetodoPago) {
+      return NextResponse.json(
+        { success: false, error: "Método de pago requerido para factura al contado" },
+        { status: 400 },
+      )
+    }
+
+    if (tipo === "credito" && (!plazoPago || !fechaVencimiento)) {
+      return NextResponse.json(
+        { success: false, error: "Plazo de pago y fecha de vencimiento requeridos para factura a crédito" },
+        { status: 400 },
+      )
     }
 
     // Convertir valores a los tipos correctos
@@ -213,7 +162,7 @@ export async function POST(request) {
     }
 
     // Obtener datos del pedido con sus detalles
-    const pedido = await prisma.PedidoCliente.findUnique({
+    const pedido = await prisma.pedidoCliente.findUnique({
       where: { idPedido: idPedidoInt },
       include: {
         pedidoDetalle: {
@@ -244,58 +193,50 @@ export async function POST(request) {
       return 2 // IVA 10%
     }
 
-    // Función para obtener precio por paquete según el tipo de producto
+    // Función para obtener precio por paquete según el tipo de producto (PRECIOS REALES DE COMERCIALIZACIÓN)
     const obtenerPrecioPorPaquete = (producto) => {
       const tipoProducto = producto.tipoProducto?.descTipoProducto?.toLowerCase() || ""
 
-      // Precios según las reglas de negocio
+      // Precios de comercialización por paquete (YA INCLUYEN IVA)
       if (tipoProducto.includes("edulcorante")) {
-        return 150000 // 150.000 Gs por paquete de 1000 sobres
+        return 150000 // ₲150.000 por paquete de 1000 sobres
       } else if (tipoProducto.includes("sal")) {
-        return 100000 // 100.000 Gs por paquete de 1000 sobres
+        return 100000 // ₲100.000 por paquete de 1000 sobres
       } else if (tipoProducto.includes("azúcar") || tipoProducto.includes("azucar")) {
-        return 100000 // 100.000 Gs por paquete de 500 sobres
+        return 100000 // ₲100.000 por paquete de 500 sobres
       } else if (tipoProducto.includes("cocido")) {
-        return 2990 // 2.990 Gs por caja (10 unidades)
+        return 2990 // ₲2.990 por caja (10 unidades)
       }
 
-      // Si no coincide con ningún tipo conocido, usar el costoPorPaquete del producto
-      return Number.parseFloat(producto.costoPorPaquete || 0)
+      // Si no coincide con ningún tipo conocido, usar un precio por defecto
+      return 10000 // Precio por defecto
     }
 
     // Función para calcular línea de factura
-    const calcularLineaFactura = (detallePedido, idImpuesto) => {
-      const producto = detallePedido.producto
-      const cantidadPaquetes = Number.parseFloat(detallePedido.cantidad || 0)
+    const calcularLineaFactura = (detallePedido, productoBD) => {
+      const cantidadUnidades = Number.parseFloat(detallePedido.cantidad || 0)
 
-      // Obtener precio por paquete según el tipo de producto
-      const precioUnitarioPaquete = obtenerPrecioPorPaquete(producto)
+      // Obtener datos del producto
+      const unidadesPorPaquete = productoBD.unidadesPorPaquete || 1
+      const costoPorPaquete = Number.parseFloat(productoBD.costoPorPaquete || 0)
 
-      // Calcular subtotal (cantidad de paquetes × precio por paquete)
-      const subtotal = cantidadPaquetes * precioUnitarioPaquete
+      // Convertir unidades a paquetes
+      const cantidadPaquetes = Math.ceil(cantidadUnidades / unidadesPorPaquete)
 
-      // Obtener porcentaje de impuesto
-      let porcentajeImpuesto = 0
-      if (idImpuesto === 1)
-        porcentajeImpuesto = 0.05 // 5%
-      else if (idImpuesto === 2) porcentajeImpuesto = 0.1 // 10%
+      // Precio por paquete (ya incluye IVA)
+      const precioConIVA = costoPorPaquete
 
-      const montoImpuesto = subtotal * porcentajeImpuesto
-      const totalLinea = subtotal + montoImpuesto
+      // Total de línea (cantidad de paquetes × precio con IVA)
+      const totalLinea = cantidadPaquetes * precioConIVA
 
-      console.log(`Calculando línea para producto ${producto.nombreProducto}:`, {
-        cantidadPaquetes,
-        precioUnitarioPaquete,
-        subtotal,
-        montoImpuesto,
-        totalLinea,
-      })
+      // Calcular IVA (10% del total)
+      const montoImpuesto = Math.round(totalLinea * 0.1)
 
       return {
-        cantidad: cantidadPaquetes,
-        precioUnitario: precioUnitarioPaquete,
-        idImpuesto: idImpuesto || 2, // Default IVA 10%
-        subtotal,
+        cantidad: cantidadPaquetes, // CANTIDAD EN PAQUETES
+        precioUnitario: precioConIVA, // PRECIO POR PAQUETE
+        idImpuesto: 2, // IVA 10%
+        subtotal: 0, // No usar subtotal
         montoImpuesto,
         totalLinea,
       }
@@ -303,85 +244,88 @@ export async function POST(request) {
 
     // Crear la factura en una transacción
     const resultado = await prisma.$transaction(async (prisma) => {
-      let nuevaFactura
+      // Usar el monto total ya calculado del pedido
+      const montoTotalCalculado = Number.parseFloat(pedido.montoTotal)
 
-      if (tipo === "contado") {
-        if (!idMetodoPago) {
-          throw new Error("Método de pago requerido para factura al contado")
-        }
+      // Calcular detalles basados en los datos del pedido
+      const detallesCalculados = []
 
-        // Obtener el próximo número de factura
-        const ultimaFactura = await prisma.FacturaClienteContado.findFirst({
-          orderBy: { nroFacClienteContado: "desc" },
+      for (const detallePedido of pedido.pedidoDetalle) {
+        // Obtener información del producto desde la BD
+        const productoBD = await prisma.producto.findUnique({
+          where: { idProducto: detallePedido.idProducto },
+          include: { tipoProducto: true },
         })
 
-        const proximoNumero = ultimaFactura ? ultimaFactura.nroFacClienteContado + 1 : 1
+        if (!productoBD) continue
 
-        // Calcular el monto total real basado en precios por paquete
-        let montoTotalCalculado = 0
-        const detallesCalculados = []
+        // Calcular línea de factura con conversión correcta
+        const lineaFactura = calcularLineaFactura(detallePedido, productoBD)
 
-        for (const detallePedido of pedido.pedidoDetalle) {
-          const idImpuesto = determinarImpuesto(detallePedido.producto)
-          const lineaFactura = calcularLineaFactura(detallePedido, idImpuesto)
-          montoTotalCalculado += lineaFactura.totalLinea
-          detallesCalculados.push({
-            detallePedido,
-            lineaFactura,
-          })
-        }
+        detallesCalculados.push({
+          detallePedido,
+          lineaFactura,
+        })
+      }
 
-        console.log(`Monto total calculado: ${montoTotalCalculado}`)
+      // Usar el monto total del pedido (ya calculado correctamente)
+      const montoTotalFactura = montoTotalCalculado
 
-        // Crear factura de contado
-        nuevaFactura = await prisma.FacturaClienteContado.create({
+      // Preparar datos de la factura
+      const datosFactura = {
+        fechaEmision: new Date(),
+        idCliente: idClienteInt,
+        idPedido: idPedidoInt,
+        operador: operadorInt,
+        idImpuesto: 2, // IVA 10% por defecto para la factura
+        montoTotalFactura: montoTotalFactura, // Usar el monto del pedido
+        observacion,
+        esContado: tipo === "contado",
+        idEstadoFactuCliente: 1, // Estado "Emitida"
+      }
+
+      // Campos específicos según el tipo
+      if (tipo === "contado") {
+        datosFactura.idMetodoPago = Number.parseInt(idMetodoPago)
+      } else {
+        datosFactura.plazoPago = Number.parseInt(plazoPago)
+        datosFactura.fechaVencimiento = new Date(fechaVencimiento)
+      }
+
+      // Crear factura
+      const nuevaFactura = await prisma.facturaCliente.create({
+        data: datosFactura,
+      })
+
+      // Crear detalles de factura
+      for (const { detallePedido, lineaFactura } of detallesCalculados) {
+        await prisma.detalleFacturaCliente.create({
           data: {
-            nroFacClienteContado: proximoNumero,
-            fechaEmision: new Date(),
-            idCliente: idClienteInt,
-            idPedido: idPedidoInt,
-            operador: operadorInt,
-            idImpuesto: 2, // IVA 10% por defecto para la factura
-            montoTotalFactura: montoTotalCalculado,
-            observacion,
-            idMetodoPago: Number.parseInt(idMetodoPago),
-            idEstadoFactuCliente: 1, // Estado "Emitida"
+            nroFactura: nuevaFactura.nroFactura,
+            idProducto: detallePedido.idProducto,
+            cantidad: lineaFactura.cantidad,
+            precioUnitario: lineaFactura.precioUnitario,
+            idImpuesto: lineaFactura.idImpuesto,
+            subtotal: lineaFactura.subtotal,
+            montoImpuesto: lineaFactura.montoImpuesto,
+            totalLinea: lineaFactura.totalLinea,
           },
         })
+      }
 
-        // Crear detalles de factura
-        for (const { detallePedido, lineaFactura } of detallesCalculados) {
-          await prisma.DetalleFacturaClienteContado.create({
-            data: {
-              nroFacClienteContado: nuevaFactura.nroFacClienteContado,
-              idProducto: detallePedido.idProducto,
-              cantidad: lineaFactura.cantidad,
-              precioUnitario: lineaFactura.precioUnitario,
-              idImpuesto: lineaFactura.idImpuesto,
-              subtotal: lineaFactura.subtotal,
-              montoImpuesto: lineaFactura.montoImpuesto,
-              totalLinea: lineaFactura.totalLinea,
-            },
-          })
-        }
-
-        // Actualizar el monto total del pedido si es diferente
-        if (Math.abs(pedido.montoTotal - montoTotalCalculado) > 0.01) {
-          await prisma.PedidoCliente.update({
-            where: { idPedido: idPedidoInt },
-            data: {
-              montoTotal: montoTotalCalculado,
-              updatedAt: new Date(),
-            },
-          })
-          console.log(`Monto del pedido actualizado de ${pedido.montoTotal} a ${montoTotalCalculado}`)
-        }
-
-        // NO cambiar el estado del pedido - mantener el estado actual
-        // El pedido se cambiará manualmente después de la entrega física
-      } else {
-        // Lógica para crédito (implementar después)
-        throw new Error("Facturación a crédito no implementada aún")
+      // Si es factura a crédito, crear cuenta por cobrar
+      if (tipo === "credito") {
+        await prisma.cuentaPorCobrar.create({
+          data: {
+            nroFactura: nuevaFactura.nroFactura,
+            idCliente: idClienteInt,
+            montoOriginal: montoTotalFactura,
+            saldoRestante: montoTotalFactura,
+            fechaVencimiento: new Date(fechaVencimiento),
+            diasVencido: 0,
+            idEstadoCuenta: 1, // Estado "Vigente"
+          },
+        })
       }
 
       return nuevaFactura
@@ -390,8 +334,8 @@ export async function POST(request) {
     // Registrar auditoría
     const auditoriaService = new AuditoriaService()
     await auditoriaService.registrarCreacion(
-      "FacturaClienteContado",
-      resultado.nroFacClienteContado,
+      "FacturaCliente",
+      resultado.nroFactura,
       {
         tipo,
         cliente: `${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido}`,
@@ -399,8 +343,8 @@ export async function POST(request) {
         montoTotal: resultado.montoTotalFactura,
         observacion,
         fechaEmision: new Date().toISOString(),
-        idMetodoPago,
-        descripcion: `Factura al contado creada para cliente ${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido} - Pedido #${idPedidoInt}`,
+        esContado: tipo === "contado",
+        descripcion: `Factura ${tipo} creada para cliente ${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido} - Pedido #${idPedidoInt}`,
       },
       operadorInt,
       auditoriaService.obtenerDireccionIP(request),
@@ -410,7 +354,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       data: resultado,
-      message: "Factura al contado creada exitosamente",
+      message: `Factura ${tipo} creada exitosamente`,
     })
   } catch (error) {
     console.error("Error al crear factura:", error)

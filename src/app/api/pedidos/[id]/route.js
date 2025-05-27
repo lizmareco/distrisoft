@@ -11,6 +11,9 @@ const auditoriaService = new AuditoriaService()
 export async function GET(request, { params }) {
   let idPedido
   try {
+    // Await params para Next.js 15
+    const resolvedParams = await params
+
     // Verificar autenticación
     const token = await authController.hasAccessToken(request)
     let userData = null
@@ -38,8 +41,7 @@ export async function GET(request, { params }) {
     }
 
     // Extraer y convertir el ID de manera segura
-    // En Next.js 13+ con App Router, podemos acceder a params directamente
-    const paramId = params ? String(params.id || "0") : "0"
+    const paramId = resolvedParams ? String(resolvedParams.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
@@ -71,7 +73,7 @@ export async function GET(request, { params }) {
               select: {
                 nombre: true,
                 apellido: true,
-                nroDocumento: true, // Usar nroDocumento en lugar de dni
+                nroDocumento: true,
               },
             },
           },
@@ -93,20 +95,24 @@ export async function GET(request, { params }) {
         estadoPedido: {
           select: {
             idEstadoPedido: true,
-            descEstadoPedido: true, // Usar descEstadoPedido en lugar de nombre
+            descEstadoPedido: true,
           },
         },
-        // Seleccionar los detalles del pedido
+        // Seleccionar los detalles del pedido con información del producto
         pedidoDetalle: {
           select: {
             idPedido: true,
             idProducto: true,
-            cantidad: true,
-            subtotal: true, // Usar subtotal en lugar de precioUnitario
+            cantidad: true, // Esta es la cantidad en UNIDADES (sobres)
+            subtotal: true,
             producto: {
               select: {
                 idProducto: true,
                 nombreProducto: true,
+                unidadesPorPaquete: true, // Unidades por paquete
+                ventaPorPaquete: true,
+                costoPorPaquete: true, // Precio por paquete
+                precioUnitario: true, // Precio por unidad individual
               },
             },
           },
@@ -125,12 +131,44 @@ export async function GET(request, { params }) {
     // Función para convertir fecha a string en formato YYYY-MM-DD
     const formatearFechaSimple = (fecha) => {
       if (!fecha) return null
-      // Convertir directamente a string y tomar solo la parte de la fecha
       return fecha.toISOString().split("T")[0]
     }
 
-    // Imprimir la fecha original para depuración
-    console.log("Fecha original:", pedido.fechaPedido)
+    // Procesar los detalles del pedido para calcular correctamente
+    const detallesProcesados = pedido.pedidoDetalle.map((detalle) => {
+      const producto = detalle.producto
+      const cantidadUnidades = detalle.cantidad // Cantidad en unidades (sobres)
+      const unidadesPorPaquete = producto.unidadesPorPaquete || 1
+      const costoPorPaquete = Number(producto.costoPorPaquete) || 0
+
+      // Calcular cuántos paquetes completos se necesitan
+      const cantidadPaquetes = Math.ceil(cantidadUnidades / unidadesPorPaquete)
+
+      // Calcular el subtotal basado en paquetes completos
+      const subtotalCalculado = cantidadPaquetes * costoPorPaquete
+
+      // Calcular precio por unidad para mostrar
+      const precioUnitarioCalculado = costoPorPaquete / unidadesPorPaquete
+
+      return {
+        ...detalle,
+        cantidadUnidades: cantidadUnidades, // Cantidad original en unidades
+        cantidadPaquetes: cantidadPaquetes, // Paquetes necesarios
+        unidadesPorPaquete: unidadesPorPaquete,
+        costoPorPaquete: costoPorPaquete,
+        precioUnitarioCalculado: precioUnitarioCalculado,
+        subtotalCalculado: subtotalCalculado,
+        producto: {
+          ...producto,
+          costoPorPaquete: costoPorPaquete,
+        },
+      }
+    })
+
+    // Recalcular el monto total basado en los paquetes necesarios
+    const montoTotalCalculado = detallesProcesados.reduce((total, detalle) => {
+      return total + detalle.subtotalCalculado
+    }, 0)
 
     const pedidoFormateado = {
       ...pedido,
@@ -141,15 +179,16 @@ export async function GET(request, { params }) {
       createdAt: pedido.createdAt ? pedido.createdAt.toISOString() : null,
       updatedAt: pedido.updatedAt ? pedido.updatedAt.toISOString() : null,
       deletedAt: pedido.deletedAt ? pedido.deletedAt.toISOString() : null,
+      // Usar el monto total calculado correctamente
+      montoTotal: montoTotalCalculado,
+      montoTotalOriginal: pedido.montoTotal, // Mantener el original para referencia
+      // Usar los detalles procesados
+      pedidoDetalle: detallesProcesados,
     }
 
-    // Imprimir fechas para depuración
-    console.log(`API: Fechas del pedido ${idPedido} formateadas:`, {
-      fechaPedido: pedidoFormateado.fechaPedido,
-      fechaEntrega: pedidoFormateado.fechaEntrega,
-    })
+    console.log(`API: Pedido con ID ${idPedido} obtenido y procesado correctamente`)
+    console.log(`Monto total original: ${pedido.montoTotal}, Monto total calculado: ${montoTotalCalculado}`)
 
-    console.log(`API: Pedido con ID ${idPedido} obtenido correctamente`)
     return NextResponse.json(pedidoFormateado)
   } catch (error) {
     console.error(`API: Error al obtener pedido con ID ${idPedido || "desconocido"}:`, error)
@@ -161,6 +200,9 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   let idPedido
   try {
+    // Await params para Next.js 15
+    const resolvedParams = await params
+
     // Verificar autenticación
     const token = await authController.hasAccessToken(request)
     let userData = null
@@ -188,7 +230,7 @@ export async function PUT(request, { params }) {
     }
 
     // Extraer y convertir el ID de manera segura
-    const paramId = params ? String(params.id || "0") : "0"
+    const paramId = resolvedParams ? String(resolvedParams.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {
@@ -231,21 +273,37 @@ export async function PUT(request, { params }) {
       detalles: pedidoExistente.pedidoDetalle,
     }
 
-    // Verificar la estructura de la tabla pedidoDetalle
-    console.log("API: Verificando estructura de pedidoDetalle...")
-    try {
-      const detalleEjemplo = await prisma.pedidoDetalle.findFirst({
-        where: {
-          idPedido: idPedido,
-        },
+    // Función para calcular el costo por paquetes necesarios
+    const calcularCostoPorPaquetes = async (idProducto, cantidadUnidades) => {
+      const producto = await prisma.producto.findUnique({
+        where: { idProducto },
+        select: { unidadesPorPaquete: true, costoPorPaquete: true },
       })
-      console.log("API: Ejemplo de detalle encontrado:", detalleEjemplo)
-    } catch (error) {
-      console.error("API: Error al verificar estructura:", error)
+
+      if (!producto) return { paquetesNecesarios: 0, costoTotal: 0 }
+
+      const unidadesPorPaquete = producto.unidadesPorPaquete || 1
+      const costoPorPaquete = Number(producto.costoPorPaquete) || 0
+
+      // Calcular paquetes necesarios (redondear hacia arriba)
+      const paquetesNecesarios = Math.ceil(cantidadUnidades / unidadesPorPaquete)
+      const costoTotal = paquetesNecesarios * costoPorPaquete
+
+      return { paquetesNecesarios, costoTotal }
     }
 
     // Actualizar el pedido y sus detalles en una transacción
     const resultado = await prisma.$transaction(async (prisma) => {
+      // Calcular el monto total correcto basado en paquetes necesarios
+      let montoTotalCalculado = 0
+
+      if (datos.detalles && datos.detalles.length > 0) {
+        for (const detalle of datos.detalles) {
+          const { costoTotal } = await calcularCostoPorPaquetes(detalle.idProducto, detalle.cantidad)
+          montoTotalCalculado += costoTotal
+        }
+      }
+
       // Actualizar el pedido
       const pedidoActualizado = await prisma.pedidoCliente.update({
         where: {
@@ -253,12 +311,12 @@ export async function PUT(request, { params }) {
         },
         data: {
           fechaPedido: new Date(datos.pedido.fechaPedido),
-          fechaEntrega: new Date(datos.pedido.fechaEntrega), // Asegurarse de que se actualice la fecha de entrega
+          fechaEntrega: new Date(datos.pedido.fechaEntrega),
           idCliente: datos.pedido.idCliente,
-          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario || userData.idUsuario, // Usar idUsuario si vendedor no está disponible
+          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario || userData.idUsuario,
           idEstadoPedido: datos.pedido.idEstadoPedido,
           observacion: datos.pedido.observacion || "",
-          montoTotal: datos.pedido.montoTotal,
+          montoTotal: montoTotalCalculado, // Usar el monto calculado correctamente
         },
       })
 
@@ -272,17 +330,18 @@ export async function PUT(request, { params }) {
           },
         })
 
-        // Crear nuevos detalles
-        const detallesPromises = datos.detalles.map((detalle) =>
-          prisma.pedidoDetalle.create({
+        // Crear nuevos detalles con cálculos correctos
+        const detallesPromises = datos.detalles.map(async (detalle) => {
+          const { costoTotal } = await calcularCostoPorPaquetes(detalle.idProducto, detalle.cantidad)
+          return prisma.pedidoDetalle.create({
             data: {
               idPedido: idPedido,
               idProducto: detalle.idProducto,
-              cantidad: detalle.cantidad,
-              subtotal: detalle.precioUnitario * detalle.cantidad, // Calcular subtotal
+              cantidad: detalle.cantidad, // Cantidad en unidades (sobres)
+              subtotal: costoTotal, // Costo total basado en paquetes necesarios
             },
-          }),
-        )
+          })
+        })
 
         detallesCreados = await Promise.all(detallesPromises)
       }
@@ -324,6 +383,9 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   let idPedido
   try {
+    // Await params para Next.js 15
+    const resolvedParams = await params
+
     // Verificar autenticación
     const token = await authController.hasAccessToken(request)
     let userData = null
@@ -351,7 +413,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Extraer y convertir el ID de manera segura
-    const paramId = params ? String(params.id || "0") : "0"
+    const paramId = resolvedParams ? String(resolvedParams.id || "0") : "0"
     idPedido = Number.parseInt(paramId)
 
     if (!idPedido) {

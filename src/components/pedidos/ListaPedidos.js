@@ -92,38 +92,118 @@ export default function ListaPedidos() {
   const [configuracionFactura, setConfiguracionFactura] = useState({
     metodoPago: 1,
     observaciones: "",
+    // Campos para crédito
+    diasCredito: 30,
+    fechaVencimiento: "",
   })
 
-  // Función para verificar si un pedido ya tiene facturas
+  // Estado mejorado para tracking de facturas
+  const [pedidosConFacturas, setPedidosConFacturas] = useState(new Set())
+  const [cargandoFacturas, setCargandoFacturas] = useState(false)
+
+  // Función mejorada para verificar si un pedido ya tiene facturas
   const verificarFacturasExistentes = async (idPedido) => {
     try {
-      const respuesta = await fetch(`/api/pedidos/${idPedido}/facturas`)
-      if (respuesta.ok) {
-        const datos = await respuesta.json()
-        return datos.tieneFacturas || false
+      console.log(`Verificando facturas para pedido ${idPedido}`)
+
+      // Primero intentar con el endpoint específico del pedido
+      let respuesta = await fetch(`/api/pedidos/${idPedido}/facturas`)
+
+      if (!respuesta.ok) {
+        console.warn(`Endpoint de pedido falló, intentando con facturas-clientes`)
+        // Si falla, intentar con el endpoint de facturas-clientes
+        respuesta = await fetch(`/api/finanzas/facturas-clientes?idPedido=${idPedido}`)
       }
-      return false
+
+      if (!respuesta.ok) {
+        console.warn(`Error ${respuesta.status} al verificar facturas para pedido ${idPedido}`)
+        return false
+      }
+
+      const datos = await respuesta.json()
+
+      // Verificar diferentes formatos de respuesta
+      let tieneFacturas = false
+      if (datos.tieneFacturas !== undefined) {
+        tieneFacturas = datos.tieneFacturas
+      } else if (Array.isArray(datos) && datos.length > 0) {
+        tieneFacturas = true
+      } else if (datos.facturas && Array.isArray(datos.facturas) && datos.facturas.length > 0) {
+        tieneFacturas = true
+      }
+
+      console.log(`Pedido ${idPedido} tiene facturas:`, tieneFacturas)
+      return tieneFacturas
     } catch (error) {
-      console.error("Error al verificar facturas:", error)
+      console.error(`Error al verificar facturas para pedido ${idPedido}:`, error)
       return false
     }
   }
 
-  // Actualizar el estado para incluir información de facturas
-  const [pedidosConFacturas, setPedidosConFacturas] = useState(new Set())
-
   // Función para cargar información de facturas para los pedidos
   const cargarInfoFacturas = async (pedidosList) => {
-    const pedidosConFacturasSet = new Set()
-
-    for (const pedido of pedidosList) {
-      const tieneFacturas = await verificarFacturasExistentes(pedido.idPedido)
-      if (tieneFacturas) {
-        pedidosConFacturasSet.add(pedido.idPedido)
-      }
+    if (!pedidosList || pedidosList.length === 0) {
+      setPedidosConFacturas(new Set())
+      return
     }
 
-    setPedidosConFacturas(pedidosConFacturasSet)
+    setCargandoFacturas(true)
+    const pedidosConFacturasSet = new Set()
+
+    try {
+      // Procesar en lotes más pequeños para mejor rendimiento
+      const batchSize = 3
+      for (let i = 0; i < pedidosList.length; i += batchSize) {
+        const batch = pedidosList.slice(i, i + batchSize)
+
+        const promesas = batch.map(async (pedido) => {
+          try {
+            const tieneFacturas = await verificarFacturasExistentes(pedido.idPedido)
+            if (tieneFacturas) {
+              pedidosConFacturasSet.add(pedido.idPedido)
+            }
+            return { idPedido: pedido.idPedido, tieneFacturas }
+          } catch (error) {
+            console.error(`Error procesando pedido ${pedido.idPedido}:`, error)
+            return { idPedido: pedido.idPedido, tieneFacturas: false }
+          }
+        })
+
+        await Promise.all(promesas)
+
+        // Pequeña pausa entre lotes para no sobrecargar el servidor
+        if (i + batchSize < pedidosList.length) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+      }
+
+      setPedidosConFacturas(pedidosConFacturasSet)
+      console.log(`Cargadas facturas para ${pedidosConFacturasSet.size} de ${pedidosList.length} pedidos`)
+    } catch (error) {
+      console.error("Error general al cargar info de facturas:", error)
+    } finally {
+      setCargandoFacturas(false)
+    }
+  }
+
+  // Función para refrescar el estado de facturas de un pedido específico
+  const refrescarEstadoFactura = async (idPedido) => {
+    try {
+      const tieneFacturas = await verificarFacturasExistentes(idPedido)
+      setPedidosConFacturas((prev) => {
+        const nuevo = new Set(prev)
+        if (tieneFacturas) {
+          nuevo.add(idPedido)
+        } else {
+          nuevo.delete(idPedido)
+        }
+        return nuevo
+      })
+      return tieneFacturas
+    } catch (error) {
+      console.error(`Error al refrescar estado de factura para pedido ${idPedido}:`, error)
+      return false
+    }
   }
 
   // Cargar estados al inicializar
@@ -180,9 +260,16 @@ export default function ListaPedidos() {
   const abrirDialogoFacturacion = (pedido) => {
     setPedidoAFacturar(pedido)
     setTipoFactura("")
+
+    // Calcular fecha de vencimiento por defecto (30 días)
+    const fechaVencimiento = new Date()
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + 30)
+
     setConfiguracionFactura({
       metodoPago: 1,
       observaciones: `Factura generada desde pedido #${pedido.idPedido}`,
+      diasCredito: 30,
+      fechaVencimiento: fechaVencimiento.toISOString().split("T")[0],
     })
     setDialogoFacturacion(true)
   }
@@ -212,7 +299,12 @@ export default function ListaPedidos() {
       // Agregar campos específicos según el tipo
       if (tipoFactura === "contado") {
         datosFactura.idMetodoPago = configuracionFactura.metodoPago
+      } else if (tipoFactura === "credito") {
+        datosFactura.plazoPago = configuracionFactura.diasCredito
+        datosFactura.fechaVencimiento = configuracionFactura.fechaVencimiento
       }
+
+      console.log("Enviando datos de factura:", datosFactura)
 
       const respuesta = await fetch("/api/finanzas/facturas-clientes", {
         method: "POST",
@@ -228,9 +320,15 @@ export default function ListaPedidos() {
       }
 
       const resultado = await respuesta.json()
+      console.log("Factura generada exitosamente:", resultado)
 
-      // Actualizar el estado para marcar este pedido como facturado
+      // Actualizar inmediatamente el estado local
       setPedidosConFacturas((prev) => new Set([...prev, pedidoAFacturar.idPedido]))
+
+      // Refrescar el estado desde el servidor para confirmar
+      setTimeout(async () => {
+        await refrescarEstadoFactura(pedidoAFacturar.idPedido)
+      }, 1000)
 
       setSnackbar({
         abierto: true,
@@ -252,6 +350,23 @@ export default function ListaPedidos() {
     } finally {
       setCargandoFactura(false)
     }
+  }
+
+  // Función para calcular fecha de vencimiento basada en días de crédito
+  const calcularFechaVencimiento = (dias) => {
+    const fecha = new Date()
+    fecha.setDate(fecha.getDate() + Number.parseInt(dias))
+    return fecha.toISOString().split("T")[0]
+  }
+
+  // Función para manejar cambio en días de crédito
+  const handleDiasCreditoChange = (dias) => {
+    const nuevaFechaVencimiento = calcularFechaVencimiento(dias)
+    setConfiguracionFactura((prev) => ({
+      ...prev,
+      diasCredito: dias,
+      fechaVencimiento: nuevaFechaVencimiento,
+    }))
   }
 
   // Función para manejar cambios en la configuración
@@ -409,18 +524,6 @@ export default function ListaPedidos() {
 
   // Aplicar filtros y buscar pedidos
   const aplicarFiltros = async (nuevaPagina = 1) => {
-    // Validar que al menos un filtro esté seleccionado
-    const tieneAlgunFiltro = filtros.cliente || filtros.estado || filtros.fechaDesde || filtros.fechaHasta
-
-    if (!tieneAlgunFiltro) {
-      setSnackbar({
-        abierto: true,
-        mensaje: "Debe seleccionar al menos un filtro para buscar pedidos",
-        tipo: "warning",
-      })
-      return
-    }
-
     setCargando(true)
     setError(null)
 
@@ -518,13 +621,15 @@ export default function ListaPedidos() {
     }
   }
 
-  // Función para renderizar botones de acción según el estado
+  // Función mejorada para renderizar botones de acción según el estado
   const renderBotonesAccion = (pedido) => {
     const idEstado = pedido.estadoPedido?.idEstadoPedido
     const tieneFacturas = pedidosConFacturas.has(pedido.idPedido)
 
+    console.log(`Pedido ${pedido.idPedido}: estado=${idEstado}, tieneFacturas=${tieneFacturas}`)
+
     return (
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
         {/* Botón Ver detalles - siempre habilitado */}
         <IconButton color="info" onClick={() => irAVerPedido(pedido.idPedido)} title="Ver detalles">
           <VisibilityIcon />
@@ -592,6 +697,9 @@ export default function ListaPedidos() {
             CAMBIAR ESTADO
           </Button>
         )}
+
+        {/* Indicador de carga de facturas */}
+        {cargandoFacturas && <CircularProgress size={16} sx={{ ml: 1 }} />}
       </Box>
     )
   }
@@ -618,6 +726,7 @@ export default function ListaPedidos() {
     setPedidos([])
     setFiltrosAplicados(false)
     setError(null)
+    setPedidosConFacturas(new Set())
     setPaginacion({
       ...paginacion,
       pagina: 1,
@@ -683,6 +792,13 @@ export default function ListaPedidos() {
 
       // Actualizar la lista de pedidos
       setPedidos(pedidos.filter((p) => p.idPedido !== pedidoAEliminar.idPedido))
+
+      // Remover del estado de facturas también
+      setPedidosConFacturas((prev) => {
+        const nuevo = new Set(prev)
+        nuevo.delete(pedidoAEliminar.idPedido)
+        return nuevo
+      })
 
       // Mostrar mensaje de éxito
       setSnackbar({
@@ -942,6 +1058,7 @@ export default function ListaPedidos() {
           <Typography variant="body2" color="text.secondary">
             Mostrando {pedidos.length} de {paginacion.totalRegistros} pedidos
             {paginacion.totalPaginas > 1 && ` (Página ${paginacion.pagina} de ${paginacion.totalPaginas})`}
+            {cargandoFacturas && " (Cargando estado de facturas...)"}
           </Typography>
           {paginacion.totalPaginas > 1 && (
             <Pagination
@@ -960,8 +1077,8 @@ export default function ListaPedidos() {
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="body1" color="text.secondary" align="center">
-              Seleccione los filtros y haga clic en "Buscar" para ver los pedidos, o "Mostrar Todos" para ver todos los
-              pedidos.
+              Use los filtros y haga clic en "Buscar" para encontrar pedidos específicos, o haga clic en "Mostrar Todos"
+              para ver todos los pedidos del sistema.
             </Typography>
           </CardContent>
         </Card>
@@ -1169,14 +1286,13 @@ export default function ListaPedidos() {
                 color="secondary"
                 onClick={() => setTipoFactura("credito")}
                 sx={{ width: "100%", p: 2, textAlign: "left" }}
-                disabled
               >
                 <Box>
                   <Typography variant="subtitle1" fontWeight="bold">
                     Factura a Crédito
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Próximamente disponible
+                    Pago diferido con fecha de vencimiento
                   </Typography>
                 </Box>
               </Button>
@@ -1215,6 +1331,68 @@ export default function ListaPedidos() {
                     onChange={(e) => handleConfiguracionChange("observaciones", e.target.value)}
                     size="small"
                   />
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+
+          {/* Configuración específica para crédito */}
+          {tipoFactura === "credito" && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: "grey.50", borderRadius: 1 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Configuración de Factura a Crédito:
+              </Typography>
+
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Días de Crédito</InputLabel>
+                    <Select
+                      value={configuracionFactura.diasCredito}
+                      onChange={(e) => handleDiasCreditoChange(e.target.value)}
+                      label="Días de Crédito"
+                    >
+                      <MenuItem value={15}>15 días</MenuItem>
+                      <MenuItem value={30}>30 días</MenuItem>
+                      <MenuItem value={45}>45 días</MenuItem>
+                      <MenuItem value={60}>60 días</MenuItem>
+                      <MenuItem value={90}>90 días</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="Fecha de Vencimiento"
+                    type="date"
+                    value={configuracionFactura.fechaVencimiento}
+                    onChange={(e) => handleConfiguracionChange("fechaVencimiento", e.target.value)}
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Observaciones"
+                    multiline
+                    rows={2}
+                    value={configuracionFactura.observaciones}
+                    onChange={(e) => handleConfiguracionChange("observaciones", e.target.value)}
+                    size="small"
+                    placeholder="Condiciones de pago, términos especiales, etc."
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box sx={{ p: 2, bgcolor: "info.light", borderRadius: 1 }}>
+                    <Typography variant="body2" color="info.dark">
+                      <strong>Nota:</strong> Las facturas a crédito generarán automáticamente una cuenta por cobrar que
+                      podrá ser gestionada desde el módulo de finanzas.
+                    </Typography>
+                  </Box>
                 </Grid>
               </Grid>
             </Box>

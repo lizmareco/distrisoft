@@ -4,152 +4,39 @@ import AuditoriaService from "@/src/backend/services/auditoria-service"
 
 const prisma = new PrismaClient()
 
-export async function POST(request) {
-  try {
-    const data = await request.json()
-    const {
-      nroFacClienteCredito,
-      montoPago,
-      fechaPago,
-      idMetodoPago,
-      comprobantePago,
-      observacion = "",
-      operador = 1,
-    } = data
-
-    // Validaciones
-    if (!nroFacClienteCredito || !montoPago || !fechaPago || !idMetodoPago) {
-      return NextResponse.json({ success: false, error: "Faltan campos requeridos" }, { status: 400 })
-    }
-
-    const nroFacturaInt = Number.parseInt(nroFacClienteCredito)
-    const montoInt = Number.parseFloat(montoPago)
-    const metodoPagoInt = Number.parseInt(idMetodoPago)
-    const operadorInt = Number.parseInt(operador)
-
-    if (isNaN(nroFacturaInt) || isNaN(montoInt) || isNaN(metodoPagoInt) || isNaN(operadorInt)) {
-      return NextResponse.json({ success: false, error: "Valores inválidos" }, { status: 400 })
-    }
-
-    if (montoInt <= 0) {
-      return NextResponse.json({ success: false, error: "El monto debe ser mayor a 0" }, { status: 400 })
-    }
-
-    // Verificar que la factura existe y tiene saldo pendiente
-    const factura = await prisma.facturaClienteCredito.findUnique({
-      where: { nroFacClienteCredito: nroFacturaInt },
-      include: {
-        cliente: { include: { persona: true } },
-      },
-    })
-
-    if (!factura) {
-      return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
-    }
-
-    if (factura.saldoRestante < montoInt) {
-      return NextResponse.json(
-        { success: false, error: "El monto del pago excede el saldo pendiente" },
-        { status: 400 },
-      )
-    }
-
-    // Iniciar transacción
-    const resultado = await prisma.$transaction(async (tx) => {
-      // Registrar el pago
-      const nuevoPago = await tx.detallePagoFacCliente.create({
-        data: {
-          nroFacClienteCredito: nroFacturaInt,
-          fechaPago: new Date(fechaPago),
-          montoPago: montoInt,
-          idMetodoPago: metodoPagoInt,
-          observacion,
-          comprobantePago: comprobantePago || "",
-        },
-      })
-
-      // Actualizar saldo restante de la factura
-      const nuevoSaldo = factura.saldoRestante - montoInt
-      const facturaActualizada = await tx.facturaClienteCredito.update({
-        where: { nroFacClienteCredito: nroFacturaInt },
-        data: {
-          saldoRestante: nuevoSaldo,
-          // Si el saldo llega a 0, cambiar estado a "Pagada"
-          ...(nuevoSaldo === 0 && { idEstadoFactuCliente: 2 }),
-          updatedAt: new Date(),
-        },
-      })
-
-      return { nuevoPago, facturaActualizada, nuevoSaldo }
-    })
-
-    // Registrar auditoría del pago
-    const auditoriaService = new AuditoriaService()
-    await auditoriaService.registrarCreacion(
-      "DetallePagoFacCliente",
-      resultado.nuevoPago.idPagoFactura,
-      {
-        nroFacClienteCredito: nroFacturaInt,
-        cliente: `${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
-        montoPago: montoInt,
-        fechaPago,
-        metodoPago: metodoPagoInt,
-        comprobantePago,
-        observacion,
-        saldoAnterior: factura.saldoRestante,
-        saldoNuevo: resultado.nuevoSaldo,
-        descripcion: `Pago registrado para factura #${nroFacturaInt} - Cliente: ${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
-      },
-      operadorInt,
-      auditoriaService.obtenerDireccionIP(request),
-      auditoriaService.obtenerInfoNavegador(request),
-    )
-
-    // Si el saldo llegó a 0, registrar auditoría de actualización de factura
-    if (resultado.nuevoSaldo === 0) {
-      await auditoriaService.registrarActualizacion(
-        "FacturaClienteCredito",
-        nroFacturaInt,
-        {
-          saldoRestante: factura.saldoRestante,
-          estado: "Pendiente",
-        },
-        {
-          saldoRestante: 0,
-          estado: "Pagada",
-          descripcion: `Factura completamente pagada - Cliente: ${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
-        },
-        operadorInt,
-        auditoriaService.obtenerDireccionIP(request),
-        auditoriaService.obtenerInfoNavegador(request),
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: resultado.nuevoPago,
-      saldoRestante: resultado.nuevoSaldo,
-      message: "Pago registrado exitosamente",
-    })
-  } catch (error) {
-    console.error("Error al registrar pago:", error)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-  }
-}
-
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const nroFactura = searchParams.get("nroFactura")
+    const cliente = searchParams.get("cliente")
     const fechaDesde = searchParams.get("fechaDesde")
     const fechaHasta = searchParams.get("fechaHasta")
+
+    // Parámetros de paginación
+    const pagina = Number.parseInt(searchParams.get("pagina") || "1")
+    const limite = Number.parseInt(searchParams.get("limite") || "10")
+    const skip = (pagina - 1) * limite
 
     const whereClause = {
       deletedAt: null,
     }
 
+    // Filtros
     if (nroFactura) {
-      whereClause.nroFacClienteCredito = Number.parseInt(nroFactura)
+      whereClause.nroFactura = Number.parseInt(nroFactura)
+    }
+
+    if (cliente) {
+      whereClause.facturaCliente = {
+        cliente: {
+          persona: {
+            OR: [
+              { nombre: { contains: cliente, mode: "insensitive" } },
+              { apellido: { contains: cliente, mode: "insensitive" } },
+            ],
+          },
+        },
+      }
     }
 
     if (fechaDesde && fechaHasta) {
@@ -159,10 +46,10 @@ export async function GET(request) {
       }
     }
 
-    const pagos = await prisma.detallePagoFacCliente.findMany({
+    const pagos = await prisma.pagoFacturaCliente.findMany({
       where: whereClause,
       include: {
-        facturaClienteCredito: {
+        facturaCliente: {
           include: {
             cliente: {
               include: {
@@ -171,30 +58,188 @@ export async function GET(request) {
             },
           },
         },
+        cuentaPorCobrar: true,
         metodoPago: true,
+        usuario: {
+          include: {
+            persona: true,
+          },
+        },
       },
       orderBy: {
         fechaPago: "desc",
       },
+      skip,
+      take: limite,
+    })
+
+    // Contar total
+    const totalRegistros = await prisma.pagoFacturaCliente.count({
+      where: whereClause,
     })
 
     const pagosFormateados = pagos.map((pago) => ({
-      idPago: pago.idPagoFactura,
-      nroFactura: pago.nroFacClienteCredito,
-      cliente: `${pago.facturaClienteCredito.cliente.persona.nombre} ${pago.facturaClienteCredito.cliente.persona.apellido}`,
-      montoPago: pago.montoPago,
+      idPago: pago.idPago,
+      nroFactura: pago.nroFactura,
+      cliente: `${pago.facturaCliente.cliente.persona.nombre} ${pago.facturaCliente.cliente.persona.apellido}`,
       fechaPago: pago.fechaPago,
+      montoPago: pago.montoPago,
       metodoPago: pago.metodoPago.descMetodoPago,
       comprobantePago: pago.comprobantePago,
-      observacion: pago.observacion,
+      observaciones: pago.observaciones,
+      operador: `${pago.usuario.persona.nombre} ${pago.usuario.persona.apellido}`,
+      saldoRestante: pago.cuentaPorCobrar?.saldoRestante || 0,
     }))
+
+    const totalPaginas = Math.ceil(totalRegistros / limite)
 
     return NextResponse.json({
       success: true,
       data: pagosFormateados,
+      meta: {
+        page: pagina,
+        limit: limite,
+        total: totalRegistros,
+        totalPages: totalPaginas,
+      },
     })
   } catch (error) {
     console.error("Error al obtener pagos:", error)
     return NextResponse.json({ success: false, error: "Error interno del servidor" }, { status: 500 })
+  }
+}
+
+export async function POST(request) {
+  try {
+    const data = await request.json()
+    const { nroFactura, montoPago, idMetodoPago, comprobantePago = "", observaciones = "", operador = 1 } = data
+
+    // Validaciones
+    if (!nroFactura || !montoPago || !idMetodoPago) {
+      return NextResponse.json({ success: false, error: "Faltan campos requeridos" }, { status: 400 })
+    }
+
+    const nroFacturaInt = Number.parseInt(nroFactura)
+    const montoPagoFloat = Number.parseFloat(montoPago)
+    const idMetodoPagoInt = Number.parseInt(idMetodoPago)
+    const operadorInt = Number.parseInt(operador)
+
+    if (isNaN(nroFacturaInt) || isNaN(montoPagoFloat) || isNaN(idMetodoPagoInt) || isNaN(operadorInt)) {
+      return NextResponse.json({ success: false, error: "Valores inválidos" }, { status: 400 })
+    }
+
+    if (montoPagoFloat <= 0) {
+      return NextResponse.json({ success: false, error: "El monto del pago debe ser mayor a cero" }, { status: 400 })
+    }
+
+    // Verificar que la factura existe y es a crédito
+    const factura = await prisma.facturaCliente.findUnique({
+      where: { nroFactura: nroFacturaInt },
+      include: {
+        cuentaPorCobrar: true,
+        cliente: {
+          include: {
+            persona: true,
+          },
+        },
+      },
+    })
+
+    if (!factura) {
+      return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
+    }
+
+    if (factura.esContado) {
+      return NextResponse.json(
+        { success: false, error: "No se pueden registrar pagos en facturas de contado" },
+        { status: 400 },
+      )
+    }
+
+    if (!factura.cuentaPorCobrar) {
+      return NextResponse.json(
+        { success: false, error: "No se encontró la cuenta por cobrar asociada" },
+        { status: 404 },
+      )
+    }
+
+    if (factura.cuentaPorCobrar.saldoRestante <= 0) {
+      return NextResponse.json({ success: false, error: "Esta factura ya está completamente pagada" }, { status: 400 })
+    }
+
+    if (montoPagoFloat > factura.cuentaPorCobrar.saldoRestante) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `El monto del pago (${montoPagoFloat}) no puede ser mayor al saldo restante (${factura.cuentaPorCobrar.saldoRestante})`,
+        },
+        { status: 400 },
+      )
+    }
+
+    // Registrar el pago en una transacción
+    const resultado = await prisma.$transaction(async (prisma) => {
+      // Crear el registro de pago
+      const nuevoPago = await prisma.pagoFacturaCliente.create({
+        data: {
+          nroFactura: nroFacturaInt,
+          idCuentaCobrar: factura.cuentaPorCobrar.idCuentaCobrar,
+          fechaPago: new Date(),
+          montoPago: montoPagoFloat,
+          idMetodoPago: idMetodoPagoInt,
+          comprobantePago,
+          observaciones,
+          operador: operadorInt,
+        },
+      })
+
+      // Actualizar el saldo restante en la cuenta por cobrar
+      const nuevoSaldoRestante = factura.cuentaPorCobrar.saldoRestante - montoPagoFloat
+
+      await prisma.cuentaPorCobrar.update({
+        where: { idCuentaCobrar: factura.cuentaPorCobrar.idCuentaCobrar },
+        data: {
+          saldoRestante: nuevoSaldoRestante,
+          idEstadoCuenta: nuevoSaldoRestante <= 0 ? 3 : factura.cuentaPorCobrar.idEstadoCuenta, // 3 = Cobrada
+          updatedAt: new Date(),
+        },
+      })
+
+      return { nuevoPago, nuevoSaldoRestante }
+    })
+
+    // Registrar auditoría
+    const auditoriaService = new AuditoriaService()
+    await auditoriaService.registrarCreacion(
+      "PagoFacturaCliente",
+      resultado.nuevoPago.idPago,
+      {
+        nroFactura: nroFacturaInt,
+        cliente: `${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
+        montoPago: montoPagoFloat,
+        saldoAnterior: factura.cuentaPorCobrar.saldoRestante,
+        nuevoSaldo: resultado.nuevoSaldoRestante,
+        comprobantePago,
+        observaciones,
+        descripcion: `Pago registrado para factura #${nroFacturaInt} - Cliente: ${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
+      },
+      operadorInt,
+      auditoriaService.obtenerDireccionIP(request),
+      auditoriaService.obtenerInfoNavegador(request),
+    )
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        idPago: resultado.nuevoPago.idPago,
+        montoPago: montoPagoFloat,
+        nuevoSaldoRestante: resultado.nuevoSaldoRestante,
+        fechaPago: resultado.nuevoPago.fechaPago,
+      },
+      message: "Pago registrado exitosamente",
+    })
+  } catch (error) {
+    console.error("Error al registrar pago:", error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

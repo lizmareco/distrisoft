@@ -13,16 +13,21 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, error: "ID de pedido inválido" }, { status: 400 })
     }
 
-    // Verificar facturas de contado
-    const facturasContado = await prisma.FacturaClienteContado.findMany({
+    console.log(`Verificando facturas para pedido ${idPedido}`)
+
+    // Verificar facturas usando el modelo FacturaCliente actualizado
+    const facturas = await prisma.facturaCliente.findMany({
       where: {
         idPedido: idPedido,
         deletedAt: null,
       },
       select: {
-        nroFacClienteContado: true,
+        nroFactura: true,
         fechaEmision: true,
+        fechaVencimiento: true,
         montoTotalFactura: true,
+        esContado: true,
+        observacion: true,
         estadoFactuCliente: {
           select: {
             descEstFactCliente: true,
@@ -33,60 +38,50 @@ export async function GET(request, { params }) {
             descMetodoPago: true,
           },
         },
-      },
-    })
-
-    // Verificar facturas de crédito
-    const facturasCredito = await prisma.facturaClienteCredito.findMany({
-      where: {
-        idPedido: idPedido,
-        deletedAt: null,
-      },
-      select: {
-        nroFacClienteCredito: true,
-        fechaEmision: true,
-        fechaVencimiento: true,
-        montoTotalFactura: true,
-        saldoRestante: true,
-        estadoFactuCliente: {
+        cuentaPorCobrar: {
           select: {
-            descEstFactCliente: true,
+            saldoRestante: true,
+            diasVencido: true,
           },
         },
       },
     })
 
-    const tieneFacturas = facturasContado.length > 0 || facturasCredito.length > 0
+    const tieneFacturas = facturas.length > 0
+
+    console.log(`Pedido ${idPedido}: ${facturas.length} facturas encontradas`)
 
     // Formatear facturas para respuesta
-    const facturas = [
-      ...facturasContado.map((f) => ({
-        numero: f.nroFacClienteContado,
-        tipo: "contado",
-        fechaEmision: f.fechaEmision,
-        monto: Number.parseFloat(f.montoTotalFactura),
-        estado: f.estadoFactuCliente.descEstFactCliente,
-        metodoPago: f.metodoPago?.descMetodoPago,
-      })),
-      ...facturasCredito.map((f) => ({
-        numero: f.nroFacClienteCredito,
-        tipo: "credito",
-        fechaEmision: f.fechaEmision,
-        fechaVencimiento: f.fechaVencimiento,
-        monto: Number.parseFloat(f.montoTotalFactura),
-        saldoRestante: f.saldoRestante,
-        estado: f.estadoFactuCliente.descEstFactCliente,
-      })),
-    ]
+    const facturasFormateadas = facturas.map((f) => ({
+      numero: f.nroFactura,
+      tipo: f.esContado ? "contado" : "credito",
+      fechaEmision: f.fechaEmision,
+      fechaVencimiento: f.fechaVencimiento,
+      monto: Number.parseFloat(f.montoTotalFactura || 0),
+      saldoRestante: f.cuentaPorCobrar?.saldoRestante ? Number.parseFloat(f.cuentaPorCobrar.saldoRestante) : null,
+      diasVencido: f.cuentaPorCobrar?.diasVencido || 0,
+      estado: f.estadoFactuCliente?.descEstFactCliente || "Emitida",
+      metodoPago: f.metodoPago?.descMetodoPago || null,
+      observacion: f.observacion || "",
+    }))
 
     return NextResponse.json({
       success: true,
       tieneFacturas,
       cantidadFacturas: facturas.length,
-      facturas,
+      facturas: facturasFormateadas,
     })
   } catch (error) {
     console.error("Error al verificar facturas del pedido:", error)
-    return NextResponse.json({ success: false, error: "Error interno del servidor" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Error interno del servidor",
+        details: error.message,
+      },
+      { status: 500 },
+    )
+  } finally {
+    await prisma.$disconnect()
   }
 }

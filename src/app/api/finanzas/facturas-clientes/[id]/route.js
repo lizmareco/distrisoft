@@ -6,120 +6,121 @@ const prisma = new PrismaClient()
 
 export async function GET(request, { params }) {
   try {
-    const { searchParams } = new URL(request.url)
-    const tipo = searchParams.get("tipo") || "contado"
     const id = Number.parseInt(params.id)
 
     if (!id || isNaN(id)) {
       return NextResponse.json({ success: false, error: "ID de factura inválido" }, { status: 400 })
     }
 
-    let factura = null
-
-    if (tipo === "contado") {
-      const facturaDB = await prisma.facturaClienteContado.findUnique({
-        where: { nroFacClienteContado: id },
-        include: {
-          cliente: {
-            include: {
-              persona: true,
-            },
-          },
-          estadoFactuCliente: true,
-          metodoPago: true,
-          pedidoCliente: true,
-          detalleFactura: {
-            include: {
-              producto: {
-                include: {
-                  tipoProducto: true,
-                  unidadMedida: true,
-                },
-              },
-              impuesto: true,
-            },
+    // Obtener datos completos de la factura con todas las relaciones
+    const factura = await prisma.facturaCliente.findUnique({
+      where: { nroFactura: id },
+      include: {
+        cliente: {
+          include: {
+            persona: true,
           },
         },
-      })
-
-      if (facturaDB) {
-        factura = {
-          nroFactura: facturaDB.nroFacClienteContado,
-          tipo: "contado",
-          fechaEmision: facturaDB.fechaEmision,
-          cliente: {
-            nombre: `${facturaDB.cliente.persona.nombre} ${facturaDB.cliente.persona.apellido}`,
-            documento: facturaDB.cliente.persona.nroDocumento,
-            direccion: facturaDB.cliente.persona.direccion,
-          },
-          montoTotal: Number.parseFloat(facturaDB.montoTotalFactura),
-          estado: facturaDB.estadoFactuCliente.descEstFactCliente,
-          metodoPago: facturaDB.metodoPago?.descMetodoPago,
-          observacion: facturaDB.observacion,
-          detalles: facturaDB.detalleFactura.map((detalle) => ({
-            cantidad: detalle.cantidad,
-            descripcion: detalle.producto.nombreProducto,
-            precioUnitario: Number.parseFloat(detalle.precioUnitario),
-            subtotal: Number.parseFloat(detalle.subtotal),
-            montoImpuesto: Number.parseFloat(detalle.montoImpuesto),
-            totalLinea: Number.parseFloat(detalle.totalLinea),
-            impuesto: detalle.impuesto.descImpuesto,
-          })),
-        }
-      }
-    } else if (tipo === "credito") {
-      const facturaDB = await prisma.facturaClienteCredito.findUnique({
-        where: { nroFacClienteCredito: id },
-        include: {
-          cliente: {
-            include: {
-              persona: true,
-            },
-          },
-          estadoFactuCliente: true,
-          metodoPago: true,
-          pedidoCliente: true,
-          detalleFactura: {
-            include: {
-              producto: {
-                include: {
-                  tipoProducto: true,
-                  unidadMedida: true,
-                },
+        estadoFactuCliente: true,
+        metodoPago: true,
+        detalleFactura: {
+          include: {
+            producto: {
+              include: {
+                tipoProducto: true,
+                unidadMedida: true,
               },
-              impuesto: true,
             },
+            impuesto: true,
           },
         },
-      })
-
-      if (facturaDB) {
-        factura = {
-          nroFactura: facturaDB.nroFacClienteCredito,
-          tipo: "credito",
-          fechaEmision: facturaDB.fechaEmision,
-          cliente: {
-            nombre: `${facturaDB.cliente.persona.nombre} ${facturaDB.cliente.persona.apellido}`,
-            documento: facturaDB.cliente.persona.nroDocumento,
-            direccion: facturaDB.cliente.persona.direccion,
+        cuentaPorCobrar: {
+          include: {
+            estadoCuenta: true,
           },
-          montoTotal: Number.parseFloat(facturaDB.montoTotalFactura),
-          saldoRestante: facturaDB.saldoRestante,
-          estado: facturaDB.estadoFactuCliente.descEstFactCliente,
-          metodoPago: facturaDB.metodoPago?.descMetodoPago,
-          observacion: facturaDB.observacion,
-          detalles: [], // TODO: Implementar detalles para crédito
-        }
-      }
-    }
+        },
+        pagos: {
+          include: {
+            metodoPago: true,
+            usuario: {
+              include: {
+                persona: true,
+              },
+            },
+          },
+          orderBy: {
+            fechaPago: "desc",
+          },
+        },
+      },
+    })
 
     if (!factura) {
       return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
     }
 
+    // Formatear respuesta con datos reales
+    const facturaFormateada = {
+      nroFactura: factura.nroFactura,
+      fechaEmision: factura.fechaEmision,
+      fechaVencimiento: factura.fechaVencimiento,
+      esContado: factura.esContado,
+      montoTotalFactura: Number.parseFloat(factura.montoTotalFactura),
+      observacion: factura.observacion,
+
+      // Datos del cliente
+      cliente: {
+        nombre: factura.cliente?.persona
+          ? `${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`
+          : `Cliente #${factura.cliente?.idCliente || "N/A"}`,
+        ruc: factura.cliente?.persona?.nroDocumento || "N/A",
+        direccion: factura.cliente?.persona?.direccion || "N/A",
+      },
+
+      // Estado y método de pago
+      estado: factura.estadoFactuCliente?.descEstFactCliente || "Sin estado",
+      metodoPago: factura.metodoPago?.descMetodoPago || "Sin método",
+
+      // Detalles de la factura con datos reales
+      detalles: factura.detalleFactura.map((detalle) => ({
+        cantidad: detalle.cantidad, // Cantidad en paquetes
+        descripcion: detalle.producto?.nombreProducto || "Producto sin nombre",
+        precioUnitario: Number.parseFloat(detalle.precioUnitario), // Precio por paquete
+        subtotal: Number.parseFloat(detalle.subtotal),
+        montoImpuesto: Number.parseFloat(detalle.montoImpuesto),
+        totalLinea: Number.parseFloat(detalle.totalLinea),
+        tipoProducto: detalle.producto?.tipoProducto?.descTipoProducto || "Sin tipo",
+        pesoUnidad: detalle.producto?.pesoUnidad || 0,
+        unidadesPorPaquete: detalle.producto?.unidadesPorPaquete || 1,
+        impuesto: detalle.impuesto?.descImpuesto || "Sin impuesto",
+      })),
+
+      // Información específica para crédito
+      cuentaPorCobrar: factura.cuentaPorCobrar
+        ? {
+            saldoRestante: Number.parseFloat(factura.cuentaPorCobrar.saldoRestante),
+            diasVencido: factura.cuentaPorCobrar.diasVencido,
+            estadoCuenta: factura.cuentaPorCobrar.estadoCuenta?.descEstadoCuenta || "Sin estado",
+          }
+        : null,
+
+      // Pagos realizados
+      pagos: factura.pagos.map((pago) => ({
+        idPago: pago.idPago,
+        fechaPago: pago.fechaPago,
+        montoPago: Number.parseFloat(pago.montoPago),
+        metodoPago: pago.metodoPago?.descMetodoPago || "Sin método",
+        comprobantePago: pago.comprobantePago,
+        observaciones: pago.observaciones,
+        operador: pago.usuario?.persona
+          ? `${pago.usuario.persona.nombre} ${pago.usuario.persona.apellido}`
+          : "Operador desconocido",
+      })),
+    }
+
     return NextResponse.json({
       success: true,
-      data: factura,
+      data: facturaFormateada,
     })
   } catch (error) {
     console.error("Error al obtener factura:", error)
@@ -131,10 +132,10 @@ export async function PUT(request, { params }) {
   try {
     const { id } = params
     const data = await request.json()
-    const { tipo, observacion, idEstadoFactuCliente, operador = 1 } = data
+    const { observacion, idEstadoFactuCliente, operador = 1 } = data
 
     // Validaciones
-    if (!id || !tipo) {
+    if (!id) {
       return NextResponse.json({ success: false, error: "Faltan parámetros requeridos" }, { status: 400 })
     }
 
@@ -145,69 +146,37 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, error: "IDs inválidos" }, { status: 400 })
     }
 
-    let facturaAnterior, facturaActualizada
-    const entidad = tipo === "contado" ? "FacturaClienteContado" : "FacturaClienteCredito"
+    // Obtener datos anteriores
+    const facturaAnterior = await prisma.facturaCliente.findUnique({
+      where: { nroFactura: idFactura },
+      include: {
+        cliente: { include: { persona: true } },
+        estadoFactuCliente: true,
+      },
+    })
 
-    if (tipo === "contado") {
-      // Obtener datos anteriores
-      facturaAnterior = await prisma.facturaClienteContado.findUnique({
-        where: { nroFacClienteContado: idFactura },
-        include: {
-          cliente: { include: { persona: true } },
-          estadoFactuCliente: true,
-        },
-      })
-
-      if (!facturaAnterior) {
-        return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
-      }
-
-      // Actualizar factura
-      facturaActualizada = await prisma.facturaClienteContado.update({
-        where: { nroFacClienteContado: idFactura },
-        data: {
-          ...(observacion && { observacion }),
-          ...(idEstadoFactuCliente && { idEstadoFactuCliente: Number.parseInt(idEstadoFactuCliente) }),
-          updatedAt: new Date(),
-        },
-        include: {
-          cliente: { include: { persona: true } },
-          estadoFactuCliente: true,
-        },
-      })
-    } else {
-      // Obtener datos anteriores
-      facturaAnterior = await prisma.facturaClienteCredito.findUnique({
-        where: { nroFacClienteCredito: idFactura },
-        include: {
-          cliente: { include: { persona: true } },
-          estadoFactuCliente: true,
-        },
-      })
-
-      if (!facturaAnterior) {
-        return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
-      }
-
-      // Actualizar factura
-      facturaActualizada = await prisma.facturaClienteCredito.update({
-        where: { nroFacClienteCredito: idFactura },
-        data: {
-          ...(observacion && { observacion }),
-          ...(idEstadoFactuCliente && { idEstadoFactuCliente: Number.parseInt(idEstadoFactuCliente) }),
-          updatedAt: new Date(),
-        },
-        include: {
-          cliente: { include: { persona: true } },
-          estadoFactuCliente: true,
-        },
-      })
+    if (!facturaAnterior) {
+      return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
     }
+
+    // Actualizar factura
+    const facturaActualizada = await prisma.facturaCliente.update({
+      where: { nroFactura: idFactura },
+      data: {
+        ...(observacion && { observacion }),
+        ...(idEstadoFactuCliente && { idEstadoFactuCliente: Number.parseInt(idEstadoFactuCliente) }),
+        updatedAt: new Date(),
+      },
+      include: {
+        cliente: { include: { persona: true } },
+        estadoFactuCliente: true,
+      },
+    })
 
     // Registrar auditoría
     const auditoriaService = new AuditoriaService()
     await auditoriaService.registrarActualizacion(
-      entidad,
+      "FacturaCliente",
       idFactura,
       {
         observacion: facturaAnterior.observacion,
@@ -218,7 +187,7 @@ export async function PUT(request, { params }) {
         observacion: facturaActualizada.observacion,
         estado: facturaActualizada.estadoFactuCliente.descEstFactCliente,
         fechaActualizacion: new Date().toISOString(),
-        descripcion: `Factura ${tipo} actualizada - Cliente: ${facturaActualizada.cliente.persona.nombre} ${facturaActualizada.cliente.persona.apellido}`,
+        descripcion: `Factura actualizada - Cliente: ${facturaActualizada.cliente.persona.nombre} ${facturaActualizada.cliente.persona.apellido}`,
       },
       operadorInt,
       auditoriaService.obtenerDireccionIP(request),
@@ -240,11 +209,10 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = params
     const { searchParams } = new URL(request.url)
-    const tipo = searchParams.get("tipo")
     const operador = searchParams.get("operador") || "1"
 
     // Validaciones
-    if (!id || !tipo) {
+    if (!id) {
       return NextResponse.json({ success: false, error: "Faltan parámetros requeridos" }, { status: 400 })
     }
 
@@ -255,75 +223,48 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, error: "IDs inválidos" }, { status: 400 })
     }
 
-    let facturaAnterior
-    const entidad = tipo === "contado" ? "FacturaClienteContado" : "FacturaClienteCredito"
+    // Obtener datos antes de eliminar
+    const facturaAnterior = await prisma.facturaCliente.findUnique({
+      where: { nroFactura: idFactura },
+      include: {
+        cliente: { include: { persona: true } },
+        estadoFactuCliente: true,
+        metodoPago: true,
+        pagos: true,
+      },
+    })
 
-    if (tipo === "contado") {
-      // Obtener datos antes de eliminar
-      facturaAnterior = await prisma.facturaClienteContado.findUnique({
-        where: { nroFacClienteContado: idFactura },
-        include: {
-          cliente: { include: { persona: true } },
-          estadoFactuCliente: true,
-          metodoPago: true,
-        },
-      })
-
-      if (!facturaAnterior) {
-        return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
-      }
-
-      // Soft delete
-      await prisma.facturaClienteContado.update({
-        where: { nroFacClienteContado: idFactura },
-        data: { deletedAt: new Date() },
-      })
-    } else {
-      // Obtener datos antes de eliminar
-      facturaAnterior = await prisma.facturaClienteCredito.findUnique({
-        where: { nroFacClienteCredito: idFactura },
-        include: {
-          cliente: { include: { persona: true } },
-          estadoFactuCliente: true,
-        },
-      })
-
-      if (!facturaAnterior) {
-        return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
-      }
-
-      // Verificar que no tenga pagos registrados
-      const pagos = await prisma.detallePagoFacCliente.findMany({
-        where: { nroFacClienteCredito: idFactura },
-      })
-
-      if (pagos.length > 0) {
-        return NextResponse.json(
-          { success: false, error: "No se puede eliminar una factura con pagos registrados" },
-          { status: 400 },
-        )
-      }
-
-      // Soft delete
-      await prisma.facturaClienteCredito.update({
-        where: { nroFacClienteCredito: idFactura },
-        data: { deletedAt: new Date() },
-      })
+    if (!facturaAnterior) {
+      return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
     }
+
+    // Verificar que no tenga pagos registrados (para facturas a crédito)
+    if (!facturaAnterior.esContado && facturaAnterior.pagos.length > 0) {
+      return NextResponse.json(
+        { success: false, error: "No se puede eliminar una factura con pagos registrados" },
+        { status: 400 },
+      )
+    }
+
+    // Soft delete
+    await prisma.facturaCliente.update({
+      where: { nroFactura: idFactura },
+      data: { deletedAt: new Date() },
+    })
 
     // Registrar auditoría
     const auditoriaService = new AuditoriaService()
     await auditoriaService.registrarEliminacion(
-      entidad,
+      "FacturaCliente",
       idFactura,
       {
         cliente: `${facturaAnterior.cliente.persona.nombre} ${facturaAnterior.cliente.persona.apellido}`,
         montoTotal: facturaAnterior.montoTotalFactura,
         fechaEmision: facturaAnterior.fechaEmision,
         estado: facturaAnterior.estadoFactuCliente.descEstFactCliente,
-        timbrado: facturaAnterior.timbrado,
+        tipo: facturaAnterior.esContado ? "contado" : "credito",
         observacion: facturaAnterior.observacion,
-        descripcion: `Factura ${tipo} eliminada - Cliente: ${facturaAnterior.cliente.persona.nombre} ${facturaAnterior.cliente.persona.apellido}`,
+        descripcion: `Factura eliminada - Cliente: ${facturaAnterior.cliente.persona.nombre} ${facturaAnterior.cliente.persona.apellido}`,
       },
       operadorInt,
       auditoriaService.obtenerDireccionIP(request),

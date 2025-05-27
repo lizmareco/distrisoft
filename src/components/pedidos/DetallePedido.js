@@ -149,19 +149,16 @@ export default function DetallePedido({ id }) {
     return "default"
   }
 
-  // Función para calcular el precio unitario
-  const calcularPrecioUnitario = (detalle) => {
-    if (!detalle) return 0
+  // Función para obtener la descripción detallada del producto
+  const getDescripcionDetallada = (detalle) => {
+    if (!detalle.producto) return `Producto #${detalle.idProducto}`
 
-    if (detalle.precioUnitario !== undefined) {
-      return detalle.precioUnitario
-    }
+    const nombre = detalle.producto.nombreProducto
+    const cantidadUnidades = detalle.cantidadUnidades || detalle.cantidad
+    const cantidadPaquetes = detalle.cantidadPaquetes || 0
+    const unidadesPorPaquete = detalle.unidadesPorPaquete || 1
 
-    if (detalle.subtotal !== undefined && detalle.cantidad) {
-      return detalle.subtotal / detalle.cantidad
-    }
-
-    return 0
+    return `${nombre} - ${cantidadUnidades} unidades (${cantidadPaquetes} paquetes de ${unidadesPorPaquete} unid.)`
   }
 
   // Función para formatear la cantidad faltante según el tipo de material
@@ -525,15 +522,18 @@ export default function DetallePedido({ id }) {
               <TableRow>
                 <TableCell>Producto</TableCell>
                 <TableCell align="right">Precio Unit.</TableCell>
-                <TableCell align="right">Cantidad</TableCell>
+                <TableCell align="right">Cantidad (Unidades)</TableCell>
+                <TableCell align="right">Paquetes Necesarios</TableCell>
                 <TableCell align="right">Subtotal</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {pedido.pedidoDetalle && pedido.pedidoDetalle.length > 0 ? (
                 pedido.pedidoDetalle.map((detalle, index) => {
-                  const precioUnitario = calcularPrecioUnitario(detalle)
-                  const subtotal = detalle.subtotal !== undefined ? detalle.subtotal : precioUnitario * detalle.cantidad
+                  const precioUnitario = detalle.precioUnitarioCalculado || 0
+                  const cantidadUnidades = detalle.cantidadUnidades || detalle.cantidad
+                  const cantidadPaquetes = detalle.cantidadPaquetes || 0
+                  const subtotal = detalle.subtotalCalculado || detalle.subtotal || 0
 
                   return (
                     <TableRow key={index}>
@@ -541,14 +541,15 @@ export default function DetallePedido({ id }) {
                         {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
                       </TableCell>
                       <TableCell align="right">₲ {precioUnitario.toLocaleString("es-PY")}</TableCell>
-                      <TableCell align="right">{detalle.cantidad}</TableCell>
+                      <TableCell align="right">{cantidadUnidades}</TableCell>
+                      <TableCell align="right">{cantidadPaquetes}</TableCell>
                       <TableCell align="right">₲ {subtotal.toLocaleString("es-PY")}</TableCell>
                     </TableRow>
                   )
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
+                  <TableCell colSpan={5} align="center">
                     No hay productos en este pedido
                   </TableCell>
                 </TableRow>
@@ -556,6 +557,14 @@ export default function DetallePedido({ id }) {
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Información adicional sobre el cálculo */}
+        <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            <strong>Nota:</strong> Los pedidos se ingresan por unidades individuales (sobres), pero se facturan por
+            paquetes completos. El sistema calcula automáticamente los paquetes necesarios y el costo correspondiente.
+          </Typography>
+        </Box>
       </Paper>
 
       <Card sx={{ mb: 3 }}>

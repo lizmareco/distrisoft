@@ -6,8 +6,6 @@ const prisma = new PrismaClient()
 
 export async function GET(request, { params }) {
   try {
-    const { searchParams } = new URL(request.url)
-    const tipo = searchParams.get("tipo") || "contado"
     const id = Number.parseInt(params.id)
 
     if (!id || isNaN(id)) {
@@ -15,63 +13,58 @@ export async function GET(request, { params }) {
     }
 
     // Obtener datos de la factura
-    let factura = null
-
-    if (tipo === "contado") {
-      const facturaDB = await prisma.facturaClienteContado.findUnique({
-        where: { nroFacClienteContado: id },
-        include: {
-          cliente: {
-            include: {
-              persona: true,
-            },
-          },
-          estadoFactuCliente: true,
-          metodoPago: true,
-          pedidoCliente: true,
-          detalleFactura: {
-            include: {
-              producto: {
-                include: {
-                  tipoProducto: true,
-                  unidadMedida: true,
-                },
-              },
-              impuesto: true,
-            },
+    const facturaDB = await prisma.facturaCliente.findUnique({
+      where: { nroFactura: id },
+      include: {
+        cliente: {
+          include: {
+            persona: true,
           },
         },
-      })
-
-      if (facturaDB) {
-        factura = {
-          nroFactura: facturaDB.nroFacClienteContado,
-          tipo: "contado",
-          fechaEmision: facturaDB.fechaEmision,
-          cliente: {
-            nombre: `${facturaDB.cliente.persona.nombre} ${facturaDB.cliente.persona.apellido}`,
-            documento: facturaDB.cliente.persona.nroDocumento,
-            direccion: facturaDB.cliente.persona.direccion,
+        estadoFactuCliente: true,
+        metodoPago: true,
+        detalleFactura: {
+          include: {
+            producto: {
+              include: {
+                tipoProducto: true,
+                unidadMedida: true,
+              },
+            },
+            impuesto: true,
           },
-          montoTotal: Number.parseFloat(facturaDB.montoTotalFactura),
-          estado: facturaDB.estadoFactuCliente.descEstFactCliente,
-          metodoPago: facturaDB.metodoPago?.descMetodoPago,
-          observacion: facturaDB.observacion,
-          detalles: facturaDB.detalleFactura.map((detalle) => ({
-            cantidad: detalle.cantidad,
-            descripcion: detalle.producto.nombreProducto,
-            precioUnitario: detalle.precioUnitario,
-            subtotal: detalle.subtotal,
-            montoImpuesto: detalle.montoImpuesto,
-            totalLinea: detalle.totalLinea,
-            impuesto: detalle.impuesto.descImpuesto,
-          })),
-        }
-      }
+        },
+      },
+    })
+
+    if (!facturaDB) {
+      return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
     }
 
-    if (!factura) {
-      return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
+    // Formatear número de factura con el nuevo formato
+    const numeroFormateado = `001-001-${String(facturaDB.nroFactura).padStart(7, "0")}`
+
+    const factura = {
+      numero: numeroFormateado,
+      timbrado: "17184746",
+      fechaEmision: facturaDB.fechaEmision.toLocaleDateString("es-PY"),
+      condicion: facturaDB.esContado ? "CONTADO" : "CREDITO",
+      cliente: {
+        nombre: facturaDB.cliente.persona
+          ? `${facturaDB.cliente.persona.nombre} ${facturaDB.cliente.persona.apellido}`
+          : `Cliente #${facturaDB.cliente.idCliente}`,
+        ruc: facturaDB.cliente.persona?.nroDocumento || "N/A",
+        direccion: facturaDB.cliente.persona?.direccion || "N/A",
+      },
+      productos: (facturaDB.detalleFactura || []).map((detalle) => ({
+        cantidad: detalle.cantidad || 1,
+        descripcion: detalle.producto?.nombreProducto || "Producto",
+        precioUnitario: Number.parseFloat(detalle.precioUnitario || 0),
+        subtotal: Number.parseFloat(detalle.subtotal || 0),
+        iva: Number.parseFloat(detalle.montoImpuesto || 0),
+        total: Number.parseFloat(detalle.totalLinea || 0),
+      })),
+      observaciones: facturaDB.observacion || "",
     }
 
     // Generar HTML de la factura
@@ -89,12 +82,12 @@ export async function GET(request, { params }) {
 
     const pdf = await page.pdf({
       format: "A4",
-      landscape: true,
+      landscape: false,
       margin: {
-        top: "0.3cm",
-        right: "0.3cm",
-        bottom: "0.3cm",
-        left: "0.3cm",
+        top: "0.5cm",
+        right: "0.5cm",
+        bottom: "0.5cm",
+        left: "0.5cm",
       },
       printBackground: true,
       preferCSSPageSize: false,
@@ -106,7 +99,7 @@ export async function GET(request, { params }) {
     return new NextResponse(pdf, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="factura-${factura.nroFactura}.pdf"`,
+        "Content-Disposition": `attachment; filename="factura-${factura.numero}.pdf"`,
       },
     })
   } catch (error) {
@@ -116,124 +109,133 @@ export async function GET(request, { params }) {
 }
 
 function generarHTMLFactura(factura) {
-  // Solo calcular IVA 10%
-  const subtotalIva10 = factura.detalles.reduce((sum, d) => sum + d.subtotal, 0)
-  const ivaCalculado10 = subtotalIva10 * 0.1
-  const totalIva = ivaCalculado10
+  // Calcular totales
+  const subtotalExentas = 0
+  const subtotalIva5 = 0
+  const subtotalIva10 = factura.productos.reduce((sum, p) => sum + p.subtotal, 0)
+  const ivaCalculado5 = 0
+  const ivaCalculado10 = factura.productos.reduce((sum, p) => sum + p.iva, 0)
+  const totalIva = ivaCalculado5 + ivaCalculado10
+  const totalGeneral = factura.productos.reduce((sum, p) => sum + p.total, 0)
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Factura ${factura.nroFactura}</title>
+      <title>Factura ${factura.numero}</title>
       <style>
         body { 
           font-family: Arial, sans-serif; 
-          font-size: 9px; 
+          font-size: 10px; 
           margin: 0; 
-          padding: 10px;
+          padding: 15px;
           width: 100%;
           box-sizing: border-box;
         }
         .header {
           border: 2px solid #000;
-          padding: 0;
-          margin-bottom: 10px;
+          margin-bottom: 15px;
           display: flex;
-          min-height: 120px;
+          min-height: 140px;
         }
         .left-section {
           flex: 1;
-          padding: 12px;
+          padding: 15px;
           border-right: 2px solid #000;
           display: flex;
           flex-direction: column;
         }
         .right-section {
-          width: 300px;
-          padding: 12px;
+          width: 280px;
+          padding: 15px;
           background: #f5f5f5;
           display: flex;
           flex-direction: column;
-          justify-content: center;
+          justify-content: space-between;
         }
         .company-header {
           display: flex;
           align-items: flex-start;
-          margin-bottom: 15px;
+          margin-bottom: 20px;
         }
         .logo {
-          width: 60px;
-          height: 60px;
-          margin-right: 12px;
+          width: 70px;
+          height: 70px;
+          margin-right: 15px;
           flex-shrink: 0;
+          border: 2px solid #000;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .logo img {
           width: 60px;
           height: 60px;
           object-fit: contain;
-          filter: grayscale(100%) contrast(1.2);
+          border-radius: 50%;
         }
         .company-info {
           flex: 1;
           text-align: center;
         }
+        .company-name {
+          font-size: 16px;
+          font-weight: bold;
+          margin-bottom: 3px;
+        }
         .company-subtitle {
+          font-size: 11px;
+          margin-bottom: 3px;
+        }
+        .company-activity {
           font-size: 9px;
           margin-bottom: 2px;
         }
-        .company-activity {
-          font-size: 10px;
-          margin-bottom: 1px;
-        }
         .company-address {
-          font-size: 10px;
-          margin-top: 4px;
-        }
-        .client-info {
-          margin-top: auto;
-        }
-        .client-info div {
-          margin-bottom: 6px;
+          font-size: 9px;
+          margin-top: 5px;
         }
         .invoice-box {
-          border: 2px solid #000;
-          padding: 15px;
-          background: white;
           text-align: center;
         }
         .invoice-section {
-          margin-bottom: 15px;
-          padding-bottom: 10px;
-          border-bottom: 1px solid #000;
-        }
-        .invoice-section:last-child {
-          border-bottom: none;
-          margin-bottom: 0;
-          padding-bottom: 0;
+          border: 2px solid #000;
+          padding: 8px;
+          margin-bottom: 8px;
+          background: white;
         }
         .invoice-section-title {
           font-weight: bold;
           font-size: 11px;
-          margin-bottom: 5px;
+          margin-bottom: 3px;
         }
         .invoice-section-value {
-          font-size: 14px;
+          font-size: 13px;
           font-weight: bold;
         }
         .condition-checkboxes {
           display: flex;
           justify-content: space-around;
-          margin-top: 8px;
+          margin-top: 5px;
         }
         .condition-checkboxes label {
-          font-size: 10px;
+          font-size: 9px;
           display: flex;
           align-items: center;
         }
         .condition-checkboxes input {
-          margin-right: 5px;
+          margin-right: 3px;
+        }
+        .client-info {
+          border: 1px solid #000;
+          padding: 15px;
+          margin-bottom: 15px;
+        }
+        .client-info div {
+          margin-bottom: 8px;
+          font-size: 10px;
         }
         .products-table {
           width: 100%;
@@ -243,7 +245,7 @@ function generarHTMLFactura(factura) {
         .products-table th,
         .products-table td {
           border: 1px solid #000;
-          padding: 6px;
+          padding: 5px;
           text-align: center;
           font-size: 9px;
         }
@@ -251,29 +253,20 @@ function generarHTMLFactura(factura) {
           background: #f5f5f5;
           font-weight: bold;
         }
-        .totals-section {
-          display: flex;
-          gap: 15px;
+        .products-table .desc-col {
+          text-align: left;
+        }
+        .products-table .num-col {
+          text-align: right;
+        }
+        .total-row {
+          background: #f0f0f0;
+          font-weight: bold;
         }
         .iva-section {
-          flex: 1;
           border: 1px solid #000;
-          padding: 12px;
-        }
-        .total-section {
-          flex: 1;
-          border: 1px solid #000;
-          padding: 12px;
-          display: flex;
-          align-items: flex-end;
-        }
-        .total-amount {
-          border: 2px solid #000;
-          padding: 8px;
-          text-align: center;
-          background: #f5f5f5;
-          font-size: 14px;
-          font-weight: bold;
+          padding: 10px;
+          margin-bottom: 15px;
         }
         .footer {
           text-align: center;
@@ -283,11 +276,9 @@ function generarHTMLFactura(factura) {
       </style>
     </head>
     <body>
-      <!-- Encabezado con dos secciones -->
+      <!-- Encabezado -->
       <div class="header">
-        <!-- Sección izquierda: Empresa y Cliente -->
         <div class="left-section">
-          <!-- Información de la empresa -->
           <div class="company-header">
             <div class="logo">
               <img src="/logo.png" alt="Logo Las Niñas">
@@ -303,17 +294,8 @@ function generarHTMLFactura(factura) {
               <div class="company-address">TELÉFONO: (0993) 540-258</div>
             </div>
           </div>
-          
-          <!-- Información del cliente -->
-          <div class="client-info">
-            <div><strong>FECHA DE EMISIÓN:</strong> ${new Date(factura.fechaEmision).toLocaleDateString("es-PY")}</div>
-            <div><strong>NOMBRE O RAZÓN SOCIAL:</strong> ${factura.cliente.nombre}</div>
-            <div><strong>R.U.C.:</strong> ${factura.cliente.documento || "N/A"}</div>
-            <div><strong>DIRECCIÓN:</strong> ${factura.cliente.direccion || "N/A"}</div>
-          </div>
         </div>
         
-        <!-- Sección derecha: Datos de factura -->
         <div class="right-section">
           <div class="invoice-box">
             <div class="invoice-section">
@@ -323,22 +305,22 @@ function generarHTMLFactura(factura) {
             
             <div class="invoice-section">
               <div class="invoice-section-title">TIMBRADO Nº</div>
-              <div class="invoice-section-value">17184746</div>
+              <div class="invoice-section-value">${factura.timbrado}</div>
             </div>
             
             <div class="invoice-section">
               <div class="invoice-section-title">FACTURA</div>
-              <div class="invoice-section-value">Nº 001-001-${String(factura.nroFactura).padStart(7, "0")}</div>
+              <div class="invoice-section-value">Nº ${factura.numero}</div>
             </div>
             
             <div class="invoice-section">
               <div class="invoice-section-title">CONDICIÓN DE VENTA</div>
               <div class="condition-checkboxes">
                 <label>
-                  <input type="checkbox" ${factura.tipo === "contado" ? "checked" : ""}> CONTADO
+                  <input type="checkbox" ${factura.condicion === "CONTADO" ? "checked" : ""}> CONTADO
                 </label>
                 <label>
-                  <input type="checkbox" ${factura.tipo === "credito" ? "checked" : ""}> CRÉDITO
+                  <input type="checkbox" ${factura.condicion === "CREDITO" ? "checked" : ""}> CRÉDITO
                 </label>
               </div>
             </div>
@@ -346,34 +328,42 @@ function generarHTMLFactura(factura) {
         </div>
       </div>
 
+      <!-- Información del cliente -->
+      <div class="client-info">
+        <div><strong>Fecha de Emisión:</strong> ${factura.fechaEmision}</div>
+        <div><strong>Nombre o Razón Social:</strong> ${factura.cliente.nombre}</div>
+        <div><strong>R.U.C.:</strong> ${factura.cliente.ruc}</div>
+        <div><strong>Dirección:</strong> ${factura.cliente.direccion}</div>
+      </div>
+
       <!-- Tabla de productos -->
       <table class="products-table">
         <thead>
           <tr>
-            <th>CANT.</th>
-            <th>DESCRIPCIÓN</th>
-            <th>PRECIO<br>UNITARIO</th>
-            <th>EXENTAS</th>
+            <th>Cant.</th>
+            <th>Descripción</th>
+            <th>Precio<br>Unitario</th>
+            <th>Exentas</th>
             <th>5%</th>
             <th>10%</th>
           </tr>
         </thead>
         <tbody>
-          ${factura.detalles
+          ${factura.productos
             .map(
-              (detalle) => `
+              (producto) => `
             <tr>
-              <td>${detalle.cantidad}</td>
-              <td style="text-align: left;">${detalle.descripcion}</td>
-              <td>₲ ${detalle.precioUnitario.toLocaleString("es-PY")}</td>
+              <td>${producto.cantidad}</td>
+              <td class="desc-col">${producto.descripcion}</td>
+              <td class="num-col">₲ ${producto.precioUnitario.toLocaleString("es-PY")}</td>
               <td></td>
               <td></td>
-              <td>₲ ${detalle.subtotal.toLocaleString("es-PY")}</td>
+              <td class="num-col">₲ ${producto.total.toLocaleString("es-PY")}</td>
             </tr>
           `,
             )
             .join("")}
-          ${Array.from({ length: Math.max(0, 6 - factura.detalles.length) })
+          ${Array.from({ length: Math.max(0, 8 - factura.productos.length) })
             .map(
               () => `
             <tr>
@@ -387,35 +377,31 @@ function generarHTMLFactura(factura) {
           `,
             )
             .join("")}
+          <tr class="total-row">
+            <td colspan="3"><strong>Sub Total:</strong></td>
+            <td class="num-col">₲ ${subtotalExentas.toLocaleString("es-PY")}</td>
+            <td class="num-col">₲ ${subtotalIva5.toLocaleString("es-PY")}</td>
+            <td class="num-col">₲ ${subtotalIva10.toLocaleString("es-PY")}</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="3"><strong>Total a Pagar Gs.:</strong></td>
+            <td colspan="3" style="font-size: 14px; background: #f0f0f0;">
+              <strong>₲ ${totalGeneral.toLocaleString("es-PY")}</strong>
+            </td>
+          </tr>
         </tbody>
       </table>
 
-      <!-- Totales -->
-      <div class="totals-section">
-        <div class="iva-section">
-          <div><strong>LIQUIDACIÓN DEL I.V.A.</strong></div>
-          <div style="margin-top: 8px;">
-            <div>Sub Total Exentas: ₲ 0</div>
-            <div>Sub Total 5%: ₲ 0</div>
-            <div>Sub Total 10%: ₲ ${subtotalIva10.toLocaleString("es-PY")}</div>
-            <hr>
-            <div>I.V.A. 5%: ₲ 0</div>
-            <div>I.V.A. 10%: ₲ ${ivaCalculado10.toLocaleString("es-PY")}</div>
-            <div><strong>TOTAL I.V.A.: ₲ ${totalIva.toLocaleString("es-PY")}</strong></div>
-          </div>
-        </div>
-        
-        <div class="total-section">
-          <div style="width: 100%;">
-            <div style="margin-bottom: 15px;"><strong>TOTAL GENERAL Gs.</strong></div>
-            <div class="total-amount">₲ ${factura.montoTotal.toLocaleString("es-PY")}</div>
-          </div>
+      <!-- Liquidación del IVA -->
+      <div class="iva-section">
+        <div><strong>Liquidación del I.V.A.:</strong></div>
+        <div style="margin-top: 8px;">
+          <span>(5%): ₲ ${ivaCalculado5.toLocaleString("es-PY")}</span> &nbsp;&nbsp;&nbsp;
+          <span>(10%): ₲ ${ivaCalculado10.toLocaleString("es-PY")}</span> &nbsp;&nbsp;&nbsp;
+          <span><strong>Total I.V.A.: ₲ ${totalIva.toLocaleString("es-PY")}</strong></span>
         </div>
       </div>
 
-      <div class="footer">
-        Original: Blanco - Comprador | Duplicado: Amarillo - Vendedor | Triplicado: Rosado - Archivo
-      </div>
     </body>
     </html>
   `
