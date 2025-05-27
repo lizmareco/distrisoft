@@ -4,6 +4,51 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 
+// Función para extraer IP del request
+function extraerIP(request) {
+  const forwarded = request.headers.get("x-forwarded-for")
+  const realIP = request.headers.get("x-real-ip")
+  const cfConnectingIP = request.headers.get("cf-connecting-ip")
+
+  if (cfConnectingIP) return cfConnectingIP
+  if (forwarded) return forwarded.split(",")[0].trim()
+  if (realIP) return realIP
+
+  return "IP no disponible"
+}
+
+// Función para detectar navegador del User-Agent
+function detectarNavegador(userAgent) {
+  if (!userAgent) return "Navegador no disponible"
+
+  if (userAgent.includes("Chrome") && !userAgent.includes("Edg")) {
+    const match = userAgent.match(/Chrome\/([0-9.]+)/)
+    return `Google Chrome ${match ? match[1] : "versión desconocida"}`
+  }
+
+  if (userAgent.includes("Edg")) {
+    const match = userAgent.match(/Edg\/([0-9.]+)/)
+    return `Microsoft Edge ${match ? match[1] : "versión desconocida"}`
+  }
+
+  if (userAgent.includes("Firefox")) {
+    const match = userAgent.match(/Firefox\/([0-9.]+)/)
+    return `Mozilla Firefox ${match ? match[1] : "versión desconocida"}`
+  }
+
+  if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
+    const match = userAgent.match(/Version\/([0-9.]+)/)
+    return `Safari ${match ? match[1] : "versión desconocida"}`
+  }
+
+  if (userAgent.includes("OPR") || userAgent.includes("Opera")) {
+    const match = userAgent.match(/(?:OPR|Opera)\/([0-9.]+)/)
+    return `Opera ${match ? match[1] : "versión desconocida"}`
+  }
+
+  return "Navegador no identificado"
+}
+
 // GET - Obtener órdenes de compra con filtros
 export async function GET(request) {
   try {
@@ -213,13 +258,25 @@ export async function POST(request) {
       },
     })
 
+    // Extraer IP y navegador del request
+    const direccionIP = extraerIP(request)
+    const userAgent = request.headers.get("user-agent")
+    const navegador = detectarNavegador(userAgent)
+
+    console.log("DEBUG - Datos para auditoría:", {
+      direccionIP: typeof direccionIP,
+      navegador: typeof navegador,
+      idOrden: typeof ordenCompra.idOrdenCompra,
+    })
+
     // Registrar la acción en auditoría
     await auditoriaService.registrarCreacion(
       "OrdenCompra",
       ordenCompra.idOrdenCompra,
       ordenCompra,
       userData.idUsuario,
-      request,
+      direccionIP,
+      navegador,
     )
 
     console.log(`API: Orden de compra creada con ID: ${ordenCompra.idOrdenCompra}`)

@@ -111,7 +111,7 @@ model CotizacionProveedor {
   deletedAt                DateTime?               @map("deleted_at")
   estado                   String                  @map("estado") @db.VarChar
   proveedor                Proveedor               @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_cotizacion_proveedor_fk")
-  detallesCotizacionProv   DetalleCotizacionProv[] // Cambiado a plural y array para indicar relación uno a muchos
+  detallesCotizacionProv   DetalleCotizacionProv[] 
   ordenCompra              OrdenCompra[]
 }
 
@@ -141,6 +141,7 @@ model DetalleCotizacionProv {
   deletedAt               DateTime?           @map("deleted_at")
   cotizacionProveedor     CotizacionProveedor @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_detalle_cotizacion_prov_fk")
   materiaPrima            MateriaPrima        @relation(fields: [idMateriaPrima], references: [idMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "materia_prima_detalle_cotizacion_prov_fk")
+  detallesFacturaProveedor DetalleFacturaProveedor[]
 }
 model FacturaCliente {
   nroFactura           Int                @id @default(autoincrement()) @map("nro_factura")
@@ -180,19 +181,23 @@ model FacturaCliente {
   @@map("FacturaCliente")
 }
 
-model DetallePagoFacProv {
-  idPagoFactura        Int                @id(map: "detalle_pago_fac_prov_pk") @default(autoincrement()) @map("id_pago_factura")
-  idFacturaCreditoProv Int                @map("id_factura_credito_prov")
-  fechaPago            DateTime           @map("fecha_pago") @db.Timestamp(6)
-  montoPago            Float              @map("monto_pago")
-  idMetodoPago         Int                @map("id_metodo_pago")
-  observacion          String             @map("observacion") @db.VarChar
-  comprobantePago      String             @map("comprobante_pago") @db.VarChar
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime?          @default(now()) @map("updated_at")
-  deletedAt            DateTime?          @map("deleted_at")
-  facturaCreditoProv   FacturaCreditoProv @relation(fields: [idFacturaCreditoProv], references: [idFacturaCreditoProv], onDelete: NoAction, onUpdate: NoAction, map: "factura_credito_prov_pago_factura_fk")
-  metodoPago           MetodoPago         @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_pago_factura_fk")
+model DetalleFacturaProveedor {
+  idDetalleFactura       Int                     @id @default(autoincrement()) @map("id_detalle_factura")
+  idFacturaProveedor     Int                     @map("id_factura_proveedor")
+  idDetalleCotizacion    Int                     @map("id_detalle_cotizacion") // Referencia al detalle original de la cotización
+  cantidadFacturada      Int                     @map("cantidad_facturada") // Puede ser diferente a la cotizada
+  precioUnitarioFinal    Float                   @map("precio_unitario_final") // Puede ser diferente al cotizado
+  subtotalFinal          Float                   @map("subtotal_final")
+  observacion            String?                 @map("observacion") @db.VarChar
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime?               @default(now()) @map("updated_at")
+  deletedAt              DateTime?               @map("deleted_at")
+  
+  // Relaciones
+  facturaProveedor       FacturaProveedor        @relation(fields: [idFacturaProveedor], references: [idFacturaProveedor], onDelete: NoAction, onUpdate: NoAction)
+  detalleCotizacion      DetalleCotizacionProv   @relation(fields: [idDetalleCotizacion], references: [idDetalleCotizacionProv], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("DetalleFacturaProveedor")
 }
 
 model Empresa {
@@ -253,14 +258,17 @@ model EstadoFactuCliente {
   @@map("EstadoFactuCliente")
 }
 
-model EstadoFacturaProv {
-  idEstadoFacturaProv Int                  @id(map: "estado_factura_prov_pk") @default(autoincrement()) @map("id_estado_factura_prov")
-  descFacturaProv     String               @map("desc_factura_prov") @db.VarChar
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime?            @default(now()) @map("updated_at")
-  deletedAt           DateTime?            @map("deleted_at")
-  facturaContadoProv  FacturaContadoProv[]
-  facturaCreditoProv  FacturaCreditoProv[]
+model EstadoFacturaProveedor {
+  idEstadoFacturaProveedor Int                @id @default(autoincrement()) @map("id_estado_factura_proveedor")
+  descEstadoFacturaProv    String             @map("desc_estado_factura_prov") @db.VarChar(50)
+  createdAt                DateTime           @default(now()) @map("created_at")
+  updatedAt                DateTime?          @default(now()) @map("updated_at")
+  deletedAt                DateTime?          @map("deleted_at")
+  
+  // Relaciones
+  facturasProveedor        FacturaProveedor[]
+
+  @@map("EstadoFacturaProveedor")
 }
 
 model EstadoMateriaPrima {
@@ -318,44 +326,42 @@ model EstadoProducto {
 }
 
 
-model FacturaContadoProv {
-  idFacturaContadoProv Int               @id(map: "factura_contado_prov_pk") @default(autoincrement()) @map("id_factura_contado_prov")
-  idProveedor          Int               @map("id_proveedor")
-  fechaEmision         DateTime          @map("fecha_emision") @db.Timestamp(6)
-  nroFacProvContado    String            @map("nro_fac_prov_contado") @db.VarChar
-  montoTotal           Float             @map("monto_total")
-  idEstadoFacturaProv  Int               @map("id_estado_factura_prov")
-  idOrdenCompra        Int?              @map("id_orden_compra")
-  idMetodoPago         Int               @map("id_metodo_pago")
-  comprobantePago      String            @map("comprobante_pago") @db.VarChar
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime?         @default(now()) @map("updated_at")
-  deletedAt            DateTime?         @map("deleted_at")
-  estadoFacturaProv    EstadoFacturaProv @relation(fields: [idEstadoFacturaProv], references: [idEstadoFacturaProv], onDelete: NoAction, onUpdate: NoAction, map: "estado_factura_prov_factura_proveedor_fk")
-  metodoPago           MetodoPago        @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction, map: "metodo_pago_factura_contado_prov_fk")
-  ordenCompra          OrdenCompra?      @relation(fields: [idOrdenCompra], references: [idOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "orden_compra_factura_proveedor_fk")
-  proveedor            Proveedor         @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_factura_proveedor_fk")
-}
+model FacturaProveedor {
+  idFacturaProveedor   Int                    @id @default(autoincrement()) @map("id_factura_proveedor")
+  nroFactura           String                 @unique @map("nro_factura") @db.VarChar(50)
+  idProveedor          Int                    @map("id_proveedor")
+  idOrdenCompra        Int                    @map("id_orden_compra") // OBLIGATORIO - siempre viene de una orden
+  fechaEmision         DateTime               @map("fecha_emision") @db.Timestamp(6)
+  fechaVencimiento     DateTime?              @map("fecha_vencimiento") @db.Timestamp(6) // Solo para crédito
+  montoTotalFactura    Float                  @map("monto_total_factura")
+  esContado            Boolean                @default(true) @map("es_contado") // true = contado, false = crédito
+  plazoPago            Int?                   @map("plazo_pago") // Solo para crédito, en días
+  idEstadoFacturaProv  Int                    @map("id_estado_factura_prov")
+  idMetodoPago         Int?                   @map("id_metodo_pago") // Solo para contado
+  comprobantePago      String?                @map("comprobante_pago") @db.VarChar // Solo para contado
+  observacion          String?                @map("observacion") @db.VarChar
+  operador             Int                    @map("operador") // Usuario que registró la factura
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime?              @default(now()) @map("updated_at")
+  deletedAt            DateTime?              @map("deleted_at")
 
-model FacturaCreditoProv {
-  idFacturaCreditoProv Int                  @id(map: "factura_credito_prov_pk") @default(autoincrement()) @map("id_factura_credito_prov")
-  montoTotal           Float                @map("monto_total")
-  montoPagado          Float                @map("monto_pagado")
-  saldoRestante        Float                @map("saldo_restante")
-  plazoPago            Int                  @map("plazo_pago")
-  idOrdenCompra        Int?                 @map("id_orden_compra")
-  idEstadoFacturaProv  Int                  @map("id_estado_factura_prov")
-  fechaEmision         DateTime             @map("fecha_emision") @db.Timestamp(6)
-  nroFacProvCredito    String               @map("nro_fac_prov_credito") @db.VarChar
-  idProveedor          Int                  @map("id_proveedor")
-  fechaVencimiento     DateTime             @map("fecha_vencimiento") @db.Timestamp(6)
-  createdAt            DateTime             @default(now()) @map("created_at")
-  updatedAt            DateTime?            @default(now()) @map("updated_at")
-  deletedAt            DateTime?            @map("deleted_at")
-  detallePagoFacProv   DetallePagoFacProv[]
-  estadoFacturaProv    EstadoFacturaProv    @relation(fields: [idEstadoFacturaProv], references: [idEstadoFacturaProv], onDelete: NoAction, onUpdate: NoAction, map: "estado_factura_prov_factura_credito_prov_fk")
-  ordenCompra          OrdenCompra?         @relation(fields: [idOrdenCompra], references: [idOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "orden_compra_factura_credito_prov_fk")
-  proveedor            Proveedor            @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction, map: "proveedor_factura_credito_prov_fk")
+  // Relaciones
+  proveedor            Proveedor              @relation(fields: [idProveedor], references: [idProveedor], onDelete: NoAction, onUpdate: NoAction)
+  ordenCompra          OrdenCompra            @relation(fields: [idOrdenCompra], references: [idOrdenCompra], onDelete: NoAction, onUpdate: NoAction)
+  estadoFacturaProv    EstadoFacturaProveedor @relation(fields: [idEstadoFacturaProv], references: [idEstadoFacturaProveedor], onDelete: NoAction, onUpdate: NoAction)
+  metodoPago           MetodoPago?            @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction)
+  usuario              Usuario                @relation(fields: [operador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction)
+  
+  // Relación con cuenta por pagar (solo para facturas a crédito)
+  cuentaPorPagar       CuentaPorPagar?
+  
+  // Relación con pagos (solo para facturas a crédito)
+  pagosFacturaProveedor PagoFacturaProveedor[]
+  
+  // Relación con detalles de factura
+  detallesFacturaProveedor DetalleFacturaProveedor[]
+
+  @@map("FacturaProveedor")
 }
 
 model Impuestos {
@@ -394,7 +400,7 @@ model MateriaPrima {
   detalleCotizacionProv DetalleCotizacionProv[]
   estadoMateriaPrima    EstadoMateriaPrima      @relation(fields: [idEstadoMateriaPrima], references: [idEstadoMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "estado_materia_prima_materia_prima_fk")
   inventario            Inventario[]
-  formulaDetalle        FormulaDetalle[] 
+  formulaDetalle        FormulaDetalle[]
 }
 
 model MetodoPago {
@@ -403,8 +409,8 @@ model MetodoPago {
   createdAt             DateTime                @default(now()) @map("created_at")
   updatedAt             DateTime?               @default(now()) @map("updated_at")
   deletedAt             DateTime?               @map("deleted_at")
-  detallePagoFacProv    DetallePagoFacProv[]
-  facturaContadoProv    FacturaContadoProv[]
+  facturaProveedor      FacturaProveedor[]
+  pagoFacturaProveedor  PagoFacturaProveedor[]
   facturaCliente        FacturaCliente[]        // Para facturas de contado
   pagoFacturaCliente    PagoFacturaCliente[]    // Para pagos de facturas a crédito
   @@map("MetodoPago")
@@ -448,8 +454,7 @@ model OrdenCompra {
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime?            @default(now()) @map("updated_at")
   deletedAt             DateTime?            @map("deleted_at")
-  facturaContadoProv    FacturaContadoProv[]
-  facturaCreditoProv    FacturaCreditoProv[]
+  facturaProveedor   FacturaProveedor[]
   cotizacionProveedor   CotizacionProveedor  @relation(fields: [idCotizacionProveedor], references: [idCotizacionProveedor], onDelete: NoAction, onUpdate: NoAction, map: "cotizacion_proveedor_orden_compra_fk")
   estadoOrdenCompra     EstadoOrdenCompra    @relation(fields: [idEstadoOrdenCompra], references: [idEstadoOrdenCompra], onDelete: NoAction, onUpdate: NoAction, map: "estado_orden_compra_orden_compra_fk")
   inventario            Inventario[]
@@ -573,8 +578,7 @@ model Proveedor {
   deletedAt            DateTime?             @map("deleted_at")
   comentario           String                @default("") @map("comentario")
   cotizacionProveedor  CotizacionProveedor[]
-  facturaContadoProv   FacturaContadoProv[]
-  facturaCreditoProv   FacturaCreditoProv[]
+  facturaProveedor   FacturaProveedor[]
   empresa              Empresa               @relation(fields: [idEmpresa], references: [idEmpresa], onDelete: NoAction, onUpdate: NoAction, map: "empresa_proveedor_fk")
 }
 
@@ -709,6 +713,8 @@ model Usuario {
   cotizacionCliente      CotizacionCliente[]
   facturaCliente         FacturaCliente[]
   pagoFacturaCliente     PagoFacturaCliente[]
+  facturaProveedor       FacturaProveedor[]
+  pagoFacturaProveedor   PagoFacturaProveedor[]
   informe                Informe[]
   notificacion           Notificacion[]
   ordenProduccion        OrdenProduccion[]
@@ -953,4 +959,65 @@ model PagoFacturaCliente {
   usuario              Usuario            @relation(fields: [operador], references: [idUsuario])
 
   @@map("PagoFacturaCliente")
+}
+
+model CuentaPorPagar {
+  idCuentaPagar        Int                @id @default(autoincrement()) @map("id_cuenta_pagar")
+  idFacturaProveedor   Int                @unique @map("id_factura_proveedor") // Una cuenta por factura
+  montoOriginal        Float              @map("monto_original")
+  montoPagado          Float              @default(0) @map("monto_pagado")
+  saldoRestante        Float              @map("saldo_restante")
+  fechaVencimiento     DateTime           @map("fecha_vencimiento") @db.Timestamp(6)
+  diasVencido          Int                @default(0) @map("dias_vencido") // Calculado automáticamente
+  idEstadoCuenta       Int                @map("id_estado_cuenta")
+  observaciones        String?            @map("observaciones") @db.VarChar
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime?          @default(now()) @map("updated_at")
+  deletedAt            DateTime?          @map("deleted_at")
+  
+  // Relaciones
+  facturaProveedor     FacturaProveedor   @relation(fields: [idFacturaProveedor], references: [idFacturaProveedor], onDelete: NoAction, onUpdate: NoAction)
+  estadoCuenta         EstadoCuentaPagar  @relation(fields: [idEstadoCuenta], references: [idEstadoCuentaPagar], onDelete: NoAction, onUpdate: NoAction)
+  
+  // Relación con pagos
+  pagosFacturaProveedor PagoFacturaProveedor[]
+
+  @@map("CuentaPorPagar")
+}
+
+model EstadoCuentaPagar {
+  idEstadoCuentaPagar  Int              @id @default(autoincrement()) @map("id_estado_cuenta_pagar")
+  descEstadoCuenta     String           @map("desc_estado_cuenta") @db.VarChar(50)
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime?        @default(now()) @map("updated_at")
+  deletedAt            DateTime?        @map("deleted_at")
+  
+  // Relaciones
+  cuentasPorPagar      CuentaPorPagar[]
+
+  @@map("EstadoCuentaPagar")
+}
+
+// Pagos realizados a facturas de proveedores
+model PagoFacturaProveedor {
+  idPago               Int              @id @default(autoincrement()) @map("id_pago")
+  idFacturaProveedor   Int              @map("id_factura_proveedor")
+  idCuentaPagar        Int              @map("id_cuenta_pagar")
+  fechaPago            DateTime         @map("fecha_pago") @db.Timestamp(6)
+  montoPago            Float            @map("monto_pago")
+  idMetodoPago         Int              @map("id_metodo_pago")
+  comprobantePago      String?          @map("comprobante_pago") @db.VarChar
+  observaciones        String?          @map("observaciones") @db.VarChar
+  operador             Int              @map("operador") // Usuario que registró el pago
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime?        @default(now()) @map("updated_at")
+  deletedAt            DateTime?        @map("deleted_at")
+  
+  // Relaciones
+  facturaProveedor     FacturaProveedor @relation(fields: [idFacturaProveedor], references: [idFacturaProveedor], onDelete: NoAction, onUpdate: NoAction)
+  cuentaPorPagar       CuentaPorPagar   @relation(fields: [idCuentaPagar], references: [idCuentaPagar], onDelete: NoAction, onUpdate: NoAction)
+  metodoPago           MetodoPago       @relation(fields: [idMetodoPago], references: [idMetodoPago], onDelete: NoAction, onUpdate: NoAction)
+  usuario              Usuario          @relation(fields: [operador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("PagoFacturaProveedor")
 }

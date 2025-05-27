@@ -1,54 +1,62 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
   Box,
   Container,
   Typography,
+  Grid,
   Card,
   CardContent,
-  Chip,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
+  Chip,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Grid,
-  Alert,
+  TextField,
   CircularProgress,
-  Pagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Snackbar,
+  Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Pagination,
 } from "@mui/material"
 import {
-  Payment,
+  AccountBalance,
   Warning,
   CheckCircle,
   Schedule,
+  Payment as PaymentIcon,
+  Search as SearchIcon,
+  ArrowBack,
   ExpandMore,
-  Search,
-  AccountBalance,
-  TrendingDown,
   Receipt,
   History,
 } from "@mui/icons-material"
-import VisorFactura from "@/src/components/facturas/VisorFactura"
-import HistorialPagos from "@/src/components/pagos/HistorialPagos"
+import VisorFacturaProveedor from "@/src/components/facturas/VisorFacturaProveedor"
 
-export default function CuentasPorCobrarPage() {
-  const [cuentasPorCobrar, setCuentasPorCobrar] = useState([])
-  const [cargando, setCargando] = useState(false)
+export default function CuentasPorPagarPage() {
+  const router = useRouter()
+  const [cuentas, setCuentas] = useState([])
   const [resumen, setResumen] = useState(null)
+  const [cargando, setCargando] = useState(false)
   const [filtros, setFiltros] = useState({
     estado: "",
-    cliente: "",
+    proveedor: "",
     fechaDesde: "",
     fechaHasta: "",
   })
@@ -61,41 +69,43 @@ export default function CuentasPorCobrarPage() {
     registrosPorPagina: 10,
   })
 
-  // Estados para diálogo de pago
-  const [openPagoDialog, setOpenPagoDialog] = useState(false)
+  // Estados para el diálogo de pago
+  const [dialogoPagoAbierto, setDialogoPagoAbierto] = useState(false)
   const [cuentaSeleccionada, setCuentaSeleccionada] = useState(null)
   const [cargandoPago, setCargandoPago] = useState(false)
   const [datosPago, setDatosPago] = useState({
     montoPago: "",
-    idMetodoPago: 1,
+    fechaPago: new Date().toISOString().split("T")[0],
+    idMetodoPago: "",
+    observacion: "",
     comprobantePago: "",
-    observaciones: "",
   })
 
   // Estados para diálogos adicionales
   const [openVisorFactura, setOpenVisorFactura] = useState(false)
   const [openHistorialPagos, setOpenHistorialPagos] = useState(false)
   const [facturaSeleccionada, setFacturaSeleccionada] = useState(null)
+  const [historialPagos, setHistorialPagos] = useState([])
 
-  // Agregar después de los estados para diálogos adicionales
-
-  // Estados para snackbar
   const [snackbar, setSnackbar] = useState({
     abierto: false,
     mensaje: "",
     tipo: "success",
   })
 
-  // Estado para búsqueda realizada
+  const [metodosPago, setMetodosPago] = useState([])
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
 
-  // Cargar cuentas por cobrar
-  const cargarCuentasPorCobrar = async (nuevaPagina = paginacion.pagina) => {
+  useEffect(() => {
+    cargarMetodosPago()
+  }, [])
+
+  const cargarCuentas = async (nuevaPagina = paginacion.pagina) => {
     setCargando(true)
     try {
       const params = new URLSearchParams()
       if (filtros.estado) params.append("estado", filtros.estado)
-      if (filtros.cliente) params.append("cliente", filtros.cliente)
+      if (filtros.proveedor) params.append("proveedor", filtros.proveedor)
       if (filtros.fechaDesde) params.append("fechaDesde", filtros.fechaDesde)
       if (filtros.fechaHasta) params.append("fechaHasta", filtros.fechaHasta)
 
@@ -103,11 +113,11 @@ export default function CuentasPorCobrarPage() {
       params.append("pagina", nuevaPagina.toString())
       params.append("limite", paginacion.registrosPorPagina.toString())
 
-      const respuesta = await fetch(`/api/finanzas/cuentas-cobrar?${params.toString()}`)
+      const respuesta = await fetch(`/api/finanzas/cuentas-pagar?${params.toString()}`)
       if (respuesta.ok) {
         const datos = await respuesta.json()
-        setCuentasPorCobrar(datos.data || [])
-        setResumen(datos.resumen)
+        setCuentas(datos.data || [])
+        setResumen(datos.resumen || {})
 
         if (datos.meta) {
           setPaginacion((prev) => ({
@@ -119,45 +129,59 @@ export default function CuentasPorCobrarPage() {
         }
       }
     } catch (error) {
-      console.error("Error al cargar cuentas por cobrar:", error)
-      mostrarSnackbar("Error al cargar cuentas por cobrar", "error")
+      console.error("Error al cargar cuentas por pagar:", error)
+      mostrarSnackbar("Error al cargar cuentas por pagar", "error")
     } finally {
       setCargando(false)
+    }
+  }
+
+  const cargarMetodosPago = async () => {
+    try {
+      const respuesta = await fetch("/api/finanzas/metodos-pago")
+      if (respuesta.ok) {
+        const datos = await respuesta.json()
+        setMetodosPago(datos.data || [])
+      }
+    } catch (error) {
+      console.error("Error al cargar métodos de pago:", error)
     }
   }
 
   const handleBuscar = () => {
     setBusquedaRealizada(true)
     setPaginacion((prev) => ({ ...prev, pagina: 1 }))
-    cargarCuentasPorCobrar(1)
+    cargarCuentas(1)
   }
 
   const handleCambioPagina = (event, nuevaPagina) => {
     if (busquedaRealizada) {
       setPaginacion((prev) => ({ ...prev, pagina: nuevaPagina }))
-      cargarCuentasPorCobrar(nuevaPagina)
+      cargarCuentas(nuevaPagina)
     }
   }
 
-  const handleRegistrarPago = (cuenta) => {
+  const abrirDialogoPago = (cuenta) => {
     setCuentaSeleccionada(cuenta)
     setDatosPago({
       montoPago: "",
-      idMetodoPago: 1,
+      fechaPago: new Date().toISOString().split("T")[0],
+      idMetodoPago: "",
+      observacion: `Pago de factura ${cuenta.nroFactura}`,
       comprobantePago: "",
-      observaciones: `Pago de factura #${cuenta.nroFactura}`,
     })
-    setOpenPagoDialog(true)
+    setDialogoPagoAbierto(true)
   }
 
-  const handleClosePagoDialog = () => {
-    setOpenPagoDialog(false)
+  const cerrarDialogoPago = () => {
+    setDialogoPagoAbierto(false)
     setCuentaSeleccionada(null)
     setDatosPago({
       montoPago: "",
-      idMetodoPago: 1,
+      fechaPago: new Date().toISOString().split("T")[0],
+      idMetodoPago: "",
+      observacion: "",
       comprobantePago: "",
-      observaciones: "",
     })
   }
 
@@ -180,26 +204,27 @@ export default function CuentasPorCobrarPage() {
 
     setCargandoPago(true)
     try {
-      const respuesta = await fetch("/api/finanzas/pagos", {
+      const respuesta = await fetch("/api/finanzas/pagos-proveedores", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          nroFactura: cuentaSeleccionada.nroFactura,
+          idFacturaProveedor: cuentaSeleccionada.idFacturaProveedor,
           montoPago: montoPago,
+          fechaPago: datosPago.fechaPago,
           idMetodoPago: datosPago.idMetodoPago,
           comprobantePago: datosPago.comprobantePago,
-          observaciones: datosPago.observaciones,
+          observacion: datosPago.observacion,
         }),
       })
 
       if (respuesta.ok) {
         const resultado = await respuesta.json()
         mostrarSnackbar("Pago registrado exitosamente", "success")
-        handleClosePagoDialog()
+        cerrarDialogoPago()
         // Recargar la lista
-        cargarCuentasPorCobrar()
+        cargarCuentas()
       } else {
         const error = await respuesta.json()
         mostrarSnackbar(error.error || "Error al registrar pago", "error")
@@ -209,6 +234,21 @@ export default function CuentasPorCobrarPage() {
       mostrarSnackbar("Error al registrar pago", "error")
     } finally {
       setCargandoPago(false)
+    }
+  }
+
+  const verHistorialPagos = async (cuenta) => {
+    try {
+      const respuesta = await fetch(`/api/finanzas/pagos-proveedores?idFactura=${cuenta.idFacturaProveedor}`)
+      if (respuesta.ok) {
+        const datos = await respuesta.json()
+        setHistorialPagos(datos.data || [])
+        setCuentaSeleccionada(cuenta)
+        setOpenHistorialPagos(true)
+      }
+    } catch (error) {
+      console.error("Error al cargar historial de pagos:", error)
+      mostrarSnackbar("Error al cargar historial de pagos", "error")
     }
   }
 
@@ -225,14 +265,14 @@ export default function CuentasPorCobrarPage() {
   }
 
   const getEstadoColor = (estado, diasVencido) => {
-    if (estado === "Cobrada") return "success"
+    if (estado === "Pagada") return "success"
     if (diasVencido > 0) return "error"
     if (diasVencido > -7) return "warning"
     return "info"
   }
 
   const getEstadoIcon = (estado, diasVencido) => {
-    if (estado === "Cobrada") return <CheckCircle />
+    if (estado === "Pagada") return <CheckCircle />
     if (diasVencido > 0) return <Warning />
     if (diasVencido > -7) return <Schedule />
     return <CheckCircle />
@@ -246,28 +286,33 @@ export default function CuentasPorCobrarPage() {
     setCuentaSeleccionada(cuenta)
     setDatosPago({
       montoPago: monto.toString(),
-      idMetodoPago: 1,
+      fechaPago: new Date().toISOString().split("T")[0],
+      idMetodoPago: "",
+      observacion: `Pago ${monto === cuenta.saldoRestante ? "total" : "parcial"} de factura ${cuenta.nroFactura}`,
       comprobantePago: "",
-      observaciones: `Pago ${monto === cuenta.saldoRestante ? "total" : "parcial"} de factura #${cuenta.nroFactura}`,
     })
-    setOpenPagoDialog(true)
+    setDialogoPagoAbierto(true)
   }
 
   const handleVerFactura = (cuenta) => {
-    setFacturaSeleccionada(cuenta.nroFactura)
+    setFacturaSeleccionada(cuenta.idFacturaProveedor)
     setOpenVisorFactura(true)
   }
 
   const handleVerHistorial = (cuenta) => {
-    setFacturaSeleccionada(cuenta.nroFactura)
-    setOpenHistorialPagos(true)
+    verHistorialPagos(cuenta)
   }
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Cuentas por Cobrar
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          Cuentas por Pagar
+        </Typography>
+        <Button variant="outlined" startIcon={<ArrowBack />} onClick={() => router.push("/finanzas")}>
+          Volver a Finanzas
+        </Button>
+      </Box>
 
       {/* Resumen */}
       {resumen && (
@@ -276,13 +321,13 @@ export default function CuentasPorCobrarPage() {
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center">
-                  <AccountBalance color="primary" sx={{ mr: 2 }} />
+                  <AccountBalance color="error" sx={{ mr: 2 }} />
                   <Box>
                     <Typography color="textSecondary" gutterBottom>
-                      Total por Cobrar
+                      Total por Pagar
                     </Typography>
-                    <Typography variant="h4" color="primary">
-                      ₲ {resumen.totalPorCobrar.toLocaleString("es-PY")}
+                    <Typography variant="h4" color="error.main">
+                      ₲ {resumen.totalPorPagar?.toLocaleString("es-PY") || "0"}
                     </Typography>
                   </Box>
                 </Box>
@@ -299,7 +344,7 @@ export default function CuentasPorCobrarPage() {
                       Cuentas Pendientes
                     </Typography>
                     <Typography variant="h4" color="warning.main">
-                      {resumen.totalCuentas}
+                      {resumen.totalCuentas || 0}
                     </Typography>
                   </Box>
                 </Box>
@@ -316,7 +361,7 @@ export default function CuentasPorCobrarPage() {
                       Cuentas Vencidas
                     </Typography>
                     <Typography variant="h4" color="error.main">
-                      {resumen.cuentasVencidas}
+                      {resumen.cuentasVencidas || 0}
                     </Typography>
                   </Box>
                 </Box>
@@ -327,13 +372,13 @@ export default function CuentasPorCobrarPage() {
             <Card>
               <CardContent>
                 <Box display="flex" alignItems="center">
-                  <TrendingDown color="error" sx={{ mr: 2 }} />
+                  <AccountBalance color="error" sx={{ mr: 2 }} />
                   <Box>
                     <Typography color="textSecondary" gutterBottom>
                       Monto Vencido
                     </Typography>
                     <Typography variant="h4" color="error.main">
-                      ₲ {resumen.montoVencido.toLocaleString("es-PY")}
+                      ₲ {resumen.montoVencido?.toLocaleString("es-PY") || "0"}
                     </Typography>
                   </Box>
                 </Box>
@@ -362,10 +407,10 @@ export default function CuentasPorCobrarPage() {
               <TextField
                 fullWidth
                 size="small"
-                label="Buscar Cliente"
-                value={filtros.cliente}
-                onChange={(e) => setFiltros({ ...filtros, cliente: e.target.value })}
-                placeholder="Nombre o apellido..."
+                label="Buscar Proveedor"
+                value={filtros.proveedor}
+                onChange={(e) => setFiltros({ ...filtros, proveedor: e.target.value })}
+                placeholder="Razón social..."
               />
             </Grid>
             <Grid item xs={12} md={2}>
@@ -379,7 +424,7 @@ export default function CuentasPorCobrarPage() {
                   <MenuItem value="">Todos</MenuItem>
                   <MenuItem value="vigente">Vigente</MenuItem>
                   <MenuItem value="vencida">Vencida</MenuItem>
-                  <MenuItem value="cobrada">Cobrada</MenuItem>
+                  <MenuItem value="pagada">Pagada</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -411,7 +456,7 @@ export default function CuentasPorCobrarPage() {
                 onClick={handleBuscar}
                 disabled={cargando}
                 fullWidth
-                startIcon={cargando ? <CircularProgress size={20} /> : <Search />}
+                startIcon={cargando ? <CircularProgress size={20} /> : <SearchIcon />}
               >
                 {cargando ? "Buscando..." : "Buscar"}
               </Button>
@@ -420,9 +465,9 @@ export default function CuentasPorCobrarPage() {
               <Button
                 variant="outlined"
                 onClick={() => {
-                  setFiltros({ estado: "", cliente: "", fechaDesde: "", fechaHasta: "" })
+                  setFiltros({ estado: "", proveedor: "", fechaDesde: "", fechaHasta: "" })
                   setBusquedaRealizada(false)
-                  setCuentasPorCobrar([])
+                  setCuentas([])
                 }}
                 fullWidth
               >
@@ -437,7 +482,7 @@ export default function CuentasPorCobrarPage() {
       {busquedaRealizada && (
         <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography variant="body2" color="text.secondary">
-            Mostrando {cuentasPorCobrar.length} de {paginacion.totalRegistros} cuentas
+            Mostrando {cuentas.length} de {paginacion.totalRegistros} cuentas
             {paginacion.totalPaginas > 1 && ` (Página ${paginacion.pagina} de ${paginacion.totalPaginas})`}
           </Typography>
           {paginacion.totalPaginas > 1 && (
@@ -452,7 +497,7 @@ export default function CuentasPorCobrarPage() {
         </Box>
       )}
 
-      {/* Lista de cuentas por cobrar */}
+      {/* Lista de cuentas por pagar */}
       {cargando ? (
         <Box display="flex" justifyContent="center" p={3}>
           <CircularProgress />
@@ -461,22 +506,22 @@ export default function CuentasPorCobrarPage() {
         <Card>
           <CardContent>
             <Typography variant="body1" color="text.secondary" align="center">
-              Use los filtros y haga clic en "Buscar" para ver las cuentas por cobrar.
+              Use los filtros y haga clic en "Buscar" para ver las cuentas por pagar.
             </Typography>
           </CardContent>
         </Card>
-      ) : cuentasPorCobrar.length === 0 ? (
+      ) : cuentas.length === 0 ? (
         <Card>
           <CardContent>
             <Typography variant="body1" color="text.secondary" align="center">
-              No se encontraron cuentas por cobrar con los criterios seleccionados.
+              No se encontraron cuentas por pagar con los criterios seleccionados.
             </Typography>
           </CardContent>
         </Card>
       ) : (
         <Box>
-          {cuentasPorCobrar.map((cuenta) => (
-            <Accordion key={cuenta.idCuentaCobrar} sx={{ mb: 1 }}>
+          {cuentas.map((cuenta) => (
+            <Accordion key={cuenta.idCuentaPagar} sx={{ mb: 1 }}>
               <AccordionSummary expandIcon={<ExpandMore />}>
                 <Grid container alignItems="center" spacing={2}>
                   <Grid item xs={1}>
@@ -491,7 +536,7 @@ export default function CuentasPorCobrarPage() {
                     </Typography>
                   </Grid>
                   <Grid item xs={3}>
-                    <Typography variant="body2">{cuenta.cliente}</Typography>
+                    <Typography variant="body2">{cuenta.proveedor}</Typography>
                   </Grid>
                   <Grid item xs={2}>
                     <Typography variant="body2">Vence: {formatearFecha(cuenta.fechaVencimiento)}</Typography>
@@ -520,7 +565,7 @@ export default function CuentasPorCobrarPage() {
                     <Box
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleRegistrarPago(cuenta)
+                        abrirDialogoPago(cuenta)
                       }}
                       sx={{
                         cursor: cuenta.saldoRestante === 0 ? "default" : "pointer",
@@ -529,7 +574,7 @@ export default function CuentasPorCobrarPage() {
                         justifyContent: "center",
                       }}
                     >
-                      <Payment color={cuenta.saldoRestante === 0 ? "disabled" : "primary"} fontSize="small" />
+                      <PaymentIcon color={cuenta.saldoRestante === 0 ? "disabled" : "primary"} fontSize="small" />
                     </Box>
                   </Grid>
                 </Grid>
@@ -537,13 +582,13 @@ export default function CuentasPorCobrarPage() {
               <AccordionDetails>
                 <Box>
                   <Typography variant="h6" gutterBottom>
-                    Detalles de la Cuenta por Cobrar
+                    Detalles de la Cuenta por Pagar
                   </Typography>
 
                   <Grid container spacing={2} sx={{ mb: 2 }}>
                     <Grid item xs={6}>
                       <Typography variant="body2">
-                        <strong>Cliente:</strong> {cuenta.cliente}
+                        <strong>Proveedor:</strong> {cuenta.proveedor}
                       </Typography>
                       <Typography variant="body2">
                         <strong>Estado de Factura:</strong> {cuenta.estadoFactura}
@@ -580,27 +625,27 @@ export default function CuentasPorCobrarPage() {
                   <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
                     <Button
                       variant="contained"
-                      startIcon={<Payment />}
-                      onClick={() => handleRegistrarPago(cuenta)}
+                      startIcon={<PaymentIcon />}
+                      onClick={() => abrirDialogoPago(cuenta)}
                       disabled={cuenta.saldoRestante === 0}
                     >
-                      Registrar Cobro
+                      Registrar Pago
                     </Button>
                     <Button
                       variant="outlined"
                       size="small"
                       onClick={() => handlePagoRapido(cuenta, cuenta.saldoRestante)}
                       disabled={cuenta.saldoRestante === 0}
-                      startIcon={<Payment />}
+                      startIcon={<PaymentIcon />}
                     >
-                      Cobro Total
+                      Pago Total
                     </Button>
                     <Button
                       variant="outlined"
                       size="small"
                       onClick={() => handlePagoRapido(cuenta, cuenta.saldoRestante / 2)}
                       disabled={cuenta.saldoRestante === 0}
-                      startIcon={<Payment />}
+                      startIcon={<PaymentIcon />}
                     >
                       50%
                     </Button>
@@ -608,7 +653,7 @@ export default function CuentasPorCobrarPage() {
                       Ver Factura
                     </Button>
                     <Button variant="outlined" startIcon={<History />} onClick={() => handleVerHistorial(cuenta)}>
-                      Historial de Cobros
+                      Historial de Pagos
                     </Button>
                   </Box>
                 </Box>
@@ -633,7 +678,7 @@ export default function CuentasPorCobrarPage() {
       )}
 
       {/* Dialog para registrar pago */}
-      <Dialog open={openPagoDialog} onClose={handleClosePagoDialog} maxWidth="sm" fullWidth>
+      <Dialog open={dialogoPagoAbierto} onClose={cerrarDialogoPago} maxWidth="sm" fullWidth>
         <DialogTitle>Registrar Pago</DialogTitle>
         <DialogContent>
           {cuentaSeleccionada && (
@@ -643,7 +688,7 @@ export default function CuentasPorCobrarPage() {
                   <Typography variant="body2">
                     <strong>Factura Nro. {cuentaSeleccionada.nroFactura}</strong>
                     <br />
-                    Cliente: {cuentaSeleccionada.cliente}
+                    Proveedor: {cuentaSeleccionada.proveedor}
                     <br />
                     Saldo pendiente: ₲ {cuentaSeleccionada.saldoRestante.toLocaleString("es-PY")}
                   </Typography>
@@ -664,6 +709,16 @@ export default function CuentasPorCobrarPage() {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Fecha de Pago"
+                  type="date"
+                  value={datosPago.fechaPago}
+                  onChange={(e) => setDatosPago({ ...datosPago, fechaPago: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel>Método de Pago</InputLabel>
                   <Select
@@ -671,10 +726,11 @@ export default function CuentasPorCobrarPage() {
                     onChange={(e) => setDatosPago({ ...datosPago, idMetodoPago: e.target.value })}
                     label="Método de Pago"
                   >
-                    <MenuItem value={1}>Efectivo</MenuItem>
-                    <MenuItem value={2}>Transferencia Bancaria</MenuItem>
-                    <MenuItem value={3}>Cheque</MenuItem>
-                    <MenuItem value={4}>Tarjeta de Crédito</MenuItem>
+                    {metodosPago.map((metodo) => (
+                      <MenuItem key={metodo.idMetodoPago} value={metodo.idMetodoPago}>
+                        {metodo.descMetodoPago}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -693,25 +749,70 @@ export default function CuentasPorCobrarPage() {
                   label="Observaciones"
                   multiline
                   rows={3}
-                  value={datosPago.observaciones}
-                  onChange={(e) => setDatosPago({ ...datosPago, observaciones: e.target.value })}
+                  value={datosPago.observacion}
+                  onChange={(e) => setDatosPago({ ...datosPago, observacion: e.target.value })}
                 />
               </Grid>
             </Grid>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClosePagoDialog} disabled={cargandoPago}>
+          <Button onClick={cerrarDialogoPago} disabled={cargandoPago}>
             Cancelar
           </Button>
           <Button
             variant="contained"
             onClick={registrarPago}
             disabled={cargandoPago}
-            startIcon={cargandoPago ? <CircularProgress size={20} /> : <Payment />}
+            startIcon={cargandoPago ? <CircularProgress size={20} /> : <PaymentIcon />}
           >
             {cargandoPago ? "Registrando..." : "Registrar Pago"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo para historial de pagos */}
+      <Dialog open={openHistorialPagos} onClose={() => setOpenHistorialPagos(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Historial de Pagos</DialogTitle>
+        <DialogContent>
+          {cuentaSeleccionada && (
+            <Box sx={{ pt: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Factura: {cuentaSeleccionada.nroFactura}
+              </Typography>
+              <Typography variant="body2" gutterBottom>
+                Proveedor: {cuentaSeleccionada.proveedor}
+              </Typography>
+
+              <TableContainer component={Paper} sx={{ mt: 2 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Fecha</TableCell>
+                      <TableCell>Monto</TableCell>
+                      <TableCell>Método</TableCell>
+                      <TableCell>Comprobante</TableCell>
+                      <TableCell>Observación</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {historialPagos.map((pago) => (
+                      <TableRow key={pago.idPago}>
+                        <TableCell>{new Date(pago.fechaPago).toLocaleDateString("es-PY")}</TableCell>
+                        <TableCell>₲ {pago.montoPago.toLocaleString("es-PY")}</TableCell>
+                        <TableCell>{pago.metodoPago.descMetodoPago}</TableCell>
+                        <TableCell>{pago.comprobantePago}</TableCell>
+                        <TableCell>{pago.observaciones}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenHistorialPagos(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
 
@@ -723,16 +824,10 @@ export default function CuentasPorCobrarPage() {
       </Snackbar>
 
       {/* Diálogos adicionales */}
-      <VisorFactura
+      <VisorFacturaProveedor
         open={openVisorFactura}
         onClose={() => setOpenVisorFactura(false)}
-        nroFactura={facturaSeleccionada}
-      />
-
-      <HistorialPagos
-        open={openHistorialPagos}
-        onClose={() => setOpenHistorialPagos(false)}
-        nroFactura={facturaSeleccionada}
+        facturaId={facturaSeleccionada}
       />
     </Container>
   )

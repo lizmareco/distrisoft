@@ -90,7 +90,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Historial de Pagos - Factura #{nroFactura}</Typography>
+          <Typography variant="h6">Historial de Cobros - Factura #{nroFactura}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -136,7 +136,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
                       </Typography>
                       {resumen && (
                         <Typography variant="body2">
-                          <strong>Total Pagado:</strong> {formatearMonto(resumen.totalPagado)}
+                          <strong>Total Cobrado:</strong> {formatearMonto(resumen.totalPagado)}
                         </Typography>
                       )}
                     </Grid>
@@ -156,7 +156,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
                         {resumen.cantidadPagos}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Pagos Realizados
+                        Cobros Realizados
                       </Typography>
                     </CardContent>
                   </Card>
@@ -169,7 +169,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
                         {formatearMonto(resumen.totalPagado)}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Total Pagado
+                        Total Cobrado
                       </Typography>
                     </CardContent>
                   </Card>
@@ -182,7 +182,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
                         {resumen.ultimoPago ? formatearFecha(resumen.ultimoPago.fechaPago) : "N/A"}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Último Pago
+                        Último Cobro
                       </Typography>
                     </CardContent>
                   </Card>

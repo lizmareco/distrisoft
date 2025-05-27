@@ -104,7 +104,7 @@ export async function GET(request) {
       },
     })
   } catch (error) {
-    console.error("Error al obtener pagos:", error)
+    console.error("Error al obtener cobros:", error)
     return NextResponse.json({ success: false, error: "Error interno del servidor" }, { status: 500 })
   }
 }
@@ -129,7 +129,7 @@ export async function POST(request) {
     }
 
     if (montoPagoFloat <= 0) {
-      return NextResponse.json({ success: false, error: "El monto del pago debe ser mayor a cero" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "El monto del cobro debe ser mayor a cero" }, { status: 400 })
     }
 
     // Verificar que la factura existe y es a crédito
@@ -151,7 +151,7 @@ export async function POST(request) {
 
     if (factura.esContado) {
       return NextResponse.json(
-        { success: false, error: "No se pueden registrar pagos en facturas de contado" },
+        { success: false, error: "No se pueden registrar cobros en facturas de contado" },
         { status: 400 },
       )
     }
@@ -164,14 +164,14 @@ export async function POST(request) {
     }
 
     if (factura.cuentaPorCobrar.saldoRestante <= 0) {
-      return NextResponse.json({ success: false, error: "Esta factura ya está completamente pagada" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "Esta factura ya está completamente cobrada" }, { status: 400 })
     }
 
     if (montoPagoFloat > factura.cuentaPorCobrar.saldoRestante) {
       return NextResponse.json(
         {
           success: false,
-          error: `El monto del pago (${montoPagoFloat}) no puede ser mayor al saldo restante (${factura.cuentaPorCobrar.saldoRestante})`,
+          error: `El monto del cobro (${montoPagoFloat}) no puede ser mayor al saldo restante (${factura.cuentaPorCobrar.saldoRestante})`,
         },
         { status: 400 },
       )
@@ -232,7 +232,7 @@ export async function POST(request) {
         nuevoSaldo: resultado.nuevoSaldoRestante,
         comprobantePago,
         observaciones,
-        descripcion: `Pago registrado para factura #${nroFacturaInt} - Cliente: ${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
+        descripcion: `Cobro registrado para factura #${nroFacturaInt} - Cliente: ${factura.cliente.persona.nombre} ${factura.cliente.persona.apellido}`,
       },
       operadorInt,
       auditoriaService.obtenerDireccionIP(request),
@@ -247,10 +247,10 @@ export async function POST(request) {
         nuevoSaldoRestante: resultado.nuevoSaldoRestante,
         fechaPago: resultado.nuevoPago.fechaPago,
       },
-      message: "Pago registrado exitosamente",
+      message: "Cobro registrado exitosamente",
     })
   } catch (error) {
-    console.error("Error al registrar pago:", error)
+    console.error("Error al registrar cobro:", error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

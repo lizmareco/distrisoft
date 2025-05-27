@@ -510,17 +510,6 @@ export default function VerOrdenCompraPage({ params }) {
                   Recepción Parcial
                 </Button>
               )}
-              {!editMode && canEdit() && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<Edit />}
-                  onClick={handleEditMode}
-                  sx={{ mr: 1 }}
-                >
-                  Editar
-                </Button>
-              )}
               {editMode && (
                 <>
                   <Button

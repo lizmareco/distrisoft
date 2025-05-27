@@ -4,6 +4,47 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 
+// Función para detectar el navegador desde el User-Agent
+function detectarNavegador(userAgent) {
+  if (!userAgent) return "Navegador no disponible"
+
+  const ua = userAgent.toLowerCase()
+
+  if (ua.includes("edg/")) {
+    const version = userAgent.match(/edg\/([0-9.]+)/i)
+    return `Microsoft Edge ${version ? version[1] : ""}`
+  } else if (ua.includes("chrome/") && !ua.includes("edg/")) {
+    const version = userAgent.match(/chrome\/([0-9.]+)/i)
+    return `Google Chrome ${version ? version[1] : ""}`
+  } else if (ua.includes("firefox/")) {
+    const version = userAgent.match(/firefox\/([0-9.]+)/i)
+    return `Mozilla Firefox ${version ? version[1] : ""}`
+  } else if (ua.includes("safari/") && !ua.includes("chrome/")) {
+    const version = userAgent.match(/version\/([0-9.]+)/i)
+    return `Safari ${version ? version[1] : ""}`
+  } else if (ua.includes("opera/") || ua.includes("opr/")) {
+    const version = userAgent.match(/(opera|opr)\/([0-9.]+)/i)
+    return `Opera ${version ? version[2] : ""}`
+  } else if (ua.includes("trident/") || ua.includes("msie")) {
+    return "Internet Explorer"
+  } else {
+    return "Navegador desconocido"
+  }
+}
+
+// Función para extraer IP del request
+function extraerIP(request) {
+  const forwarded = request.headers.get("x-forwarded-for")
+  const realIP = request.headers.get("x-real-ip")
+  const cfConnectingIP = request.headers.get("cf-connecting-ip")
+
+  if (cfConnectingIP) return cfConnectingIP
+  if (forwarded) return forwarded.split(",")[0].trim()
+  if (realIP) return realIP
+
+  return "IP no disponible"
+}
+
 // GET - Obtener cotizaciones de proveedores con filtro de búsqueda
 export async function GET(request) {
   try {
@@ -144,13 +185,18 @@ export async function POST(request) {
       },
     })
 
-    // Registrar la acción en auditoría con datos básicos
+    // Extraer IP y navegador del request
+    const direccionIP = extraerIP(request)
+    const navegador = detectarNavegador(request.headers.get("user-agent"))
+
+    // Registrar la acción en auditoría usando el método específico
     await auditoriaService.registrarCreacion(
       "CotizacionProveedor",
       cotizacion.idCotizacionProveedor,
       cotizacionBasica,
       userData.idUsuario,
-      request,
+      direccionIP,
+      navegador,
     )
 
     console.log(`API: Cotización de proveedor creada con ID: ${cotizacion.idCotizacionProveedor}`)
