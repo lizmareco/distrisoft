@@ -32,7 +32,8 @@ export async function GET(request) {
           empresa: {
             include: {
               tipoDocumento: true,
-              persona: true,
+              categoriaEmpresa: true,
+              ciudad: true,
             },
           },
         },
@@ -90,6 +91,21 @@ export async function POST(request) {
       return NextResponse.json({ error: "Faltan datos requeridos (empresa)" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
+    // Verificar si ya existe un proveedor para esta empresa
+    const proveedorExistente = await prisma.proveedor.findFirst({
+      where: {
+        idEmpresa: Number.parseInt(data.idEmpresa),
+        deletedAt: null,
+      },
+    })
+
+    if (proveedorExistente) {
+      return NextResponse.json(
+        { error: "Ya existe un proveedor registrado para esta empresa" },
+        { status: HTTP_STATUS_CODES.conflict },
+      )
+    }
+
     // Crear el proveedor con el nuevo campo comentario
     const proveedor = await prisma.proveedor.create({
       data: {
@@ -100,22 +116,26 @@ export async function POST(request) {
         empresa: {
           include: {
             tipoDocumento: true,
-            persona: true,
+            categoriaEmpresa: true,
+            ciudad: true,
           },
         },
       },
     })
 
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Proveedor",
-      idRegistro: proveedor.idProveedor.toString(),
-      accion: "CREAR",
-      valorAnterior: null,
-      valorNuevo: proveedor,
-      idUsuario: idUsuario,
-      request: request,
-    })
+    await auditoriaService.registrarCreacion(
+      "Proveedor",
+      proveedor.idProveedor,
+      proveedor,
+      idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log("API: Proveedor creado con ID:", proveedor.idProveedor)
     return NextResponse.json(proveedor, { status: HTTP_STATUS_CODES.created })

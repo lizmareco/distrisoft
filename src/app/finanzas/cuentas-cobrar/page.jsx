@@ -41,6 +41,8 @@ import {
 } from "@mui/icons-material"
 import VisorFactura from "@/src/components/facturas/VisorFactura"
 import HistorialPagos from "@/src/components/pagos/HistorialPagos"
+import Link from "next/link"
+import ArrowBack from "@mui/icons-material/ArrowBack"
 
 export default function CuentasPorCobrarPage() {
   const [cuentasPorCobrar, setCuentasPorCobrar] = useState([])
@@ -265,6 +267,9 @@ export default function CuentasPorCobrarPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Typography variant="h4" component="h1" gutterBottom>
         Cuentas por Cobrar
       </Typography>

@@ -70,13 +70,18 @@ export async function POST(request) {
       },
     })
 
-    // Registrar la acción en auditoría
+    // Extraer IP y navegador del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+    // Registrar la acción en auditoría con los parámetros correctos
     await auditoriaService.registrarCreacion(
       "MateriaPrima",
       nuevaMateriaPrima.idMateriaPrima,
       nuevaMateriaPrima,
       userData.idUsuario,
-      request,
+      direccionIP,
+      navegador,
     )
 
     console.log(`API: Materia prima creada con ID: ${nuevaMateriaPrima.idMateriaPrima}`)

@@ -27,8 +27,9 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material"
-import { Refresh as RefreshIcon, Search as SearchIcon } from "@mui/icons-material"
+import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack } from "@mui/icons-material"
 import InventarioNav from "@/src/components/inventario-nav"
+import Link from "next/link"
 
 export default function ProductosInventarioPage() {
   const [productos, setProductos] = useState([])
@@ -248,6 +249,9 @@ export default function ProductosInventarioPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Typography variant="h4" gutterBottom>
         Inventario de Productos
       </Typography>

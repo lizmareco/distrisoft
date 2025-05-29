@@ -24,14 +24,15 @@ import SaveIcon from "@mui/icons-material/Save"
 import BusinessIcon from "@mui/icons-material/Business"
 import CommentIcon from "@mui/icons-material/Comment"
 import Link from "next/link"
+import { use } from "react"
 
 export default function EditarProveedorPage({ params }) {
-  const { id } = params
+  const { id } = use(params)
   const router = useRouter()
 
   const [formData, setFormData] = useState({
     idEmpresa: "",
-    comentario: "", // Incluir el campo comentario
+    comentario: "",
   })
 
   const [proveedor, setProveedor] = useState(null)
@@ -45,8 +46,12 @@ export default function EditarProveedorPage({ params }) {
     const fetchData = async () => {
       try {
         console.log(`Cargando datos para proveedor ID: ${id}...`)
-        // Cargar datos relacionados
-        const [proveedorRes, empresasRes] = await Promise.all([fetch(`/api/proveedores/${id}`), fetch("/api/empresas")])
+
+        // Cargar datos relacionados - usar el endpoint que funciona
+        const [proveedorRes, empresasRes] = await Promise.all([
+          fetch(`/api/proveedores/${id}`),
+          fetch("/api/proveedores/all"), // ✅ Usar endpoint de proveedores que sabemos que funciona
+        ])
 
         if (!proveedorRes.ok) {
           throw new Error("No se pudo cargar el proveedor")
@@ -56,15 +61,29 @@ export default function EditarProveedorPage({ params }) {
           throw new Error("Error al cargar datos de referencia")
         }
 
-        const [proveedorData, empresasData] = await Promise.all([proveedorRes.json(), empresasRes.json()])
+        const [proveedorData, proveedoresData] = await Promise.all([proveedorRes.json(), empresasRes.json()])
+
+        console.log("Datos del proveedor:", proveedorData)
+        console.log("Datos de proveedores:", proveedoresData)
+
+        // Extraer las empresas de los proveedores existentes
+        const empresasDisponibles = proveedoresData.map((p) => p.empresa).filter(Boolean)
+
+        // Agregar la empresa actual del proveedor si no está en la lista
+        if (
+          proveedorData.empresa &&
+          !empresasDisponibles.find((e) => e.idEmpresa === proveedorData.empresa.idEmpresa)
+        ) {
+          empresasDisponibles.push(proveedorData.empresa)
+        }
 
         setProveedor(proveedorData)
-        setEmpresas(empresasData)
+        setEmpresas(empresasDisponibles)
 
         // Configurar el formulario con los datos del proveedor
         setFormData({
           idEmpresa: proveedorData.idEmpresa.toString(),
-          comentario: proveedorData.comentario || "", // Cargar el comentario existente
+          comentario: proveedorData.comentario || "",
         })
       } catch (error) {
         console.error("Error al cargar datos:", error)
@@ -88,7 +107,6 @@ export default function EditarProveedorPage({ params }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validar que se hayan completado todos los campos requeridos
     if (!formData.idEmpresa) {
       setError("Debe seleccionar una empresa para el proveedor")
       return
@@ -123,7 +141,6 @@ export default function EditarProveedorPage({ params }) {
     }
   }
 
-  // Renderizar un mensaje de carga mientras se obtienen los datos
   if (loading) {
     return (
       <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
@@ -132,8 +149,10 @@ export default function EditarProveedorPage({ params }) {
     )
   }
 
-  // Buscar la empresa seleccionada
-  const empresaSeleccionada = empresas.find((e) => e.idEmpresa.toString() === formData.idEmpresa)
+  // Asegurar que empresas sea un array antes de usar find
+  const empresaSeleccionada = Array.isArray(empresas)
+    ? empresas.find((e) => e.idEmpresa.toString() === formData.idEmpresa)
+    : null
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -166,11 +185,12 @@ export default function EditarProveedorPage({ params }) {
               <FormControl fullWidth required>
                 <InputLabel>Empresa</InputLabel>
                 <Select name="idEmpresa" value={formData.idEmpresa} onChange={handleChange} label="Empresa">
-                  {empresas.map((empresa) => (
-                    <MenuItem key={empresa.idEmpresa} value={empresa.idEmpresa.toString()}>
-                      {`${empresa.razonSocial} - ${empresa.ruc}`}
-                    </MenuItem>
-                  ))}
+                  {Array.isArray(empresas) &&
+                    empresas.map((empresa) => (
+                      <MenuItem key={empresa.idEmpresa} value={empresa.idEmpresa.toString()}>
+                        {`${empresa.razonSocial} - ${empresa.ruc}`}
+                      </MenuItem>
+                    ))}
                 </Select>
               </FormControl>
             </Grid>
@@ -206,7 +226,6 @@ export default function EditarProveedorPage({ params }) {
               <Divider sx={{ mb: 2 }} />
             </Grid>
 
-            {/* Campo de comentarios */}
             <Grid item xs={12}>
               <TextField
                 fullWidth

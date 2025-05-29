@@ -31,6 +31,9 @@ import {
 import { ExpandMore, Search, Refresh, VisibilityOutlined, FilterAlt, ClearAll, TableChart } from "@mui/icons-material"
 
 import { exportToExcel } from "@/src/utils/export-utils"
+import Link from "next/link"
+import ArrowBack from "@mui/icons-material/ArrowBack"
+
 
 export default function AuditoriaPage() {
   // Estados para filtros
@@ -323,6 +326,9 @@ export default function AuditoriaPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Auditoría del Sistema

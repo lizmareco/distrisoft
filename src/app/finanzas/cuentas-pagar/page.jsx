@@ -48,6 +48,7 @@ import {
   History,
 } from "@mui/icons-material"
 import VisorFacturaProveedor from "@/src/components/facturas/VisorFacturaProveedor"
+import Link from "next/link"
 
 export default function CuentasPorPagarPage() {
   const router = useRouter()
@@ -305,13 +306,13 @@ export default function CuentasPorPagarPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
           Cuentas por Pagar
         </Typography>
-        <Button variant="outlined" startIcon={<ArrowBack />} onClick={() => router.push("/finanzas")}>
-          Volver a Finanzas
-        </Button>
       </Box>
 
       {/* Resumen */}
