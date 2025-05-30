@@ -162,7 +162,18 @@ export async function POST(request) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarCreacion("Empresa", empresa.idEmpresa, empresa, userData.idUsuario, request)
+const direccionIP = auditoriaService.obtenerDireccionIP(request)
+const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+// Registrar la acción en auditoría
+await auditoriaService.registrarCreacion(
+  "Empresa", 
+  empresa.idEmpresa, 
+  empresa, 
+  userData.idUsuario, 
+  direccionIP, 
+  navegador
+)
 
     console.log("Empresa creada con ID:", empresa.idEmpresa)
     return NextResponse.json(empresa, { status: HTTP_STATUS_CODES.created })

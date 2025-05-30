@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { prisma } from "@/prisma/client" // ← FALTA ESTA IMPORTACIÓN
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
@@ -63,19 +64,44 @@ export async function POST(request) {
 
     // Obtener el usuario actual desde el token (si está autenticado)
     const accessToken = await authController.hasAccessToken(request)
-    let idUsuario = null
+    let idUsuario = 1 // Usuario por defecto
 
     if (accessToken) {
       const userData = await authController.getUserFromToken(accessToken)
-      idUsuario = userData?.idUsuario || null
+      idUsuario = userData?.idUsuario || 1
     }
 
     // Validar datos requeridos
     if (!data.idPersona || !data.idSectorCliente) {
       console.error("Datos incompletos:", data)
       return NextResponse.json(
-        { error: "Faltan datos requeridos (persona, o sector)" },
+        { error: "Faltan datos requeridos (persona o sector)" },
         { status: HTTP_STATUS_CODES.badRequest },
+      )
+    }
+
+    // Verificar si ya existe un cliente con la misma persona
+    const clienteExistente = await prisma.cliente.findFirst({
+      where: {
+        idPersona: Number.parseInt(data.idPersona),
+        deletedAt: null,
+      },
+      include: {
+        persona: true,
+      },
+    })
+
+    if (clienteExistente) {
+      console.log(`Ya existe un cliente con la persona ID ${data.idPersona}`)
+      return NextResponse.json(
+        {
+          error: `Ya existe un cliente registrado para esta persona`,
+          clienteExistente: {
+            id: clienteExistente.idCliente,
+            nombre: `${clienteExistente.persona.nombre} ${clienteExistente.persona.apellido}`,
+          },
+        },
+        { status: HTTP_STATUS_CODES.conflict },
       )
     }
 
@@ -93,16 +119,11 @@ export async function POST(request) {
       },
     })
 
-    // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Cliente",
-      idRegistro: cliente.idCliente.toString(),
-      accion: "CREAR",
-      valorAnterior: null,
-      valorNuevo: cliente,
-      idUsuario: idUsuario,
-      request: request,
-    })
+    // Registrar la acción en auditoría (CORREGIDO)
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+    await auditoriaService.registrarCreacion("Cliente", cliente.idCliente, cliente, idUsuario, direccionIP, navegador)
 
     console.log("Cliente creado con ID:", cliente.idCliente)
     return NextResponse.json(cliente, { status: HTTP_STATUS_CODES.created })

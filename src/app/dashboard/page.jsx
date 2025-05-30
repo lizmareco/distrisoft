@@ -29,8 +29,15 @@ import {
   History as HistoryIcon,
   Description as DescriptionIcon,
   ReceiptLong as ReceiptLongIcon, // Nuevo icono para cotizaciones de proveedores
+  AttachMoney as AttachMoneyIcon, // Para finanzas
+  Science as ScienceIcon, // Para formulas
+  Inventory2 as InventoryGeneralIcon, // Para inventario general
+  ShoppingCart as ShoppingCartIcon, // Para pedidos
 } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -47,6 +54,9 @@ export default function DashboardPage() {
     usuarios: true,
     ventas: true, // Nueva sección para ventas/cotizaciones
     compras: true, // Nueva sección para compras/cotizaciones de proveedores
+    finanzas: true,
+    cuentasCobrar: true,
+    cuentasPagar: true,
   })
 
   // Estado para controlar la visibilidad de los elementos dentro de cada sección
@@ -60,16 +70,24 @@ export default function DashboardPage() {
     // Sección de Inventario
     materiaprima: true,
     productos: true,
+    inventario: true, // Nuevo
+    formulas: true, // Nuevo
 
     // Sección de Usuarios
     administracionUsuarios: true,
 
     // Sección de Ventas
     cotizaciones: true,
+    pedidos: true, // Nuevo
 
     // Sección de Compras
     cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
     ordenesCompra: true, // Nuevo ítem para órdenes de compra
+
+    // Sección de Finanzas
+    finanzas: true, // Nuevo
+    cuentasCobrar: true,
+    cuentasPagar: true,
   })
 
   // Modificar la función useEffect para asegurar que se obtengan correctamente los datos del usuario
@@ -175,6 +193,9 @@ export default function DashboardPage() {
       usuarios: true, // Siempre visible para pruebas
       ventas: true, // Sección para ventas/cotizaciones
       compras: true, // Nueva sección para compras/cotizaciones de proveedores
+      finanzas: true,
+      cuentasCobrar: true,
+      cuentasPagar: true,
     }
 
     const items = {
@@ -184,10 +205,16 @@ export default function DashboardPage() {
       proveedores: true,
       materiaprima: true,
       productos: true,
+      inventario: true, // Nuevo
+      formulas: true,
       administracionUsuarios: true, // Siempre visible para pruebas
       cotizaciones: true, // Ítem para cotizaciones de clientes
+      pedidos: true, // Nuevo
       cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
       ordenesCompra: true, // Nuevo ítem para órdenes de compra
+      finanzas: true, // Nuevo
+      cuentasCobrar: true,
+      cuentasPagar: true,
     }
 
     // Configurar permisos específicos según el rol
@@ -308,21 +335,50 @@ export default function DashboardPage() {
                 <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
                   <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
                     <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <DescriptionIcon sx={{ fontSize: 60, color: "#00796b" }} /> {/* Verde azulado */}
+                      <DescriptionIcon sx={{ fontSize: 60, color: "#009688" }} /> {/* Teal */}
                     </Box>
                     <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Cotizaciones
+                      Cotizaciones de Clientes
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las cotizaciones para clientes. Cree nuevas cotizaciones, consulte el historial y
-                      gestione el estado de las mismas.
+                      Administre las cotizaciones del sistema. Cree nuevas cotizaciones, consulte el historial y
+                      gestione el estado.
                     </Typography>
                   </CardContent>
                   <CardActions sx={{ justifyContent: "center", pb: 2 }}>
                     <Button
                       variant="contained"
                       onClick={() => navigateTo("/cotizaciones")}
-                      sx={{ bgcolor: "#00796b", "&:hover": { bgcolor: "#004d40" } }}
+                      sx={{ bgcolor: "#009688", "&:hover": { bgcolor: "#00796b" } }}
+                    >
+                      ACCEDER
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Tarjeta de Gestión de Pedidos */}
+            {visibleItems.pedidos && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                      <ShoppingCartIcon sx={{ fontSize: 60, color: "#ff5722" }} />
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Gestión de Pedidos
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Administre los pedidos de clientes. Cree nuevos pedidos, consulte el historial y gestione el
+                      estado de los mismos.
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigateTo("/pedidos")}
+                      sx={{ bgcolor: "#ff5722", "&:hover": { bgcolor: "#d84315" } }}
                     >
                       ACCEDER
                     </Button>
@@ -370,6 +426,8 @@ export default function DashboardPage() {
                 </Card>
               </Grid>
             )}
+
+            {/* Tarjeta de Gestión de Órdenes de Compra */}
             {visibleItems.ordenesCompra && (
               <Grid item xs={12} sm={6} md={4}>
                 <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
@@ -400,6 +458,101 @@ export default function DashboardPage() {
           </Grid>
         </Paper>
       )}
+
+      {/* Nueva Sección de Gestión de Finanzas */}
+{visibleSections.finanzas && (
+  <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+    <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
+      Gestión de Finanzas
+    </Typography>
+
+    <Grid container spacing={3} justifyContent="center">
+      {visibleItems.finanzas && (
+        <Grid item xs={12} sm={6} md={4}>
+          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <AttachMoneyIcon sx={{ fontSize: 60, color: "#2e7d32" }} /> {/* Verde oscuro */}
+              </Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Finanzas
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Administre las finanzas del sistema. Revise ingresos, egresos y estado de cuentas.
+              </Typography>
+            </CardContent>
+            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+              <Button
+                variant="contained"
+                onClick={() => navigateTo("/finanzas")}
+                sx={{ bgcolor: "#2e7d32", "&:hover": { bgcolor: "#1b5e20" } }}
+              >
+                ACCEDER
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      )}
+      
+      {/* Tarjeta de Cuentas por Cobrar */}
+      {visibleItems.cuentasCobrar && (
+        <Grid item xs={12} sm={6} md={4}>
+          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <TrendingUpIcon sx={{ fontSize: 60, color: "#1976d2" }} /> {/* Azul */}
+              </Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Cuentas por Cobrar
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Gestione las cuentas pendientes por cobrar. Controle pagos y vencimientos.
+              </Typography>
+            </CardContent>
+            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+              <Button
+                variant="contained"
+                onClick={() => navigateTo("/finanzas/cuentas-cobrar")}
+                sx={{ bgcolor: "#1976d2", "&:hover": { bgcolor: "#0d47a1" } }}
+              >
+                ACCEDER
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      )}
+      
+      {/* Tarjeta de Cuentas por Pagar */}
+      {visibleItems.cuentasPagar && (
+        <Grid item xs={12} sm={6} md={4}>
+          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <TrendingDownIcon sx={{ fontSize: 60, color: "#ed6c02" }} /> {/* Naranja */}
+              </Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Cuentas por Pagar
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Administre las cuentas pendientes por pagar. Programe pagos y controle vencimientos.
+              </Typography>
+            </CardContent>
+            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+              <Button
+                variant="contained"
+                onClick={() => navigateTo("/finanzas/cuentas-pagar")}
+                sx={{ bgcolor: "#ed6c02", "&:hover": { bgcolor: "#e65100" } }}
+              >
+                ACCEDER
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      )}
+    </Grid>
+  </Paper>
+)}
+
 
       {/* Sección de Gestión de Entidades */}
       {visibleSections.entidades && (
@@ -547,7 +700,7 @@ export default function DashboardPage() {
                       Gestión de Materia Prima
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre el inventario de materias primas. Visualice, registre y modifique la información de
+                      Administre el catálogo de materias primas. Visualice, registre y modifique la información de
                       stock, unidades de medida y estados de las materias primas.
                     </Typography>
                   </CardContent>
@@ -585,6 +738,63 @@ export default function DashboardPage() {
                       variant="contained"
                       onClick={() => navigateTo("/producto")}
                       sx={{ bgcolor: "#f44336", "&:hover": { bgcolor: "#b71c1c" } }}
+                    >
+                      ACCEDER
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Tarjeta de Gestión de Inventario de Materia Prima y Producto*/}
+            {visibleItems.inventario && (
+              <Grid item xs={12} sm={6}>
+                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
+                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                      <InventoryGeneralIcon sx={{ fontSize: 60, color: "#607d8b" }} /> {/* Gris azulado */}
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Inventario de Materia Prima y Producto
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Administre el Inventario de Materia Prima y Producto. Visualice stock total, movimientos de inventario.
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigateTo("/inventario")}
+                      sx={{ bgcolor: "#607d8b", "&:hover": { bgcolor: "#455a64" } }}
+                    >
+                      ACCEDER
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Tarjeta de Gestión de Fórmulas */}
+            {visibleItems.formulas && (
+              <Grid item xs={12} sm={6}>
+                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
+                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                      <ScienceIcon sx={{ fontSize: 60, color: "#3f51b5" }} /> {/* Índigo */}
+                    </Box>
+                    <Typography variant="h5" component="h2" gutterBottom>
+                      Gestión de Fórmulas
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Administre las fórmulas de producción. Cree, modifique y gestione las recetas y fórmulas para la
+                      fabricación de productos.
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={() => navigateTo("/formulas")}
+                      sx={{ bgcolor: "#3f51b5", "&:hover": { bgcolor: "#303f9f" } }}
                     >
                       ACCEDER
                     </Button>

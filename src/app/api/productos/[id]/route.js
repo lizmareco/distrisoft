@@ -127,6 +127,12 @@ export async function PUT(request, { params }) {
     // Guardar el estado anterior para auditoría
     const productoAnterior = { ...productoExistente }
 
+    // Calcular precio unitario automáticamente
+    let precioUnitarioCalculado = data.precioUnitario
+    if (data.costoPorPaquete && data.unidadesPorPaquete && data.unidadesPorPaquete > 0) {
+      precioUnitarioCalculado = Number.parseFloat(data.costoPorPaquete) / Number.parseInt(data.unidadesPorPaquete)
+    }
+
     // Actualizar el producto
     const producto = await prisma.producto.update({
       where: {
@@ -137,13 +143,15 @@ export async function PUT(request, { params }) {
         descripcion: data.descripcion,
         idTipoProducto: Number.parseInt(data.idTipoProducto),
         pesoUnidad: Number.parseFloat(data.pesoUnidad),
-        precioUnitario: Number.parseFloat(data.precioUnitario),
+        precioUnitario: Number.parseFloat(precioUnitarioCalculado),
         idUnidadMedida: Number.parseInt(data.idUnidadMedida),
         idEstadoProducto: Number.parseInt(data.idEstadoProducto),
         updatedAt: new Date(),
-        unidadesPorPaquete: datos.unidadesPorPaquete || 1,
-        ventaPorPaquete: datos.ventaPorPaquete || false,
-        paqueteMinimo: datos.paqueteMinimo,
+        // Nuevos campos
+        unidadesPorPaquete: data.unidadesPorPaquete ? Number.parseInt(data.unidadesPorPaquete) : 1,
+        ventaPorPaquete: Boolean(data.ventaPorPaquete),
+        paqueteMinimo: data.paqueteMinimo ? Number.parseInt(data.paqueteMinimo) : 1,
+        costoPorPaquete: data.costoPorPaquete ? Number.parseFloat(data.costoPorPaquete) : 0,
       },
       include: {
         unidadMedida: true,
@@ -153,15 +161,19 @@ export async function PUT(request, { params }) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Producto",
-      idRegistro: id.toString(),
-      accion: "ACTUALIZAR",
-      valorAnterior: productoAnterior,
-      valorNuevo: producto,
-      idUsuario: userData.idUsuario,
-      request: request,
-    })
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+    // Llamar con método correcto
+    await auditoriaService.registrarActualizacion(
+      "Producto",
+      id,
+      productoAnterior,
+      producto,
+      userData.idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log(`API: Producto con ID ${id} actualizado correctamente`)
     return NextResponse.json(
@@ -235,16 +247,19 @@ export async function DELETE(request, { params }) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Producto",
-      idRegistro: id.toString(),
-      accion: "ELIMINAR",
-      valorAnterior: productoAnterior,
-      valorNuevo: null,
-      idUsuario: userData.idUsuario,
-      request: request,
-    })
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
 
+    // Llamar con método correcto
+    await auditoriaService.registrarEliminacion(
+      "Producto",
+      id,
+      productoAnterior,
+      userData.idUsuario,
+      direccionIP,
+      navegador,
+    )
     console.log(`API: Producto con ID ${id} eliminado correctamente`)
     return NextResponse.json({ message: "Producto eliminado correctamente" }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {

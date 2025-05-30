@@ -118,7 +118,19 @@ export async function POST(request) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarCreacion("Persona", persona.idPersona, persona, userData.idUsuario, request)
+    // Extraer información del request
+const direccionIP = auditoriaService.obtenerDireccionIP(request)
+const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+// Llamar con parámetros correctos
+await auditoriaService.registrarCreacion(
+  "Persona", 
+  persona.idPersona, 
+  persona, 
+  userData.idUsuario, 
+  direccionIP, 
+  navegador
+)
 
     console.log("API: Persona creada con ID:", persona.idPersona)
     return NextResponse.json(persona, { status: HTTP_STATUS_CODES.created })

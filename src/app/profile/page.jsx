@@ -18,6 +18,8 @@ import {
 } from "@mui/material"
 import { Person, Email, Phone, LocationOn, Badge, CalendarToday, Security } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
+import ArrowBack from "@mui/icons-material/ArrowBack"
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(null)
@@ -171,6 +173,9 @@ export default function ProfilePage() {
 
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Paper elevation={3} sx={{ p: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
           <Avatar

@@ -96,14 +96,19 @@ export async function PUT(request, { params }) {
       },
     })
 
-    // Registrar la acción en auditoría
+    // Extraer IP y navegador del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+    // Registrar la acción en auditoría con los parámetros correctos
     await auditoriaService.registrarActualizacion(
       "MateriaPrima",
       id,
       materiaPrimaAnterior,
       materiaPrimaActualizada,
       userData.idUsuario,
-      request,
+      direccionIP,
+      navegador,
     )
 
     console.log(`API: Materia prima con ID ${id} actualizada correctamente`)
@@ -146,8 +151,19 @@ export async function DELETE(request, { params }) {
       },
     })
 
-    // Registrar la acción en auditoría
-    await auditoriaService.registrarEliminacion("MateriaPrima", id, materiaPrimaAnterior, userData.idUsuario, request)
+    // Extraer IP y navegador del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+    // Registrar la acción en auditoría con los parámetros correctos
+    await auditoriaService.registrarEliminacion(
+      "MateriaPrima",
+      id,
+      materiaPrimaAnterior,
+      userData.idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log(`API: Materia prima con ID ${id} eliminada correctamente`)
     return NextResponse.json({ message: "Materia prima eliminada correctamente" })
@@ -156,4 +172,3 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: "Error al eliminar materia prima" }, { status: 500 })
   }
 }
-
