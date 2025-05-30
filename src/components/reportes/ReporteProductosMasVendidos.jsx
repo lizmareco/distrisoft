@@ -58,10 +58,13 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
     }).format(valor)
   }
 
+  const [reporteGenerado, setReporteGenerado] = useState(false)
+
   // Función para generar el reporte
   const handleGenerarReporte = async () => {
     setLoading(true)
     setError(null)
+    setReporteGenerado(false) // Reinicia antes de generar
 
     try {
       const response = await fetch(
@@ -75,6 +78,7 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
 
       setDatosReporte(data.data)
       setTotalGeneral(data.totalGeneral)
+      setReporteGenerado(true) // Solo aquí lo marcas como generado
       toast({
         title: "Reporte generado",
         description: `Se encontraron ${data.data.length} productos vendidos en el período seleccionado.`,
@@ -82,6 +86,7 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
     } catch (err) {
       console.error("Error:", err)
       setError(err.message)
+      setReporteGenerado(true) // También aquí, para mostrar el error si corresponde
       toast({
         title: "Error",
         description: err.message,
@@ -91,11 +96,6 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
       setLoading(false)
     }
   }
-
-  // Generar reporte al cargar el componente
-  useEffect(() => {
-    handleGenerarReporte()
-  }, [])
 
   // Preparar datos para el gráfico (limitado a los 10 más vendidos)
   const prepararDatosGrafico = () => {
@@ -382,7 +382,7 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
         </>
       )}
 
-      {datosReporte.length === 0 && !loading && !error && (
+      {reporteGenerado && datosReporte.length === 0 && !loading && !error && (
         <Alert severity="info">
           No se encontraron datos para el período seleccionado. Ajuste los filtros e intente nuevamente.
         </Alert>

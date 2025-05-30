@@ -53,7 +53,7 @@ export default function ReportesPage() {
         { id: "ventas-rango-fecha", title: "Ventas por Rango de Fecha", icon: <DateRangeIcon fontSize="large" /> },
         { id: "ventas-vendedor", title: "Ventas por Vendedor", icon: <GroupIcon fontSize="large" /> },
         { id: "productos-mas-vendidos", title: "Productos Más Vendidos", icon: <TrendingUpIcon fontSize="large" /> },
-        { id: "cotizaciones", title: "Cotizaciones a Clientes", icon: <AttachMoneyIcon fontSize="large" /> },
+        //{ id: "cotizaciones", title: "Cotizaciones a Clientes", icon: <AttachMoneyIcon fontSize="large" /> },
       ],
       compras: [
         { id: "compras-proveedor", title: "Compras por Proveedor", icon: <PieChartIcon fontSize="large" /> },
