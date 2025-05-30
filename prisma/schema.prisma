@@ -726,7 +726,7 @@ model Usuario {
   rol                    Rol                      @relation(fields: [idRol], references: [idRol], onDelete: NoAction, onUpdate: NoAction, map: "rol_usuario_fk")
 }
 
-/*model RecuperacionContrasena {
+model RecuperacionContrasena {
   idRecuperacion Int      @id @default(autoincrement()) @map("id_recuperacion")
   token          String   @unique
   expiracion     DateTime
@@ -739,7 +739,7 @@ model Usuario {
   usuario        Usuario  @relation(fields: [idUsuario], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_recuperacion_fk")
 
   @@map("RecuperacionContrasena")
-}*/
+}
 
 model AccessToken {
   idAccessToken Int           @id @default(autoincrement()) @map("id_access_token")
@@ -772,21 +772,6 @@ model Departamento {
   deletedAt        DateTime? @map("deleted_at")
   ciudades         Ciudad[]
 }
-
-model RecuperacionContrasena {
-  id_recuperacion Int       @id(map: "recuperacion_contrasena_pk") @default(autoincrement())
-  token           String    @unique(map: "token_unique") @db.VarChar
-  expiracion      DateTime  @db.Timestamp(6)
-  usado           Boolean   @default(false)
-  id_usuario      Int
-  created_at      DateTime  @default(now())
-  updated_at      DateTime? @default(now())
-  deleted_at      DateTime?
-  Usuario         Usuario   @relation(fields: [id_usuario], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction, map: "usuario_recuperacion_fk")
-
-  @@index([token], map: "idx_recuperacion_token")
-  @@index([id_usuario], map: "idx_recuperacion_usuario")
-} 
 
 model Auditoria {
   idAuditoria   Int       @id @default(autoincrement()) @map("id_auditoria")
