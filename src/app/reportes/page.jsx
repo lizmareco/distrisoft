@@ -10,9 +10,14 @@ import {
   Inventory as InventoryIcon,
   ShoppingCart as ShoppingCartIcon,
   Storefront as StorefrontIcon,
+  DateRange as DateRangeIcon,
+  Group as GroupIcon,
 } from "@mui/icons-material"
 import ReporteVentasCliente from "@/src/components/reportes/ReporteVentasCliente"
 import ReporteVentasProducto from "@/src/components/reportes/ReporteVentasProducto"
+import ReporteVentasRangoFecha from "@/src/components/reportes/ReporteVentasRangoFecha"
+import ReporteVentasVendedor from "@/src/components/reportes/ReporteVentasVendedor"
+import ReporteProductosMasVendidos from "@/src/components/reportes/ReporteProductosMasVendidos"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -29,6 +34,11 @@ export default function ReportesPage() {
     setSelectedReport(reportType)
   }
 
+  // Volver a la lista de reportes
+  const handleVolver = () => {
+    setSelectedReport(null)
+  }
+
   // Renderizar tarjetas de reporte según la categoría
   const renderReportCards = () => {
     const reportsByCategory = {
@@ -40,6 +50,9 @@ export default function ReportesPage() {
       ventas: [
         { id: "ventas-cliente", title: "Ventas por Cliente", icon: <PieChartIcon fontSize="large" /> },
         { id: "ventas-producto", title: "Ventas por Producto", icon: <StorefrontIcon fontSize="large" /> },
+        { id: "ventas-rango-fecha", title: "Ventas por Rango de Fecha", icon: <DateRangeIcon fontSize="large" /> },
+        { id: "ventas-vendedor", title: "Ventas por Vendedor", icon: <GroupIcon fontSize="large" /> },
+        { id: "productos-mas-vendidos", title: "Productos Más Vendidos", icon: <TrendingUpIcon fontSize="large" /> },
         { id: "cotizaciones", title: "Cotizaciones a Clientes", icon: <AttachMoneyIcon fontSize="large" /> },
       ],
       compras: [
@@ -83,9 +96,15 @@ export default function ReportesPage() {
   const renderSelectedReport = () => {
     switch (selectedReport) {
       case "ventas-cliente":
-        return <ReporteVentasCliente />
+        return <ReporteVentasCliente onVolver={handleVolver} />
       case "ventas-producto":
-        return <ReporteVentasProducto />
+        return <ReporteVentasProducto onVolver={handleVolver} />
+      case "ventas-rango-fecha":
+        return <ReporteVentasRangoFecha onVolver={handleVolver} />
+      case "ventas-vendedor":
+        return <ReporteVentasVendedor onVolver={handleVolver} />
+      case "productos-mas-vendidos":
+        return <ReporteProductosMasVendidos onVolver={handleVolver} />
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>

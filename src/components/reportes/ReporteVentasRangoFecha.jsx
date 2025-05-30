@@ -43,8 +43,7 @@ const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
 // Importación dinámica de los componentes de Chart.js
 const ChartJS = dynamic(() => import("chart.js").then((mod) => mod.Chart), { ssr: false })
 
-export default function ReporteVentasCliente({ onVolver }) {
-  const [nroDocumento, setNroDocumento] = useState("")
+export default function ReporteVentasRangoFecha({ onVolver }) {
   const [fechaDesde, setFechaDesde] = useState("")
   const [fechaHasta, setFechaHasta] = useState("")
   const [ventasDetalladas, setVentasDetalladas] = useState([])
@@ -77,19 +76,19 @@ export default function ReporteVentasCliente({ onVolver }) {
 
   // Generar reporte
   const handleGenerarReporte = async () => {
-    if (!nroDocumento || !fechaDesde || !fechaHasta) {
-      setError("Todos los campos son requeridos")
+    if (!fechaDesde || !fechaHasta) {
+      setError("Las fechas desde y hasta son requeridas")
       return
     }
 
     setLoading(true)
     setError(null)
     setBusquedaRealizada(true)
-    console.log("Iniciando generación de reporte con:", { nroDocumento, fechaDesde, fechaHasta })
+    console.log("Iniciando generación de reporte con:", { fechaDesde, fechaHasta })
 
     try {
       // Obtener datos detallados
-      const urlDetallado = `/api/reportes/ventas-cliente?nroDocumento=${nroDocumento}&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}&tipo=detallado`
+      const urlDetallado = `/api/reportes/ventas-rango-fecha?fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`
       console.log("Llamando a URL detallado:", urlDetallado)
 
       const responseDetallado = await fetch(urlDetallado)
@@ -103,6 +102,13 @@ export default function ReporteVentasCliente({ onVolver }) {
 
       const datosDetallados = await responseDetallado.json()
       console.log("Datos detallados recibidos:", datosDetallados)
+
+      // Verificar el formato de las fechas
+      if (datosDetallados.length > 0) {
+        console.log("Ejemplo de fecha recibida:", datosDetallados[0].FECHA_VENTA)
+        console.log("Tipo de fecha recibida:", typeof datosDetallados[0].FECHA_VENTA)
+      }
+
       setVentasDetalladas(datosDetallados)
 
       if (datosDetallados.length === 0) {
@@ -111,21 +117,28 @@ export default function ReporteVentasCliente({ onVolver }) {
         return
       }
 
-      // Obtener datos agrupados para estadísticas y gráfico
-      const urlAgrupado = `/api/reportes/ventas-cliente?nroDocumento=${nroDocumento}&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}&tipo=agrupado`
-      console.log("Llamando a URL agrupado:", urlAgrupado)
+      // Agrupar datos por fecha para estadísticas y gráfico
+      // Crear un objeto para agrupar por fecha
+      const agrupado = {}
 
-      const responseAgrupado = await fetch(urlAgrupado)
-      console.log("Response agrupado status:", responseAgrupado.status)
+      // Agrupar ventas por fecha
+      datosDetallados.forEach((venta) => {
+        const fecha = venta.FECHA_VENTA
+        console.log("Agrupando por fecha:", fecha)
 
-      if (!responseAgrupado.ok) {
-        const errorData = await responseAgrupado.json()
-        console.error("Error en response agrupado:", errorData)
-        throw new Error(errorData.error || "Error al obtener datos agrupados")
-      }
+        if (!agrupado[fecha]) {
+          agrupado[fecha] = {
+            fecha: fecha,
+            totalVenta: 0,
+          }
+        }
+        agrupado[fecha].totalVenta += venta.MONTO_TOTAL
+      })
 
-      const datosAgrupados = await responseAgrupado.json()
-      console.log("Datos agrupados recibidos:", datosAgrupados)
+      // Convertir a array
+      const datosAgrupados = Object.values(agrupado)
+      console.log("Datos agrupados:", datosAgrupados)
+
       setVentasAgrupadas(datosAgrupados)
 
       console.log("Reporte generado exitosamente")
@@ -146,7 +159,7 @@ export default function ReporteVentasCliente({ onVolver }) {
 
     try {
       console.log("Exportando a Excel:", ventasDetalladas)
-      exportToExcel(ventasDetalladas, `reporte-ventas-cliente-${nroDocumento}`)
+      exportToExcel(ventasDetalladas, `reporte-ventas-rango-fecha-${fechaDesde}-${fechaHasta}`)
     } catch (error) {
       console.error("Error al exportar a Excel:", error)
       setError("Error al exportar a Excel: " + error.message)
@@ -168,7 +181,7 @@ export default function ReporteVentasCliente({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>Reporte de Ventas por Cliente</title>
+            <title>Reporte de Ventas por Rango de Fecha</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
               h1 { color: #333; }
@@ -181,18 +194,19 @@ export default function ReporteVentasCliente({ onVolver }) {
             </style>
           </head>
           <body>
-            <h1>Reporte de Ventas por Cliente</h1>
+            <h1>Reporte de Ventas por Rango de Fecha</h1>
             <div class="info">
-              <p><strong>Documento:</strong> ${nroDocumento}</p>
               <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
-              <p><strong>Cliente:</strong> ${ventasDetalladas[0]?.NOMBRE || ""} ${ventasDetalladas[0]?.APELLIDO || ""}</p>
             </div>
             <table>
               <thead>
                 <tr>
                   <th>ID Venta</th>
-                  <th>Fecha</th>
+                  <th>Documento Cliente</th>
+                  <th>Nombre</th>
+                  <th>Apellido</th>
                   <th>Monto Total</th>
+                  <th>Fecha Venta</th>
                   <th>Vendedor</th>
                 </tr>
               </thead>
@@ -202,15 +216,18 @@ export default function ReporteVentasCliente({ onVolver }) {
                     (venta) => `
                   <tr>
                     <td>${venta.ID_VENTA || ""}</td>
-                    <td>${venta.FECHA_VENTA || ""}</td>
+                    <td>${venta.DOC_CLIENTE || ""}</td>
+                    <td>${venta.NOMBRE || ""}</td>
+                    <td>${venta.APELLIDO || ""}</td>
                     <td class="text-right">₲ ${(venta.MONTO_TOTAL || 0).toLocaleString("es-PY")}</td>
+                    <td>${venta.FECHA_VENTA || ""}</td>
                     <td>${venta.VENDEDOR || ""}</td>
                   </tr>
                 `,
                   )
                   .join("")}
                 <tr class="total">
-                  <td colspan="2"><strong>Total</strong></td>
+                  <td colspan="4"><strong>Total</strong></td>
                   <td class="text-right"><strong>₲ ${total.toLocaleString("es-PY")}</strong></td>
                   <td></td>
                 </tr>
@@ -241,7 +258,7 @@ export default function ReporteVentasCliente({ onVolver }) {
 
       // Crear un enlace temporal para la descarga
       const link = document.createElement("a")
-      link.download = `grafico-ventas-cliente-${nroDocumento}-${fechaDesde}-${fechaHasta}.png`
+      link.download = `grafico-ventas-rango-fecha-${fechaDesde}-${fechaHasta}.png`
       link.href = canvas.toDataURL("image/png")
 
       // Simular click para descargar
@@ -278,9 +295,12 @@ export default function ReporteVentasCliente({ onVolver }) {
   const parsearFecha = (fechaStr) => {
     if (!fechaStr) return new Date(0)
 
+    console.log("Parseando fecha:", fechaStr)
+
     // Si la fecha viene en formato DD-MM-YYYY
     if (fechaStr.includes("-") && fechaStr.length === 10) {
       const [dia, mes, año] = fechaStr.split("-")
+      console.log("Partes de la fecha:", { dia, mes, año })
       return new Date(año, mes - 1, dia) // mes - 1 porque los meses en JS van de 0-11
     }
 
@@ -298,14 +318,21 @@ export default function ReporteVentasCliente({ onVolver }) {
     const datosOrdenados = [...ventasAgrupadas].sort((a, b) => {
       const fechaA = parsearFecha(a.fecha)
       const fechaB = parsearFecha(b.fecha)
+      console.log("Comparando fechas:", {
+        fechaA_str: a.fecha,
+        fechaA_date: fechaA,
+        fechaB_str: b.fecha,
+        fechaB_date: fechaB,
+      })
       return fechaA - fechaB
     })
 
     console.log("Datos ordenados:", datosOrdenados)
 
-    return {
+    // Crear datos para el gráfico
+    const data = {
       labels: datosOrdenados.map((item) => {
-        // Mantener el formato original de la fecha para mostrar
+        console.log("Etiqueta para gráfico:", item.fecha)
         return item.fecha
       }),
       datasets: [
@@ -324,6 +351,9 @@ export default function ReporteVentasCliente({ onVolver }) {
         },
       ],
     }
+
+    console.log("Datos para el gráfico:", data)
+    return data
   }
 
   // Opciones del gráfico
@@ -381,21 +411,11 @@ export default function ReporteVentasCliente({ onVolver }) {
       </Box>
 
       <Typography variant="h5" gutterBottom>
-        Reporte de Ventas por Cliente
+        Reporte de Ventas por Rango de Fecha
       </Typography>
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={3} alignItems="end">
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="Número de Documento"
-              value={nroDocumento}
-              onChange={(e) => setNroDocumento(e.target.value)}
-              placeholder="Ej: 12345678"
-            />
-          </Grid>
-
           <Grid item xs={12} md={3}>
             <TextField
               fullWidth
@@ -445,17 +465,15 @@ export default function ReporteVentasCliente({ onVolver }) {
             📋 Sin resultados
           </Typography>
           <Typography>
-            No se encontraron ventas para el cliente con documento <strong>{nroDocumento}</strong> en el período del{" "}
-            <strong>{fechaDesde}</strong> al <strong>{fechaHasta}</strong>.
+            No se encontraron ventas en el período del <strong>{fechaDesde}</strong> al <strong>{fechaHasta}</strong>.
           </Typography>
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" gutterBottom>
               Verifique que:
             </Typography>
             <Box component="ul" sx={{ pl: 2, mt: 0 }}>
-              <li>El número de documento sea correcto</li>
-              <li>El cliente tenga ventas completadas en el período seleccionado</li>
               <li>Las fechas estén en el formato correcto</li>
+              <li>Existan ventas en el rango de fechas especificado</li>
             </Box>
           </Box>
         </Alert>
@@ -567,9 +585,11 @@ export default function ReporteVentasCliente({ onVolver }) {
               <TableHead>
                 <TableRow>
                   <TableCell>ID Venta</TableCell>
-                  <TableCell>Cliente</TableCell>
-                  <TableCell>Fecha</TableCell>
+                  <TableCell>Documento Cliente</TableCell>
+                  <TableCell>Nombre</TableCell>
+                  <TableCell>Apellido</TableCell>
                   <TableCell align="right">Monto Total</TableCell>
+                  <TableCell>Fecha Venta</TableCell>
                   <TableCell>Vendedor</TableCell>
                 </TableRow>
               </TableHead>
@@ -577,14 +597,16 @@ export default function ReporteVentasCliente({ onVolver }) {
                 {ventasDetalladas.map((venta, index) => (
                   <TableRow key={index}>
                     <TableCell>{venta.ID_VENTA || ""}</TableCell>
-                    <TableCell>{`${venta.NOMBRE || ""} ${venta.APELLIDO || ""}`}</TableCell>
-                    <TableCell>{venta.FECHA_VENTA || ""}</TableCell>
+                    <TableCell>{venta.DOC_CLIENTE || ""}</TableCell>
+                    <TableCell>{venta.NOMBRE || ""}</TableCell>
+                    <TableCell>{venta.APELLIDO || ""}</TableCell>
                     <TableCell align="right">₲ {(venta.MONTO_TOTAL || 0).toLocaleString("es-PY")}</TableCell>
+                    <TableCell>{venta.FECHA_VENTA || ""}</TableCell>
                     <TableCell>{venta.VENDEDOR || ""}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                  <TableCell colSpan={3}>
+                  <TableCell colSpan={4}>
                     <strong>Total</strong>
                   </TableCell>
                   <TableCell align="right">

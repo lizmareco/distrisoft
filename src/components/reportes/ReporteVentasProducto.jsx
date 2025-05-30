@@ -26,6 +26,7 @@ import {
   TableChart as ExcelIcon,
   Search as SearchIcon,
   Download as DownloadIcon,
+  ArrowBack as ArrowBackIcon,
 } from "@mui/icons-material"
 import { exportToExcel } from "@/src/utils/export-utils"
 import dynamic from "next/dynamic"
@@ -43,7 +44,7 @@ const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
 // Importación dinámica de los componentes de Chart.js
 const ChartJS = dynamic(() => import("chart.js").then((mod) => mod.Chart), { ssr: false })
 
-export default function ReporteVentasProducto() {
+export default function ReporteVentasProducto({ onVolver }) {
   const [productos, setProductos] = useState([])
   const [productoSeleccionado, setProductoSeleccionado] = useState(null)
   const [fechaDesde, setFechaDesde] = useState("")
@@ -392,6 +393,13 @@ export default function ReporteVentasProducto() {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Botón de volver */}
+      <Box sx={{ mb: 2 }}>
+        <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={onVolver} sx={{ mb: 2 }}>
+          Volver a Reportes
+        </Button>
+      </Box>
+
       <Typography variant="h5" gutterBottom>
         Reporte de Ventas por Producto
       </Typography>
@@ -485,11 +493,6 @@ export default function ReporteVentasProducto() {
             <Button variant="outlined" startIcon={<PdfIcon />} onClick={handleExportarPDF} color="error">
               Exportar PDF
             </Button>
-            {chartLoaded && datosGrafico && (
-              <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDescargarGrafico} color="primary">
-                Descargar Gráfico PNG
-              </Button>
-            )}
           </Box>
 
           {/* Gráfico de evolución de ventas */}

@@ -31,7 +31,7 @@ import { exportToExcel } from "@/src/utils/export-utils"
 import dynamic from "next/dynamic"
 
 // Importación dinámica de Chart.js para evitar problemas de SSR
-const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
+const Bar = dynamic(() => import("react-chartjs-2").then((mod) => mod.Bar), {
   ssr: false,
   loading: () => (
     <Box sx={{ height: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -40,15 +40,10 @@ const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   ),
 })
 
-// Importación dinámica de los componentes de Chart.js
-const ChartJS = dynamic(() => import("chart.js").then((mod) => mod.Chart), { ssr: false })
-
-export default function ReporteVentasCliente({ onVolver }) {
-  const [nroDocumento, setNroDocumento] = useState("")
+export default function ReporteVentasVendedor({ onVolver }) {
   const [fechaDesde, setFechaDesde] = useState("")
   const [fechaHasta, setFechaHasta] = useState("")
-  const [ventasDetalladas, setVentasDetalladas] = useState([])
-  const [ventasAgrupadas, setVentasAgrupadas] = useState([])
+  const [ventasVendedor, setVentasVendedor] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
@@ -61,11 +56,9 @@ export default function ReporteVentasCliente({ onVolver }) {
   useEffect(() => {
     const registerChartComponents = async () => {
       try {
-        const { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } = await import(
-          "chart.js"
-        )
+        const { Chart, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } = await import("chart.js")
 
-        Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+        Chart.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
         setChartLoaded(true)
       } catch (error) {
         console.error("Error al cargar Chart.js:", error)
@@ -77,58 +70,26 @@ export default function ReporteVentasCliente({ onVolver }) {
 
   // Generar reporte
   const handleGenerarReporte = async () => {
-    if (!nroDocumento || !fechaDesde || !fechaHasta) {
-      setError("Todos los campos son requeridos")
+    if (!fechaDesde || !fechaHasta) {
+      setError("Las fechas desde y hasta son requeridas")
       return
     }
 
     setLoading(true)
     setError(null)
     setBusquedaRealizada(true)
-    console.log("Iniciando generación de reporte con:", { nroDocumento, fechaDesde, fechaHasta })
 
     try {
-      // Obtener datos detallados
-      const urlDetallado = `/api/reportes/ventas-cliente?nroDocumento=${nroDocumento}&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}&tipo=detallado`
-      console.log("Llamando a URL detallado:", urlDetallado)
+      const url = `/api/reportes/ventas-vendedor?fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`
+      const response = await fetch(url)
 
-      const responseDetallado = await fetch(urlDetallado)
-      console.log("Response detallado status:", responseDetallado.status)
-
-      if (!responseDetallado.ok) {
-        const errorData = await responseDetallado.json()
-        console.error("Error en response detallado:", errorData)
-        throw new Error(errorData.error || "Error al obtener datos detallados")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Error al obtener datos")
       }
 
-      const datosDetallados = await responseDetallado.json()
-      console.log("Datos detallados recibidos:", datosDetallados)
-      setVentasDetalladas(datosDetallados)
-
-      if (datosDetallados.length === 0) {
-        console.log("No se encontraron datos detallados")
-        setVentasAgrupadas([])
-        return
-      }
-
-      // Obtener datos agrupados para estadísticas y gráfico
-      const urlAgrupado = `/api/reportes/ventas-cliente?nroDocumento=${nroDocumento}&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}&tipo=agrupado`
-      console.log("Llamando a URL agrupado:", urlAgrupado)
-
-      const responseAgrupado = await fetch(urlAgrupado)
-      console.log("Response agrupado status:", responseAgrupado.status)
-
-      if (!responseAgrupado.ok) {
-        const errorData = await responseAgrupado.json()
-        console.error("Error en response agrupado:", errorData)
-        throw new Error(errorData.error || "Error al obtener datos agrupados")
-      }
-
-      const datosAgrupados = await responseAgrupado.json()
-      console.log("Datos agrupados recibidos:", datosAgrupados)
-      setVentasAgrupadas(datosAgrupados)
-
-      console.log("Reporte generado exitosamente")
+      const datos = await response.json()
+      setVentasVendedor(datos)
     } catch (error) {
       console.error("Error al generar reporte:", error)
       setError(error.message)
@@ -139,14 +100,13 @@ export default function ReporteVentasCliente({ onVolver }) {
 
   // Exportar a Excel
   const handleExportarExcel = () => {
-    if (ventasDetalladas.length === 0) {
+    if (ventasVendedor.length === 0) {
       setError("No hay datos para exportar")
       return
     }
 
     try {
-      console.log("Exportando a Excel:", ventasDetalladas)
-      exportToExcel(ventasDetalladas, `reporte-ventas-cliente-${nroDocumento}`)
+      exportToExcel(ventasVendedor, `reporte-ventas-vendedor-${fechaDesde}-${fechaHasta}`)
     } catch (error) {
       console.error("Error al exportar a Excel:", error)
       setError("Error al exportar a Excel: " + error.message)
@@ -155,20 +115,19 @@ export default function ReporteVentasCliente({ onVolver }) {
 
   // Exportar a PDF
   const handleExportarPDF = () => {
-    if (ventasDetalladas.length === 0) {
+    if (ventasVendedor.length === 0) {
       setError("No hay datos para exportar")
       return
     }
 
     try {
-      console.log("Exportando a PDF:", ventasDetalladas)
       const printWindow = window.open("", "_blank")
-      const total = ventasDetalladas.reduce((sum, venta) => sum + (venta.MONTO_TOTAL || 0), 0)
+      const total = ventasVendedor.reduce((sum, venta) => sum + (venta.TOTAL_VENDIDO || 0), 0)
 
       printWindow.document.write(`
         <html>
           <head>
-            <title>Reporte de Ventas por Cliente</title>
+            <title>Reporte de Ventas por Vendedor</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
               h1 { color: #333; }
@@ -181,38 +140,38 @@ export default function ReporteVentasCliente({ onVolver }) {
             </style>
           </head>
           <body>
-            <h1>Reporte de Ventas por Cliente</h1>
+            <h1>Reporte de Ventas por Vendedor</h1>
             <div class="info">
-              <p><strong>Documento:</strong> ${nroDocumento}</p>
               <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
-              <p><strong>Cliente:</strong> ${ventasDetalladas[0]?.NOMBRE || ""} ${ventasDetalladas[0]?.APELLIDO || ""}</p>
             </div>
             <table>
               <thead>
                 <tr>
-                  <th>ID Venta</th>
-                  <th>Fecha</th>
-                  <th>Monto Total</th>
-                  <th>Vendedor</th>
+                  <th>Usuario</th>
+                  <th>Nombre</th>
+                  <th>Apellido</th>
+                  <th>Cantidad de Ventas</th>
+                  <th>Total Vendido</th>
                 </tr>
               </thead>
               <tbody>
-                ${ventasDetalladas
+                ${ventasVendedor
                   .map(
                     (venta) => `
                   <tr>
-                    <td>${venta.ID_VENTA || ""}</td>
-                    <td>${venta.FECHA_VENTA || ""}</td>
-                    <td class="text-right">₲ ${(venta.MONTO_TOTAL || 0).toLocaleString("es-PY")}</td>
-                    <td>${venta.VENDEDOR || ""}</td>
+                    <td>${venta.VENDEDOR_USER || ""}</td>
+                    <td>${venta.NOMBRE || ""}</td>
+                    <td>${venta.APELLIDO || ""}</td>
+                    <td class="text-right">${venta.CANTIDAD_VENTAS || 0}</td>
+                    <td class="text-right">₲ ${(venta.TOTAL_VENDIDO || 0).toLocaleString("es-PY")}</td>
                   </tr>
                 `,
                   )
                   .join("")}
                 <tr class="total">
-                  <td colspan="2"><strong>Total</strong></td>
+                  <td colspan="3"><strong>Total</strong></td>
+                  <td class="text-right"><strong>${ventasVendedor.reduce((sum, venta) => sum + (venta.CANTIDAD_VENTAS || 0), 0)}</strong></td>
                   <td class="text-right"><strong>₲ ${total.toLocaleString("es-PY")}</strong></td>
-                  <td></td>
                 </tr>
               </tbody>
             </table>
@@ -236,20 +195,13 @@ export default function ReporteVentasCliente({ onVolver }) {
     }
 
     try {
-      // Obtener el canvas del gráfico
       const canvas = chartRef.current.canvas
-
-      // Crear un enlace temporal para la descarga
       const link = document.createElement("a")
-      link.download = `grafico-ventas-cliente-${nroDocumento}-${fechaDesde}-${fechaHasta}.png`
+      link.download = `grafico-ventas-vendedor-${fechaDesde}-${fechaHasta}.png`
       link.href = canvas.toDataURL("image/png")
-
-      // Simular click para descargar
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-
-      console.log("Gráfico descargado exitosamente")
     } catch (error) {
       console.error("Error al descargar gráfico:", error)
       setError("Error al descargar el gráfico: " + error.message)
@@ -258,69 +210,37 @@ export default function ReporteVentasCliente({ onVolver }) {
 
   // Calcular estadísticas
   const calcularEstadisticas = () => {
-    if (ventasAgrupadas.length === 0) return null
+    if (ventasVendedor.length === 0) return null
 
-    const totalVentas = ventasAgrupadas.reduce((sum, item) => sum + (item.totalVenta || 0), 0)
-    const promedioVentas = totalVentas / ventasAgrupadas.length
-    const ventaMaxima = Math.max(...ventasAgrupadas.map((item) => item.totalVenta || 0))
-    const ventaMinima = Math.min(...ventasAgrupadas.map((item) => item.totalVenta || 0))
+    const totalVentas = ventasVendedor.reduce((sum, item) => sum + (item.TOTAL_VENDIDO || 0), 0)
+    const totalCantidad = ventasVendedor.reduce((sum, item) => sum + (item.CANTIDAD_VENTAS || 0), 0)
+    const promedioVentas = totalVentas / ventasVendedor.length
+    const ventaMaxima = Math.max(...ventasVendedor.map((item) => item.TOTAL_VENDIDO || 0))
+    const ventaMinima = Math.min(...ventasVendedor.map((item) => item.TOTAL_VENDIDO || 0))
 
     return {
       totalVentas,
+      totalCantidad,
       promedioVentas,
       ventaMaxima,
       ventaMinima,
-      cantidadDias: ventasAgrupadas.length,
+      cantidadVendedores: ventasVendedor.length,
     }
-  }
-
-  // Función para parsear fecha en formato DD-MM-YYYY
-  const parsearFecha = (fechaStr) => {
-    if (!fechaStr) return new Date(0)
-
-    // Si la fecha viene en formato DD-MM-YYYY
-    if (fechaStr.includes("-") && fechaStr.length === 10) {
-      const [dia, mes, año] = fechaStr.split("-")
-      return new Date(año, mes - 1, dia) // mes - 1 porque los meses en JS van de 0-11
-    }
-
-    // Si viene en otro formato, intentar parsearlo directamente
-    return new Date(fechaStr)
   }
 
   // Preparar datos para el gráfico
   const prepararDatosGrafico = () => {
-    if (ventasAgrupadas.length === 0) return null
-
-    console.log("Datos agrupados antes de ordenar:", ventasAgrupadas)
-
-    // Ordenar por fecha correctamente
-    const datosOrdenados = [...ventasAgrupadas].sort((a, b) => {
-      const fechaA = parsearFecha(a.fecha)
-      const fechaB = parsearFecha(b.fecha)
-      return fechaA - fechaB
-    })
-
-    console.log("Datos ordenados:", datosOrdenados)
+    if (ventasVendedor.length === 0) return null
 
     return {
-      labels: datosOrdenados.map((item) => {
-        // Mantener el formato original de la fecha para mostrar
-        return item.fecha
-      }),
+      labels: ventasVendedor.map((item) => item.VENDEDOR_USER),
       datasets: [
         {
-          label: "Ventas por Día",
-          data: datosOrdenados.map((item) => item.totalVenta || 0),
-          borderColor: "rgb(75, 192, 192)",
-          backgroundColor: "rgba(75, 192, 192, 0.2)",
-          borderWidth: 2,
-          fill: true,
-          tension: 0.1,
-          pointBackgroundColor: "rgb(75, 192, 192)",
-          pointBorderColor: "#fff",
-          pointBorderWidth: 2,
-          pointRadius: 5,
+          label: "Total Vendido",
+          data: ventasVendedor.map((item) => item.TOTAL_VENDIDO || 0),
+          backgroundColor: "rgba(54, 162, 235, 0.6)",
+          borderColor: "rgba(54, 162, 235, 1)",
+          borderWidth: 1,
         },
       ],
     }
@@ -336,7 +256,7 @@ export default function ReporteVentasCliente({ onVolver }) {
       },
       title: {
         display: true,
-        text: "Evolución de Ventas por Fecha",
+        text: "Ventas por Vendedor",
         font: {
           size: 16,
           weight: "bold",
@@ -344,7 +264,7 @@ export default function ReporteVentasCliente({ onVolver }) {
       },
       tooltip: {
         callbacks: {
-          label: (context) => `Ventas: ₲ ${(context.parsed.y || 0).toLocaleString("es-PY")}`,
+          label: (context) => `Total: ₲ ${(context.parsed.y || 0).toLocaleString("es-PY")}`,
         },
       },
     },
@@ -356,13 +276,13 @@ export default function ReporteVentasCliente({ onVolver }) {
         },
         title: {
           display: true,
-          text: "Monto de Ventas (₲)",
+          text: "Monto Total (₲)",
         },
       },
       x: {
         title: {
           display: true,
-          text: "Fecha",
+          text: "Vendedor",
         },
       },
     },
@@ -381,21 +301,11 @@ export default function ReporteVentasCliente({ onVolver }) {
       </Box>
 
       <Typography variant="h5" gutterBottom>
-        Reporte de Ventas por Cliente
+        Reporte de Ventas por Vendedor
       </Typography>
 
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={3} alignItems="end">
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
-              label="Número de Documento"
-              value={nroDocumento}
-              onChange={(e) => setNroDocumento(e.target.value)}
-              placeholder="Ej: 12345678"
-            />
-          </Grid>
-
           <Grid item xs={12} md={3}>
             <TextField
               fullWidth
@@ -439,29 +349,27 @@ export default function ReporteVentasCliente({ onVolver }) {
       </Paper>
 
       {/* Mostrar mensaje de "Sin resultados" solo después de realizar una búsqueda */}
-      {!loading && !error && busquedaRealizada && ventasDetalladas.length === 0 && (
+      {!loading && !error && busquedaRealizada && ventasVendedor.length === 0 && (
         <Alert severity="info" sx={{ mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             📋 Sin resultados
           </Typography>
           <Typography>
-            No se encontraron ventas para el cliente con documento <strong>{nroDocumento}</strong> en el período del{" "}
-            <strong>{fechaDesde}</strong> al <strong>{fechaHasta}</strong>.
+            No se encontraron ventas en el período del <strong>{fechaDesde}</strong> al <strong>{fechaHasta}</strong>.
           </Typography>
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" gutterBottom>
               Verifique que:
             </Typography>
             <Box component="ul" sx={{ pl: 2, mt: 0 }}>
-              <li>El número de documento sea correcto</li>
-              <li>El cliente tenga ventas completadas en el período seleccionado</li>
               <li>Las fechas estén en el formato correcto</li>
+              <li>Existan ventas en el rango de fechas especificado</li>
             </Box>
           </Box>
         </Alert>
       )}
 
-      {ventasDetalladas.length > 0 && (
+      {ventasVendedor.length > 0 && (
         <>
           {/* Botones de exportación */}
           <Box sx={{ mb: 3, display: "flex", gap: 2, flexWrap: "wrap" }}>
@@ -473,12 +381,12 @@ export default function ReporteVentasCliente({ onVolver }) {
             </Button>
           </Box>
 
-          {/* Gráfico de evolución de ventas */}
+          {/* Gráfico de ventas por vendedor */}
           {chartLoaded && datosGrafico && (
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                  <Typography variant="h6">📈 Evolución de Ventas</Typography>
+                  <Typography variant="h6">📊 Ventas por Vendedor</Typography>
                   <Button
                     size="small"
                     variant="outlined"
@@ -491,7 +399,7 @@ export default function ReporteVentasCliente({ onVolver }) {
                 </Box>
                 <Divider sx={{ mb: 2 }} />
                 <Box sx={{ height: 400 }}>
-                  <Line ref={chartRef} data={datosGrafico} options={opcionesGrafico} />
+                  <Bar ref={chartRef} data={datosGrafico} options={opcionesGrafico} />
                 </Box>
               </CardContent>
             </Card>
@@ -509,10 +417,10 @@ export default function ReporteVentasCliente({ onVolver }) {
                   <Grid item xs={12} sm={6} md={2.4}>
                     <Box textAlign="center">
                       <Typography variant="h4" color="primary">
-                        {estadisticas.cantidadDias}
+                        {estadisticas.cantidadVendedores}
                       </Typography>
                       <Typography variant="body2" color="textSecondary">
-                        Días con ventas
+                        Vendedores activos
                       </Typography>
                     </Box>
                   </Grid>
@@ -529,10 +437,10 @@ export default function ReporteVentasCliente({ onVolver }) {
                   <Grid item xs={12} sm={6} md={2.4}>
                     <Box textAlign="center">
                       <Typography variant="h4" color="info.main">
-                        ₲ {Math.round(estadisticas.promedioVentas).toLocaleString("es-PY")}
+                        {estadisticas.totalCantidad}
                       </Typography>
                       <Typography variant="body2" color="textSecondary">
-                        Promedio por día
+                        Total de ventas
                       </Typography>
                     </Box>
                   </Grid>
@@ -542,17 +450,17 @@ export default function ReporteVentasCliente({ onVolver }) {
                         ₲ {estadisticas.ventaMaxima.toLocaleString("es-PY")}
                       </Typography>
                       <Typography variant="body2" color="textSecondary">
-                        Venta máxima
+                        Vendedor top
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid item xs={12} sm={6} md={2.4}>
                     <Box textAlign="center">
-                      <Typography variant="h4" color="error.main">
-                        ₲ {estadisticas.ventaMinima.toLocaleString("es-PY")}
+                      <Typography variant="h4" color="secondary.main">
+                        ₲ {Math.round(estadisticas.promedioVentas).toLocaleString("es-PY")}
                       </Typography>
                       <Typography variant="body2" color="textSecondary">
-                        Venta mínima
+                        Promedio por vendedor
                       </Typography>
                     </Box>
                   </Grid>
@@ -566,21 +474,28 @@ export default function ReporteVentasCliente({ onVolver }) {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>ID Venta</TableCell>
-                  <TableCell>Cliente</TableCell>
-                  <TableCell>Fecha</TableCell>
-                  <TableCell align="right">Monto Total</TableCell>
-                  <TableCell>Vendedor</TableCell>
+                  <TableCell>Usuario</TableCell>
+                  <TableCell>Nombre</TableCell>
+                  <TableCell>Apellido</TableCell>
+                  <TableCell align="right">Cantidad de Ventas</TableCell>
+                  <TableCell align="right">Total Vendido</TableCell>
+                  <TableCell align="right">Promedio por Venta</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {ventasDetalladas.map((venta, index) => (
+                {ventasVendedor.map((venta, index) => (
                   <TableRow key={index}>
-                    <TableCell>{venta.ID_VENTA || ""}</TableCell>
-                    <TableCell>{`${venta.NOMBRE || ""} ${venta.APELLIDO || ""}`}</TableCell>
-                    <TableCell>{venta.FECHA_VENTA || ""}</TableCell>
-                    <TableCell align="right">₲ {(venta.MONTO_TOTAL || 0).toLocaleString("es-PY")}</TableCell>
-                    <TableCell>{venta.VENDEDOR || ""}</TableCell>
+                    <TableCell>{venta.VENDEDOR_USER || ""}</TableCell>
+                    <TableCell>{venta.NOMBRE || ""}</TableCell>
+                    <TableCell>{venta.APELLIDO || ""}</TableCell>
+                    <TableCell align="right">{venta.CANTIDAD_VENTAS || 0}</TableCell>
+                    <TableCell align="right">₲ {(venta.TOTAL_VENDIDO || 0).toLocaleString("es-PY")}</TableCell>
+                    <TableCell align="right">
+                      ₲{" "}
+                      {venta.CANTIDAD_VENTAS > 0
+                        ? Math.round((venta.TOTAL_VENDIDO || 0) / venta.CANTIDAD_VENTAS).toLocaleString("es-PY")
+                        : "0"}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
@@ -588,14 +503,19 @@ export default function ReporteVentasCliente({ onVolver }) {
                     <strong>Total</strong>
                   </TableCell>
                   <TableCell align="right">
+                    <strong>{ventasVendedor.reduce((sum, venta) => sum + (venta.CANTIDAD_VENTAS || 0), 0)}</strong>
+                  </TableCell>
+                  <TableCell align="right">
                     <strong>
                       ₲{" "}
-                      {ventasDetalladas
-                        .reduce((sum, venta) => sum + (venta.MONTO_TOTAL || 0), 0)
+                      {ventasVendedor
+                        .reduce((sum, venta) => sum + (venta.TOTAL_VENDIDO || 0), 0)
                         .toLocaleString("es-PY")}
                     </strong>
                   </TableCell>
-                  <TableCell></TableCell>
+                  <TableCell align="right">
+                    <strong>-</strong>
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
