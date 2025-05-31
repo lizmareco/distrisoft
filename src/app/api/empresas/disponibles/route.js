@@ -39,7 +39,6 @@ export async function GET(request) {
       include: {
         tipoDocumento: true,
         ciudad: true,
-        persona: true,
         categoriaEmpresa: true,
       },
       orderBy: {

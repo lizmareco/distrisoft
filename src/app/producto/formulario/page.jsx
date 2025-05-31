@@ -15,9 +15,12 @@ import {
   Snackbar,
   AlertTitle,
   Chip,
+  FormControlLabel,
+  Switch,
+  InputAdornment,
 } from "@mui/material"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowBack, CheckCircle, Cancel } from "@mui/icons-material"
+import { ArrowBack, CheckCircle, Cancel, Calculate } from "@mui/icons-material"
 import Link from "next/link"
 
 export default function FormularioProductoPage() {
@@ -33,6 +36,11 @@ export default function FormularioProductoPage() {
     precioUnitario: "",
     idUnidadMedida: "",
     idEstadoProducto: "1", // Por defecto, estado activo (1)
+    // Nuevos campos
+    unidadesPorPaquete: "1",
+    ventaPorPaquete: false,
+    paqueteMinimo: "1",
+    costoPorPaquete: "",
   })
 
   const [unidadesMedida, setUnidadesMedida] = useState([])
@@ -46,6 +54,28 @@ export default function FormularioProductoPage() {
     message: "",
     severity: "error",
   })
+
+  // Función para calcular precio unitario automáticamente
+  const calcularPrecioUnitario = (costoPorPaquete, unidadesPorPaquete) => {
+    const costo = Number.parseFloat(costoPorPaquete) || 0
+    const unidades = Number.parseInt(unidadesPorPaquete) || 1
+
+    if (costo > 0 && unidades > 0) {
+      return (costo / unidades).toFixed(2)
+    }
+    return ""
+  }
+
+  // Efecto para recalcular precio unitario cuando cambian costo o unidades
+  useEffect(() => {
+    if (formData.costoPorPaquete && formData.unidadesPorPaquete) {
+      const nuevoPrecio = calcularPrecioUnitario(formData.costoPorPaquete, formData.unidadesPorPaquete)
+      setFormData((prev) => ({
+        ...prev,
+        precioUnitario: nuevoPrecio,
+      }))
+    }
+  }, [formData.costoPorPaquete, formData.unidadesPorPaquete])
 
   // Asegurarnos de que el formulario muestre correctamente los tipos de producto
   useEffect(() => {
@@ -103,6 +133,11 @@ export default function FormularioProductoPage() {
             precioUnitario: producto.precioUnitario?.toString() || "",
             idUnidadMedida: producto.idUnidadMedida?.toString() || "",
             idEstadoProducto: producto.idEstadoProducto?.toString() || "1",
+            // Nuevos campos
+            unidadesPorPaquete: producto.unidadesPorPaquete?.toString() || "1",
+            ventaPorPaquete: producto.ventaPorPaquete || false,
+            paqueteMinimo: producto.paqueteMinimo?.toString() || "1",
+            costoPorPaquete: producto.costoPorPaquete?.toString() || "",
           })
         }
       } catch (error) {
@@ -117,10 +152,12 @@ export default function FormularioProductoPage() {
   }, [id])
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
+    const newValue = type === "checkbox" ? checked : value
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: newValue,
     }))
 
     // Limpiar error del campo cuando el usuario lo modifica
@@ -164,18 +201,6 @@ export default function FormularioProductoPage() {
       }
     }
 
-    if (!formData.precioUnitario) {
-      errors.precioUnitario = "El precio unitario es requerido"
-      isValid = false
-    } else {
-      // Limpiar el valor para validación
-      const precioLimpio = formData.precioUnitario.toString().replace(/\./g, "").replace(",", ".")
-      if (isNaN(precioLimpio) || Number.parseFloat(precioLimpio) <= 0) {
-        errors.precioUnitario = "El precio debe ser un número positivo"
-        isValid = false
-      }
-    }
-
     if (!formData.idUnidadMedida) {
       errors.idUnidadMedida = "La unidad de medida es requerida"
       isValid = false
@@ -183,6 +208,22 @@ export default function FormularioProductoPage() {
 
     if (!formData.idEstadoProducto) {
       errors.idEstadoProducto = "El estado del producto es requerido"
+      isValid = false
+    }
+
+    // Validaciones para nuevos campos
+    if (!formData.unidadesPorPaquete || Number.parseInt(formData.unidadesPorPaquete) <= 0) {
+      errors.unidadesPorPaquete = "Las unidades por paquete deben ser mayor a 0"
+      isValid = false
+    }
+
+    if (!formData.paqueteMinimo || Number.parseInt(formData.paqueteMinimo) <= 0) {
+      errors.paqueteMinimo = "El paquete mínimo debe ser mayor a 0"
+      isValid = false
+    }
+
+    if (!formData.costoPorPaquete || Number.parseFloat(formData.costoPorPaquete) <= 0) {
+      errors.costoPorPaquete = "El costo por paquete debe ser mayor a 0"
       isValid = false
     }
 
@@ -223,15 +264,20 @@ export default function FormularioProductoPage() {
       // Asegurarse de que los valores numéricos sean números
       // Eliminar posibles puntos de miles antes de convertir a número
       const pesoUnidadLimpio = formData.pesoUnidad.toString().replace(/\./g, "").replace(",", ".")
-      const precioUnitarioLimpio = formData.precioUnitario.toString().replace(/\./g, "").replace(",", ".")
+      const costoPorPaqueteLimpio = formData.costoPorPaquete.toString().replace(/\./g, "").replace(",", ".")
 
       const dataToSend = {
         ...formData,
         pesoUnidad: Number.parseFloat(pesoUnidadLimpio),
-        precioUnitario: Number.parseFloat(precioUnitarioLimpio),
+        precioUnitario: Number.parseFloat(formData.precioUnitario),
         idTipoProducto: Number.parseInt(formData.idTipoProducto),
         idUnidadMedida: Number.parseInt(formData.idUnidadMedida),
         idEstadoProducto: Number.parseInt(formData.idEstadoProducto),
+        // Nuevos campos
+        unidadesPorPaquete: Number.parseInt(formData.unidadesPorPaquete),
+        ventaPorPaquete: formData.ventaPorPaquete,
+        paqueteMinimo: Number.parseInt(formData.paqueteMinimo),
+        costoPorPaquete: Number.parseFloat(costoPorPaqueteLimpio),
       }
 
       const response = await fetch(url, {
@@ -328,6 +374,13 @@ export default function FormularioProductoPage() {
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
+            {/* Información Básica */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, color: "primary.main" }}>
+                Información Básica
+              </Typography>
+            </Grid>
+
             <Grid item xs={12} sm={6}>
               <TextField
                 name="nombreProducto"
@@ -408,35 +461,6 @@ export default function FormularioProductoPage() {
 
             <Grid item xs={12} sm={6}>
               <TextField
-                name="precioUnitario"
-                label="Precio Unitario"
-                type="text"
-                value={formData.precioUnitario}
-                onChange={(e) => {
-                  // Permitir solo números, comas y puntos
-                  const value = e.target.value.replace(/[^\d.,]/g, "")
-                  setFormData((prev) => ({
-                    ...prev,
-                    precioUnitario: value,
-                  }))
-                }}
-                fullWidth
-                required
-                margin="normal"
-                error={!!fieldErrors.precioUnitario}
-                helperText={
-                  fieldErrors.precioUnitario || "Ingrese el precio con punto como separador de miles (ej: 1.000,50)"
-                }
-                InputProps={{
-                  inputProps: {
-                    inputMode: "decimal",
-                  },
-                }}
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
                 name="idUnidadMedida"
                 label="Unidad de Medida"
                 select
@@ -475,6 +499,127 @@ export default function FormularioProductoPage() {
                   </MenuItem>
                 ))}
               </TextField>
+            </Grid>
+
+            {/* Configuración de Paquetes */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, mt: 3, color: "primary.main" }}>
+                Configuración de Paquetes
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="unidadesPorPaquete"
+                label="Unidades por Paquete"
+                type="number"
+                value={formData.unidadesPorPaquete}
+                onChange={handleChange}
+                fullWidth
+                required
+                margin="normal"
+                error={!!fieldErrors.unidadesPorPaquete}
+                helperText={fieldErrors.unidadesPorPaquete || "Cantidad de unidades que contiene cada paquete"}
+                InputProps={{
+                  inputProps: { min: 1 },
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="costoPorPaquete"
+                label="Costo por Paquete"
+                type="text"
+                value={formData.costoPorPaquete}
+                onChange={(e) => {
+                  // Permitir solo números, comas y puntos
+                  const value = e.target.value.replace(/[^\d.,]/g, "")
+                  setFormData((prev) => ({
+                    ...prev,
+                    costoPorPaquete: value,
+                  }))
+                }}
+                fullWidth
+                required
+                margin="normal"
+                error={!!fieldErrors.costoPorPaquete}
+                helperText={fieldErrors.costoPorPaquete || "Costo total del paquete completo"}
+                InputProps={{
+                  inputProps: {
+                    inputMode: "decimal",
+                  },
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="paqueteMinimo"
+                label="Paquete Mínimo"
+                type="number"
+                value={formData.paqueteMinimo}
+                onChange={handleChange}
+                fullWidth
+                required
+                margin="normal"
+                error={!!fieldErrors.paqueteMinimo}
+                helperText={fieldErrors.paqueteMinimo || "Cantidad mínima de paquetes para venta"}
+                InputProps={{
+                  inputProps: { min: 1 },
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    name="ventaPorPaquete"
+                    checked={formData.ventaPorPaquete}
+                    onChange={handleChange}
+                    color="primary"
+                  />
+                }
+                label="Venta por Paquete"
+                sx={{ mt: 2 }}
+              />
+              <Typography variant="caption" display="block" color="text.secondary">
+                Activar si el producto se vende únicamente por paquetes completos
+              </Typography>
+            </Grid>
+
+            {/* Precio Calculado */}
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, mt: 3, color: "primary.main" }}>
+                Precio Calculado
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="precioUnitario"
+                label="Precio Unitario (Calculado)"
+                value={formData.precioUnitario}
+                fullWidth
+                margin="normal"
+                disabled
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Calculate color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+                helperText="Se calcula automáticamente: Costo por Paquete ÷ Unidades por Paquete"
+                sx={{
+                  "& .MuiInputBase-input.Mui-disabled": {
+                    WebkitTextFillColor: "rgba(0, 0, 0, 0.87)",
+                    fontWeight: "bold",
+                  },
+                }}
+              />
             </Grid>
 
             <Grid item xs={12}>

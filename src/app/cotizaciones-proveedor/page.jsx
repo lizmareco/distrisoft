@@ -33,6 +33,8 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ArrowBack } from "@mui/icons-material"
+import ArrowBack from "@mui/icons-material/ArrowBack"
+
 
 export default function CotizacionesProveedorPage() {
   const [loading, setLoading] = useState(false)

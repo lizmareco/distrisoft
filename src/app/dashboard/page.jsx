@@ -37,7 +37,7 @@ import {
 import { useRootContext } from "@/src/app/context/root"
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import PrecisionManufacturingSharpIcon from '@mui/icons-material/PrecisionManufacturingSharp';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 
 
 export default function DashboardPage() {
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                       <DescriptionIcon sx={{ fontSize: 60, color: "#009688" }} /> {/* Teal */}
                     </Box>
                     <Typography variant="h5" component="h2" gutterBottom>
-                      Cotizaciones de Clientes
+                      Cotizaciones a Clientes
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Administre las cotizaciones del sistema. Cree nuevas cotizaciones, consulte el historial y
@@ -831,7 +831,7 @@ export default function DashboardPage() {
           >
             <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
               <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                <PrecisionManufacturingSharpIcon sx={{ fontSize: 60, color: "#FFC107" }} /> {/* Ámbar */}
+                <PrecisionManufacturingIcon sx={{ fontSize: 60, color: "#FFC107" }} />
               </Box>
               <Typography variant="h5" component="h2" gutterBottom>
                 Gestión de Producción
@@ -841,7 +841,7 @@ export default function DashboardPage() {
                 color="text.secondary"
                 sx={{ mb: 2 }}
               >
-                Administre las producciones de los pedidos de clientes.
+                Administre las producciones de pedidos de clientes.
               </Typography>
             </CardContent>
             <CardActions sx={{ justifyContent: "center", pb: 2 }}>

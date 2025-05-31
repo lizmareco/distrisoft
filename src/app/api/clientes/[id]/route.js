@@ -76,8 +76,20 @@ export async function PUT(request, { params }) {
       },
     })
 
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría
-    await auditoriaService.registrarActualizacion("Cliente", id, clienteAnterior, cliente, userData.idUsuario, request)
+    await auditoriaService.registrarActualizacion(
+      "Cliente",
+      Number.parseInt(id),
+      clienteAnterior,
+      cliente,
+      userData.idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log(`Cliente actualizado con ID: ${id}`)
     return NextResponse.json(cliente)
@@ -121,8 +133,19 @@ export async function DELETE(request, { params }) {
       },
     })
 
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría
-    await auditoriaService.registrarEliminacion("Cliente", id, clienteAnterior, userData.idUsuario, request)
+    await auditoriaService.registrarEliminacion(
+      "Cliente",
+      Number.parseInt(id),
+      clienteAnterior,
+      userData.idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log(`Cliente eliminado con ID: ${id}`)
     return NextResponse.json({ message: "Cliente eliminado correctamente" })

@@ -1,4 +1,4 @@
-import { Box, Container, Typography } from '@mui/material';
+import { Box, Container, Typography, Button } from '@mui/material';
 import ListaPedidos from "../../components/pedidos/ListaPedidos"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"

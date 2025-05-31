@@ -313,9 +313,6 @@ export default function CuentasPorPagarPage() {
         <Typography variant="h4" component="h1">
           Cuentas por Pagar
         </Typography>
-        <Button variant="outlined" startIcon={<ArrowBack />} onClick={() => router.push("/finanzas")}>
-          Volver a Finanzas
-        </Button>
       </Box>
 
       {/* Resumen */}

@@ -116,15 +116,20 @@ export async function PUT(request, { params }) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Persona",
-      idRegistro: id.toString(),
-      accion: "ACTUALIZAR",
-      valorAnterior: personaAnterior,
-      valorNuevo: persona,
-      idUsuario: userData.idUsuario,
-      request: request,
-    })
+    // Extraer información del request
+const direccionIP = auditoriaService.obtenerDireccionIP(request)
+const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+// Llamar con método correcto
+await auditoriaService.registrarActualizacion(
+  "Persona",
+  Number.parseInt(id),
+  personaAnterior,
+  persona,
+  userData.idUsuario,
+  direccionIP,
+  navegador
+)
 
     return NextResponse.json(persona, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
@@ -167,15 +172,19 @@ export async function DELETE(request, { params }) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Persona",
-      idRegistro: id.toString(),
-      accion: "ELIMINAR",
-      valorAnterior: personaAnterior,
-      valorNuevo: null,
-      idUsuario: userData.idUsuario,
-      request: request,
-    })
+    // Extraer información del request
+const direccionIP = auditoriaService.obtenerDireccionIP(request)
+const navegador = auditoriaService.obtenerInfoNavegador(request)
+
+// Llamar con método correcto
+await auditoriaService.registrarEliminacion(
+  "Persona",
+  Number.parseInt(id),
+  personaAnterior,
+  userData.idUsuario,
+  direccionIP,
+  navegador
+)
 
     return NextResponse.json({ message: "Persona eliminada correctamente" }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {

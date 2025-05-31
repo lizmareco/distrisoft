@@ -27,10 +27,9 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material"
-import { Refresh as RefreshIcon, Search as SearchIcon } from "@mui/icons-material"
+import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack} from "@mui/icons-material"
 import InventarioNav from "@/src/components/inventario-nav"
 import Link from "next/link"
-import { ArrowBack } from "@mui/icons-material"
 
 // Estilos personalizados para los botones de acción
 const actionButtonStyles = {

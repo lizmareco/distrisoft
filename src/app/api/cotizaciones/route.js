@@ -4,7 +4,7 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 
-// GET - Obtener cotizaciones con filtro de búsqueda
+// GET - Obtener cotizaciones con filtros avanzados
 export async function GET(request) {
   try {
     console.log("API: Obteniendo cotizaciones...")
@@ -12,58 +12,135 @@ export async function GET(request) {
     // Obtener parámetros de búsqueda de la URL
     const { searchParams } = new URL(request.url)
     const searchTerm = searchParams.get("search") || ""
+    const idCotizacion = searchParams.get("idCotizacion")
+    const idEstado = searchParams.get("idEstado")
+    const idCliente = searchParams.get("idCliente")
+    const mostrarTodas = searchParams.get("mostrarTodas") === "true"
+    const limite = Number.parseInt(searchParams.get("limite")) || 100
 
-    // Si no hay término de búsqueda, devolver un array vacío en lugar de todas las cotizaciones
-    if (!searchTerm) {
-      console.log("API: No se proporcionó término de búsqueda, devolviendo array vacío")
-      return NextResponse.json([], { status: HTTP_STATUS_CODES.ok })
-    }
-
-    // Intentar convertir el término de búsqueda a número para buscar por ID
-    const searchId = !isNaN(Number.parseInt(searchTerm)) ? Number.parseInt(searchTerm) : undefined
+    console.log("API: Parámetros de búsqueda:", {
+      searchTerm,
+      idCotizacion,
+      idEstado,
+      idCliente,
+      mostrarTodas,
+      limite,
+    })
 
     // Construir condiciones de búsqueda
-    const searchCondition = {
+    const whereCondition = {
       deletedAt: null,
-      OR: [
-        // Búsqueda por ID de cotización
-        searchId ? { idCotizacionCliente: searchId } : {},
-        // Búsqueda por nombre o apellido del cliente (case insensitive)
-        {
-          cliente: {
-            persona: {
-              OR: [
-                { nombre: { contains: searchTerm, mode: "insensitive" } },
-                { apellido: { contains: searchTerm, mode: "insensitive" } },
-              ],
-            },
-          },
-        },
-        // Búsqueda por número de documento del cliente (case insensitive)
-        {
-          cliente: {
-            persona: {
-              nroDocumento: { contains: searchTerm, mode: "insensitive" },
-            },
-          },
-        },
-        // Búsqueda por nombre o apellido del vendedor (case insensitive)
-        {
-          usuario: {
-            persona: {
-              OR: [
-                { nombre: { contains: searchTerm, mode: "insensitive" } },
-                { apellido: { contains: searchTerm, mode: "insensitive" } },
-              ],
-            },
-          },
-        },
-      ],
     }
 
-    // Obtener cotizaciones con sus relaciones y aplicar filtro de búsqueda
+    // Si no es "mostrar todas" y no hay filtros específicos, aplicar búsqueda por término
+    if (!mostrarTodas) {
+      const conditions = []
+
+      // Filtro por ID específico
+      if (idCotizacion) {
+        conditions.push({
+          idCotizacionCliente: Number.parseInt(idCotizacion),
+        })
+      }
+
+      // Filtro por estado
+      if (idEstado) {
+        conditions.push({
+          idEstadoCotizacionCliente: Number.parseInt(idEstado),
+        })
+      }
+
+      // Filtro por cliente específico
+      const cliente = searchParams.get("cliente")
+      if (cliente) {
+        conditions.push({
+          OR: [
+            // Búsqueda por nombre y apellido del cliente
+            {
+              cliente: {
+                persona: {
+                  OR: [
+                    { nombre: { contains: cliente, mode: "insensitive" } },
+                    { apellido: { contains: cliente, mode: "insensitive" } },
+                    { nroDocumento: { contains: cliente, mode: "insensitive" } },
+                  ],
+                },
+              },
+            },
+            // Búsqueda por razón social de empresa
+            {
+              cliente: {
+                empresa: {
+                  razonSocial: { contains: cliente, mode: "insensitive" },
+                },
+              },
+            },
+          ],
+        })
+      }
+
+      // Búsqueda por término general (mantener la búsqueda original si existe)
+      if (searchTerm && !cliente) {
+        const searchId = !isNaN(Number.parseInt(searchTerm)) ? Number.parseInt(searchTerm) : undefined
+
+        conditions.push({
+          OR: [
+            // Búsqueda por ID de cotización
+            searchId ? { idCotizacionCliente: searchId } : {},
+            // Búsqueda por nombre o apellido del cliente
+            {
+              cliente: {
+                persona: {
+                  OR: [
+                    { nombre: { contains: searchTerm, mode: "insensitive" } },
+                    { apellido: { contains: searchTerm, mode: "insensitive" } },
+                  ],
+                },
+              },
+            },
+            // Búsqueda por razón social de empresa
+            {
+              cliente: {
+                empresa: {
+                  razonSocial: { contains: searchTerm, mode: "insensitive" },
+                },
+              },
+            },
+            // Búsqueda por número de documento del cliente
+            {
+              cliente: {
+                persona: {
+                  nroDocumento: { contains: searchTerm, mode: "insensitive" },
+                },
+              },
+            },
+            // Búsqueda por vendedor
+            {
+              usuario: {
+                persona: {
+                  OR: [
+                    { nombre: { contains: searchTerm, mode: "insensitive" } },
+                    { apellido: { contains: searchTerm, mode: "insensitive" } },
+                  ],
+                },
+              },
+            },
+          ],
+        })
+      }
+
+      // Si hay condiciones específicas, usar AND
+      if (conditions.length > 0) {
+        whereCondition.AND = conditions
+      } else if (!mostrarTodas) {
+        console.log("API: No se proporcionaron filtros y no es mostrar todas, devolviendo array vacío")
+        return NextResponse.json([], { status: HTTP_STATUS_CODES.ok })
+      }
+    }
+
+    // Obtener cotizaciones con sus relaciones
     const cotizaciones = await prisma.cotizacionCliente.findMany({
-      where: searchCondition,
+      where: whereCondition,
       include: {
         cliente: {
           include: {
@@ -81,13 +158,19 @@ export async function GET(request) {
           },
         },
         estadoCotizacionCliente: true,
+        detalleCotizacionCliente: {
+          include: {
+            producto: true,
+          },
+        },
       },
       orderBy: {
         fechaCotizacion: "desc",
       },
+      take: limite,
     })
 
-    console.log(`API: Se encontraron ${cotizaciones.length} cotizaciones para el término "${searchTerm}"`)
+    console.log(`API: Se encontraron ${cotizaciones.length} cotizaciones`)
     return NextResponse.json(cotizaciones, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
     console.error("API: Error al obtener cotizaciones:", error)
@@ -125,7 +208,7 @@ export async function POST(request) {
       return NextResponse.json({ message: "Faltan datos requeridos" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
-    // Obtener el ID del estado "Pendiente" (asumiendo que es el ID 1)
+    // Obtener el ID del estado "Pendiente"
     const estadoPendiente = await prisma.estadoCotizacionCliente.findFirst({
       where: {
         descEstadoCotizacionCliente: "PENDIENTE",
@@ -189,13 +272,18 @@ export async function POST(request) {
       },
     })
 
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría
     await auditoriaService.registrarCreacion(
       "CotizacionCliente",
       cotizacion.idCotizacionCliente,
       cotizacionCompleta,
       userData.idUsuario,
-      request,
+      direccionIP,
+      navegador,
     )
 
     console.log(`API: Cotización creada con ID: ${cotizacion.idCotizacionCliente}`)

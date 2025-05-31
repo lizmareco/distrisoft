@@ -136,8 +136,19 @@ export async function POST(request) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarCreacion("Producto", producto.idProducto, producto, userData.idUsuario, request)
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
 
+    // Llamar con parámetros correctos
+    await auditoriaService.registrarCreacion(
+  "Producto", 
+  producto.idProducto, 
+  producto, 
+  userData.idUsuario, 
+  direccionIP, 
+  navegador
+  )
     console.log(`API: Producto creado con ID: ${producto.idProducto}`)
     return NextResponse.json(
       { message: "Producto creado exitosamente", producto },

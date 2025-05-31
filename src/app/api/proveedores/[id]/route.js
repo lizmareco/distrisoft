@@ -6,7 +6,8 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const resolvedParams = await params
+    const { id } = resolvedParams
     console.log(`API: Obteniendo proveedor con ID: ${id}`)
 
     const proveedor = await prisma.proveedor.findUnique({
@@ -18,7 +19,6 @@ export async function GET(request, { params }) {
         empresa: {
           include: {
             tipoDocumento: true,
-            persona: true,
             ciudad: true,
             categoriaEmpresa: true,
           },
@@ -61,7 +61,8 @@ export async function PUT(request, { params }) {
       idUsuario = 1
     }
 
-    const { id } = params
+    const resolvedParams = await params // ✅ Corregido
+    const { id } = resolvedParams
     const data = await request.json()
     console.log(`API: Actualizando proveedor con ID: ${id}`)
     console.log("Datos recibidos:", data)
@@ -86,29 +87,34 @@ export async function PUT(request, { params }) {
       },
       data: {
         idEmpresa: data.idEmpresa ? Number.parseInt(data.idEmpresa) : undefined,
-        comentario: data.comentario !== undefined ? data.comentario : undefined, // Actualizar comentario si se proporciona
+        comentario: data.comentario !== undefined ? data.comentario : undefined,
         updatedAt: new Date(),
       },
       include: {
         empresa: {
           include: {
             tipoDocumento: true,
-            persona: true,
+            ciudad: true,
+            categoriaEmpresa: true,
           },
         },
       },
     })
 
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Proveedor",
-      idRegistro: id.toString(),
-      accion: "ACTUALIZAR",
-      valorAnterior: proveedorAnterior,
-      valorNuevo: proveedor,
-      idUsuario: idUsuario,
-      request: request,
-    })
+    await auditoriaService.registrarActualizacion(
+      "Proveedor",
+      Number.parseInt(id),
+      proveedorAnterior,
+      proveedor,
+      idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log(`API: Proveedor con ID ${id} actualizado correctamente`)
     return NextResponse.json(proveedor, { status: HTTP_STATUS_CODES.ok })
@@ -140,7 +146,8 @@ export async function DELETE(request, { params }) {
       idUsuario = 1
     }
 
-    const { id } = params
+    const resolvedParams = await params // ✅ Corregido
+    const { id } = resolvedParams
     console.log(`API: Eliminando proveedor con ID: ${id}`)
 
     // Obtener el proveedor actual para auditoría
@@ -166,16 +173,19 @@ export async function DELETE(request, { params }) {
       },
     })
 
+    // Extraer información del request
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría
-    await auditoriaService.registrarAuditoria({
-      entidad: "Proveedor",
-      idRegistro: id.toString(),
-      accion: "ELIMINAR",
-      valorAnterior: proveedorAnterior,
-      valorNuevo: null,
-      idUsuario: idUsuario,
-      request: request,
-    })
+    await auditoriaService.registrarEliminacion(
+      "Proveedor",
+      Number.parseInt(id),
+      proveedorAnterior,
+      idUsuario,
+      direccionIP,
+      navegador,
+    )
 
     console.log(`API: Proveedor con ID ${id} eliminado correctamente`)
     return NextResponse.json({ message: "Proveedor eliminado correctamente" }, { status: HTTP_STATUS_CODES.ok })
