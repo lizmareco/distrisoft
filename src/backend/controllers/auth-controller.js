@@ -67,70 +67,12 @@ class AuthController {
     try {
       console.log("Verificando token de acceso...")
 
-      // Verificar si estamos en modo desarrollo
-      if (process.env.NODE_ENV === "development") {
-        console.log("Modo desarrollo: Permitiendo acceso sin verificación de token")
-
-        // Crear un usuario ficticio para desarrollo
-        const devUser = {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "dev_user",
-          permisos: ["*"], // Todos los permisos
-        }
-
-        // Generar un token para este usuario ficticio
-        if (!process.env.JWT_SECRET) {
-          console.warn("JWT_SECRET no está definido, usando valor predeterminado para desarrollo")
-          process.env.JWT_SECRET = "dev-secret-key-do-not-use-in-production"
-        }
-
-        try {
-          const devToken = jwt.sign(devUser, process.env.JWT_SECRET, {
-            expiresIn: "1h",
-            algorithm: "HS256",
-          })
-
-          console.log("Token de desarrollo generado correctamente")
-          return devToken
-        } catch (tokenError) {
-          console.error("Error al generar token de desarrollo:", tokenError)
-          return "dev-mode-bypass-token"
-        }
-      }
-
       // El resto del código original para verificar tokens en producción
       // Obtener el token de las cookies
       const cookieToken = request.cookies.get("at")?.value
 
       if (cookieToken) {
-        console.log("Token encontrado en cookies")
-        // Verificar el token de las cookies
-        try {
-          const decoded = jwt.verify(cookieToken, process.env.JWT_SECRET)
-          console.log("Token de cookie verificado correctamente")
-
-          // Verificar si el token existe en la base de datos y es válido
-          const tokenRecord = await prisma.accessToken.findFirst({
-            where: {
-              accessToken: cookieToken,
-              deletedAt: null,
-            },
-          })
-
-          if (tokenRecord) {
-            console.log("Token encontrado en base de datos")
-            return cookieToken
-          } else {
-            console.log("Token no encontrado en base de datos")
-          }
-        } catch (error) {
-          // Si el token no es válido o está expirado, continuar con la verificación del encabezado
-          console.log("Token en cookie inválido o expirado, verificando encabezado...")
-        }
+        return true;
       } else {
         console.log("No se encontró token en cookies")
       }
@@ -547,8 +489,6 @@ class AuthController {
       // Incluir directamente los datos del usuario en el payload principal
       const payload = {
         idUsuario: usuario.idUsuario,
-        nombre: usuario.persona.nombre,
-        apellido: usuario.persona.apellido,
         correo: usuario.persona.correoPersona,
         rol: usuario.rol.nombreRol,
         usuario: usuario.nombreUsuario,

@@ -11,10 +11,10 @@ export async function POST(request) {
     console.log("API login: Recibiendo solicitud")
 
     const authController = new AuthController()
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
+    const hasAccessToken = await authController.hasAccessToken(request)
+    if (hasAccessToken) {
       console.log("API login: Usuario ya tiene sesión activa")
-      return NextResponse.json({ accessToken, message: "Ya has iniciado sesión" }, { status: HTTP_STATUS_CODES.ok })
+      return NextResponse.json({ message: "Ya has iniciado sesión" }, { status: HTTP_STATUS_CODES.ok })
     }
 
     // Clonar la solicitud para poder leer el cuerpo múltiples veces
@@ -64,15 +64,15 @@ export async function POST(request) {
       response.cookies.set("at", accessToken, {
         httpOnly: true,
         maxAge: ACCESS_TOKEN_MAX_AGE,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure:true,
+        sameSite: "strict",
       })
 
       response.cookies.set("rt", refreshToken, {
         httpOnly: true,
         maxAge: REFRESH_TOKEN_MAX_AGE,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: true,
+        sameSite: "strict",
       })
 
       console.log("API login: Cookies establecidas y respuesta preparada")

@@ -3,9 +3,11 @@ import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 
 // GET - Obtener todas las materias primas
-export async function GET() {
+export async function GET(request) {
   try {
     console.log("API: Obteniendo materias primas...")
+
+    console.log('🔥🔥🔥🔥 accessToken: ', request.cookies.get("at")?.value)
 
     const materiasPrimas = await prisma.materiaPrima.findMany({
       where: {
