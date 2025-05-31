@@ -834,7 +834,7 @@ export default function DashboardPage() {
                 <PrecisionManufacturingIcon sx={{ fontSize: 60, color: "#FFC107" }} />
               </Box>
               <Typography variant="h5" component="h2" gutterBottom>
-                Gestión de Producción
+                Órdenes de Producción
               </Typography>
               <Typography
                 variant="body2"

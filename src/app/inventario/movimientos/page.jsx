@@ -46,6 +46,7 @@ import ExportarExcel from "@/src/components/ExportarExcel"
 import RegistrarMovimiento from "@/src/components/RegistrarMovimiento"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
+import Autocomplete from "@mui/material/Autocomplete"
 
 export default function MovimientosPage() {
   const theme = useTheme()
@@ -62,11 +63,21 @@ export default function MovimientosPage() {
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [totalRegistros, setTotalRegistros] = useState(0)
+  const [filtroNombre, setFiltroNombre] = useState("")
+  const [opcionesNombre, setOpcionesNombre] = useState([])
+  const [cargandoNombre, setCargandoNombre] = useState(false)
+  const [seleccionNombre, setSeleccionNombre] = useState(null)
 
   useEffect(() => {
     // Establecer mostrarFiltros basado en el tamaño de pantalla
     setMostrarFiltros(!esMobil)
   }, [esMobil])
+
+  useEffect(() => {
+    setFiltroNombre("")
+    setSeleccionNombre(null)
+    setOpcionesNombre([])
+  }, [valorTab])
 
   const handleTabChange = (event, nuevoValor) => {
     setValorTab(nuevoValor)
@@ -81,75 +92,42 @@ export default function MovimientosPage() {
   const obtenerMovimientos = async () => {
     setCargando(true)
     try {
-      // Construir parámetros de consulta
       const params = new URLSearchParams()
-
-      // Verificar si hay filtros específicos
-      const hayFiltrosEspecificos = (filtroTipo && filtroTipo !== "TODOS") || filtroFechaDesde || filtroFechaHasta
-
-      // Si no hay filtros específicos, agregar loadAll=true
+      const hayFiltrosEspecificos = (filtroTipo && filtroTipo !== "TODOS") || filtroFechaDesde || filtroFechaHasta || seleccionNombre
       if (!hayFiltrosEspecificos) {
         params.append("loadAll", "true")
       }
-
-      // Manejar el tipo de movimiento
       if (filtroTipo && filtroTipo !== "TODOS") {
         params.append("tipoMovimiento", filtroTipo)
       }
-
-      // Añadir fechas para filtro BETWEEN en fechaMovimiento
       if (filtroFechaDesde) {
-        // Crear una fecha con la fecha seleccionada pero manteniendo la zona horaria local
         const fechaDesde = new Date(filtroFechaDesde)
-        // Ajustar para obtener la fecha correcta en UTC
         const fechaDesdeUTC = new Date(fechaDesde.getFullYear(), fechaDesde.getMonth(), fechaDesde.getDate(), 0, 0, 0)
-
         params.append("fechaDesde", fechaDesdeUTC.toISOString())
-        console.log("Fecha desde (local):", format(fechaDesde, "yyyy-MM-dd"))
-        console.log("Fecha desde (UTC para API):", fechaDesdeUTC.toISOString())
       }
-
       if (filtroFechaHasta) {
-        // Crear una fecha con la fecha seleccionada pero manteniendo la zona horaria local
         const fechaHasta = new Date(filtroFechaHasta)
-        // Ajustar para obtener la fecha correcta en UTC
-        const fechaHastaUTC = new Date(
-          fechaHasta.getFullYear(),
-          fechaHasta.getMonth(),
-          fechaHasta.getDate(),
-          23,
-          59,
-          59,
-          999,
-        )
-
+        const fechaHastaUTC = new Date(fechaHasta.getFullYear(), fechaHasta.getMonth(), fechaHasta.getDate(), 23, 59, 59, 999)
         params.append("fechaHasta", fechaHastaUTC.toISOString())
-        console.log("Fecha hasta (local):", format(fechaHasta, "yyyy-MM-dd"))
-        console.log("Fecha hasta (UTC para API):", fechaHastaUTC.toISOString())
       }
-
-      // Añadir parámetros de paginación
-      params.append("page", (page + 1).toString()) // API espera páginas desde 1
+      if (seleccionNombre) {
+        if (valorTab === "materiasprimas") {
+          params.append("materiaPrimaId", seleccionNombre.idMateriaPrima)
+        } else {
+          params.append("productoId", seleccionNombre.idProducto)
+        }
+      }
+      params.append("page", (page + 1).toString())
       params.append("limit", rowsPerPage.toString())
-
-      // Obtener datos según la pestaña activa
       let url = valorTab === "materiasprimas" ? "/api/inventario" : "/api/inventario-producto"
-
-      // Siempre agregar parámetros
       url += `?${params.toString()}`
-
-      console.log("URL de consulta:", url)
-      console.log("Hay filtros específicos:", hayFiltrosEspecificos)
-
       const respuesta = await fetch(url)
       if (!respuesta.ok) {
         throw new Error(
           `Error al cargar los movimientos de ${valorTab === "materiasprimas" ? "materias primas" : "productos"}`,
         )
       }
-
       const datos = await respuesta.json()
-      console.log("Datos recibidos:", datos)
       setMovimientos(datos.movimientos || [])
       setTotalRegistros(datos.meta?.total || datos.movimientos?.length || 0)
       setError(null)
@@ -203,6 +181,9 @@ export default function MovimientosPage() {
     setFiltroTipo("TODOS")
     setFiltroFechaDesde(null)
     setFiltroFechaHasta(null)
+    setFiltroNombre("")
+    setSeleccionNombre(null)
+    setOpcionesNombre([])
     setPage(0)
     setMovimientos([])
     setBusquedaRealizada(false)
@@ -236,6 +217,30 @@ export default function MovimientosPage() {
     // Recargar los movimientos solo si ya se realizó una búsqueda
     if (busquedaRealizada) {
       obtenerMovimientos()
+    }
+  }
+
+  const buscarOpcionesNombre = async (input) => {
+    if (!input || input.length < 2) {
+      setOpcionesNombre([])
+      return
+    }
+    setCargandoNombre(true)
+    try {
+      let url = valorTab === "materiasprimas"
+        ? `/api/materiaprima/buscar?query=${encodeURIComponent(input)}&activas=true`
+        : `/api/productos/buscar?query=${encodeURIComponent(input)}`
+      const resp = await fetch(url)
+      if (resp.ok) {
+        const data = await resp.json()
+        setOpcionesNombre(data)
+      } else {
+        setOpcionesNombre([])
+      }
+    } catch (e) {
+      setOpcionesNombre([])
+    } finally {
+      setCargandoNombre(false)
     }
   }
 
@@ -368,6 +373,53 @@ export default function MovimientosPage() {
                       ),
                     }}
                     InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} sm={3}>
+                  <Autocomplete
+                    freeSolo
+                    options={opcionesNombre}
+                    getOptionLabel={(option) =>
+                      valorTab === "materiasprimas"
+                        ? option?.nombreMateriaPrima || ""
+                        : option?.nombreProducto || ""
+                    }
+                    loading={cargandoNombre}
+                    value={seleccionNombre === undefined ? null : seleccionNombre}
+                    inputValue={typeof filtroNombre === "string" ? filtroNombre : ""}
+                    onChange={(event, newValue) => {
+                      setSeleccionNombre(newValue)
+                      if (newValue) {
+                        setFiltroNombre(valorTab === "materiasprimas"
+                          ? newValue.nombreMateriaPrima || ""
+                          : newValue.nombreProducto || "")
+                      } else {
+                        setFiltroNombre("")
+                      }
+                    }}
+                    onInputChange={(event, newInputValue, reason) => {
+                      if (reason === "input") {
+                        setFiltroNombre(newInputValue || "")
+                        buscarOpcionesNombre(newInputValue || "")
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label={valorTab === "materiasprimas" ? "Materia Prima" : "Producto"}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {cargandoNombre ? <CircularProgress color="inherit" size={20} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                        helperText={`Escriba para buscar ${valorTab === "materiasprimas" ? "materia prima" : "producto"}`}
+                      />
+                    )}
                   />
                 </Grid>
 

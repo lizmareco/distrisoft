@@ -38,6 +38,38 @@ export async function POST(request) {
       return NextResponse.json({ error: "El pedido no está en estado pendiente" }, { status: 400 })
     }
 
+// Buscar si ya existe una orden de producción CANCELADA para este pedido
+const ordenCancelada = await prisma.ordenProduccion.findFirst({
+  where: {
+    idPedido: idPedidoInt,
+    idEstadoOrdenProd: 3, // CANCELADO
+    deletedAt: null,
+  },
+});
+
+if (ordenCancelada) {
+  // Reactivar la orden cancelada
+  const ordenReactivada = await prisma.ordenProduccion.update({
+    where: { idOrdenProduccion: ordenCancelada.idOrdenProduccion },
+    data: {
+      idEstadoOrdenProd: 1, // EN PROCESO
+      fechaInicioProd: new Date(),
+    },
+  });
+
+  // Cambiar el estado del pedido a EN PROCESO
+  await prisma.pedidoCliente.update({
+    where: { idPedido: idPedidoInt },
+    data: { idEstadoPedido: 2 },
+  });
+
+  return NextResponse.json({
+    success: true,
+    ordenProduccion: ordenReactivada,
+    message: "Orden de producción reactivada exitosamente",
+  });
+}
+
     // Verificar que no existe ya una orden de producción para este pedido
     const ordenExistente = await prisma.ordenProduccion.findFirst({
       where: {

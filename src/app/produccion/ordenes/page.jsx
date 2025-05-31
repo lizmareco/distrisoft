@@ -68,6 +68,7 @@ export default function ListaOrdenesProduccionPage() {
   const estados = [
     { id: 1, nombre: "EN PROCESO", color: "warning" },
     { id: 2, nombre: "FINALIZADO", color: "success" },
+    { id: 3, nombre: "CANCELADO", color: "error" },
   ]
 
   // Cargar usuarios al inicio
@@ -196,6 +197,15 @@ export default function ListaOrdenesProduccionPage() {
       }
 
       const resultado = await respuesta.json()
+
+      // Si se seleccionó CANCELADO, cambiar el estado del pedido a PENDIENTE
+      if (Number.parseInt(nuevoEstado) === 3 && ordenSeleccionada?.pedidoCliente?.idPedido) {
+        await fetch(`/api/pedidos/${ordenSeleccionada.pedidoCliente.idPedido}/estado`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nuevoEstado: 1 }), // 1 = PENDIENTE
+        })
+      }
 
       // Mostrar mensaje de éxito específico
       if (Number.parseInt(nuevoEstado) === 2) {
@@ -472,11 +482,19 @@ export default function ListaOrdenesProduccionPage() {
           <FormControl fullWidth>
             <InputLabel>Nuevo Estado</InputLabel>
             <Select value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value)} label="Nuevo Estado">
-              {estados.map((estado) => (
-                <MenuItem key={estado.id} value={estado.id}>
-                  {estado.nombre}
-                </MenuItem>
-              ))}
+              {estados
+                .filter((estado) => {
+                  // Mostrar CANCELADO solo si la orden está EN PROCESO
+                  if (estado.id === 3) {
+                    return ordenSeleccionada?.idEstadoOrdenProd === 1
+                  }
+                  return true
+                })
+                .map((estado) => (
+                  <MenuItem key={estado.id} value={estado.id}>
+                    {estado.nombre}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
           {nuevoEstado === 2 && (

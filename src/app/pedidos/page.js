@@ -2,7 +2,7 @@ import { Box, Container, Typography, Button } from '@mui/material';
 import ListaPedidos from "../../components/pedidos/ListaPedidos"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
-import { Button } from "@mui/material"
+
 
 export const metadata = {
   title: "Gestión de Pedidos",

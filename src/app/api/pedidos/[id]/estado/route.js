@@ -98,6 +98,7 @@ export async function PUT(request, { params }) {
     // Validar transiciones de estado permitidas
     const transicionesPermitidas = {
       1: [6], // Pendiente -> Cancelado
+      2: [1], // En Proceso -> Pendiente
       3: [4, 5], // Listo para Entrega -> Enviado, Entregado
       4: [5], // Enviado -> Entregado
     }
@@ -153,26 +154,28 @@ export async function PUT(request, { params }) {
         // Pedido cambia a "Enviado" → Facturas cambian a "Enviado" (ID 2)
         console.log(`API: Actualizando facturas a estado "Enviado" para pedido ${idPedido}`)
 
-        const facturasContado = await tx.facturaClienteContado.updateMany({
+        const facturasContado = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: 1, // Solo las que están en "Emitida"
+            esContado: true,
+            idEstadoFactuCliente: 1,
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 2, // Cambiar a "Enviado"
+            idEstadoFactuCliente: 2,
             updatedAt: new Date(),
           },
         })
 
-        const facturasCredito = await tx.facturaClienteCredito.updateMany({
+        const facturasCredito = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: 1, // Solo las que están en "Emitida"
+            esContado: false,
+            idEstadoFactuCliente: 1,
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 2, // Cambiar a "Enviado"
+            idEstadoFactuCliente: 2,
             updatedAt: new Date(),
           },
         })
@@ -196,26 +199,28 @@ export async function PUT(request, { params }) {
         // Pedido cambia a "Entregado" → Facturas cambian a "Cobrado" (ID 3)
         console.log(`API: Actualizando facturas a estado "Cobrado" para pedido ${idPedido}`)
 
-        const facturasContado = await tx.facturaClienteContado.updateMany({
+        const facturasContado = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: { in: [1, 2] }, // "Emitida" o "Enviado"
+            esContado: true,
+            idEstadoFactuCliente: 1,
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 3, // Cambiar a "Cobrado"
+            idEstadoFactuCliente: 2,
             updatedAt: new Date(),
           },
         })
 
-        const facturasCredito = await tx.facturaClienteCredito.updateMany({
+        const facturasCredito = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: { in: [1, 2] }, // "Emitida" o "Enviado"
+            esContado: false,
+            idEstadoFactuCliente: 1,
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 3, // Cambiar a "Cobrado"
+            idEstadoFactuCliente: 2,
             updatedAt: new Date(),
           },
         })
@@ -447,6 +452,7 @@ export async function GET(request, { params }) {
     // Definir transiciones permitidas
     const transicionesPermitidas = {
       1: [6], // Pendiente -> Cancelado
+      2: [1], // En Proceso -> Pendiente
       3: [4, 5], // Listo para Entrega -> Enviado, Entregado
       4: [5], // Enviado -> Entregado
     }
