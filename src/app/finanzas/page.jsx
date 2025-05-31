@@ -36,6 +36,8 @@ import {
 } from "@mui/icons-material"
 import VistaPreviaFactura from "../../components/facturas/VistaPrevia"
 import VisorFacturaProveedor from "../../components/facturas/VisorFacturaProveedor"
+import Link from "next/link"
+import { ArrowBack } from "@mui/icons-material"
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -61,6 +63,9 @@ export default function FinanzasPage() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
           Gestión Financiera

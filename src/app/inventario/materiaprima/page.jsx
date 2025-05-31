@@ -29,6 +29,8 @@ import {
 } from "@mui/material"
 import { Refresh as RefreshIcon, Search as SearchIcon } from "@mui/icons-material"
 import InventarioNav from "@/src/components/inventario-nav"
+import Link from "next/link"
+import { ArrowBack } from "@mui/icons-material"
 
 // Estilos personalizados para los botones de acción
 const actionButtonStyles = {
@@ -226,6 +228,9 @@ export default function MateriaPrimaPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       <Typography variant="h4" gutterBottom>
         Stock de Materias Primas
       </Typography>

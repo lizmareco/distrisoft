@@ -44,6 +44,8 @@ import { es } from "date-fns/locale"
 import InventarioNav from "@/src/components/inventario-nav"
 import ExportarExcel from "@/src/components/ExportarExcel"
 import RegistrarMovimiento from "@/src/components/RegistrarMovimiento"
+import Link from "next/link"
+import { ArrowBack } from "@mui/icons-material"
 
 export default function MovimientosPage() {
   const theme = useTheme()
@@ -239,6 +241,9 @@ export default function MovimientosPage() {
 
   return (
     <Container maxWidth="xl">
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       {/* 1. TÍTULO */}
       <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Typography variant="h4" component="h1" gutterBottom>

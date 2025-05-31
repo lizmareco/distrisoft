@@ -175,7 +175,7 @@ export default function UsuariosPage() {
       {/* Botón de Volver */}
       <Box display="flex" alignItems="center" mb={3} mt={2}>
         <Button component={Link} href="/dashboard" startIcon={<ArrowBackIcon />} variant="outlined">
-          Volver al Dashboard
+          Volver a Gestión
         </Button>
       </Box>
 

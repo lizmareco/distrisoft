@@ -32,6 +32,8 @@ import {
 import SearchIcon from "@mui/icons-material/Search"
 import EditIcon from "@mui/icons-material/Edit"
 import ClearIcon from "@mui/icons-material/Clear"
+import Link from "next/link"
+import { ArrowBack } from "@mui/icons-material"
 
 export default function ListaOrdenesProduccionPage() {
   const router = useRouter()
@@ -235,6 +237,9 @@ export default function ListaOrdenesProduccionPage() {
 
   return (
     <Box sx={{ p: 3 }}>
+      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+      </Button>
       {/* Título */}
       <Typography
         variant="h4"
