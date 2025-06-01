@@ -72,7 +72,7 @@ class AuthController {
       const cookieToken = request.cookies.get("at")?.value
 
       if (cookieToken) {
-        return true;
+        return cookieToken;
       } else {
         console.log("No se encontró token en cookies")
       }
@@ -144,6 +144,7 @@ class AuthController {
   // Método login modificado para manejar correctamente usuarios con contraseña vencida
   async login(loginForm, request) {
     const { nombreUsuario, contrasena } = loginForm
+    console.log("🔑 Login solicitado con:", loginForm)
 
     // Extraer información de IP y navegador usando el servicio de auditoría
     const ip = this.auditoriaService.obtenerDireccionIP(request)
@@ -227,10 +228,12 @@ class AuthController {
 
       // Si la cuenta tiene contraseña vencida, permitir el inicio de sesión pero marcar como vencida
       if (usuario.estado === "VENCIDO") {
-        console.log("Usuario con contraseña vencida:", usuario.nombreUsuario)
+        console.log("📡 Usuario encontrado en BD:", usuario.idUsuario, usuario.nombreUsuario)
+        console.log("🧠 Hash almacenado en BD:", usuario.contrasena)
+        console.log("Contraseña ingresada:", contrasena)
 
-        // Verificar la contraseña
         const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena)
+        console.log("¿La contraseña coincide?:", contrasenaValida)
 
         if (!contrasenaValida) {
           // Obtener los intentos fallidos recientes
@@ -329,12 +332,24 @@ class AuthController {
           navegador: navegador,
         })
 
+        console.log("🔍 Login correcto, generando tokens para:", {
+          id: usuario.idUsuario,
+          nombre: usuario.nombreUsuario,
+          correo: usuario.persona?.correoPersona,
+        })
         // Si la contraseña es correcta, generar tokens pero marcar la cuenta como vencida
         return await this.generarTokens(usuario, true)
       }
 
+      console.log("📡 Usuario encontrado en BD:", usuario?.idUsuario, usuario?.nombreUsuario)
+      console.log("🧠 Hash de BD:", usuario?.contrasena)
       // Para usuarios con estado ACTIVO, verificar la contraseña normalmente
       const contrasenaValida = await bcrypt.compare(contrasena, usuario.contrasena)
+      console.log("Contraseña ingresada:", contrasena)
+      console.log("Hash almacenado en BD:", usuario.contrasena)
+
+const match = await bcrypt.compare(contrasena, usuario.contrasena)
+console.log("¿La contraseña coincide?:", match)
 
       if (!contrasenaValida) {
         // Obtener los intentos fallidos recientes
@@ -427,6 +442,11 @@ class AuthController {
         navegador: navegador,
       })
 
+      console.log("🔍 Login correcto, generando tokens para:", {
+        id: usuario.idUsuario,
+        nombre: usuario.nombreUsuario,
+        correo: usuario.persona?.correoPersona,
+      })
       // Generar tokens para usuario normal (no vencido)
       return await this.generarTokens(usuario, false)
     } catch (error) {
@@ -495,7 +515,7 @@ class AuthController {
         permisos: permisosArray,
       }
 
-      console.log("Payload del token:", payload)
+      console.log("🧾 Payload para token:", payload)
 
       // Generar tokens con la estructura adecuada
       const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
@@ -877,19 +897,6 @@ class AuthController {
         }
       }
 
-      // Si estamos en modo desarrollo y el token es el bypass token
-      if (process.env.NODE_ENV === "development" && token === "dev-mode-bypass-token") {
-        console.log("Modo desarrollo: Usando usuario ficticio para el bypass token")
-        return {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "dev_user",
-          permisos: ["*"], // Todos los permisos
-        }
-      }
 
       // Decodificar el token
       try {
@@ -909,62 +916,22 @@ class AuthController {
       } catch (error) {
         console.error("Error al verificar token:", error)
 
-        // En modo desarrollo, permitir tokens expirados
         if (process.env.NODE_ENV === "development") {
           console.log("Modo desarrollo: Permitiendo token expirado o inválido")
-
-          // Decodificar el token sin verificar (solo para desarrollo)
-          try {
-            const decoded = jwt.decode(token)
-            if (decoded) {
-              console.log("Token decodificado sin verificar:", decoded)
-              return {
-                idUsuario: decoded.idUsuario || 1,
-                nombre: decoded.nombre || "Usuario",
-                apellido: decoded.apellido || "Desarrollo",
-                correo: decoded.correo || "desarrollo@example.com",
-                rol: decoded.rol || "ADMINISTRADOR",
-                usuario: decoded.usuario || "dev_user",
-                permisos: decoded.permisos || ["*"],
-              }
-            }
-          } catch (decodeError) {
-            console.error("Error al decodificar token sin verificar:", decodeError)
-          }
-
-          // Si no se pudo decodificar, devolver usuario ficticio
-          console.log("Usando usuario ficticio para desarrollo")
-          return {
-            idUsuario: 1,
-            nombre: "Usuario",
-            apellido: "Desarrollo",
-            correo: "desarrollo@example.com",
-            rol: "ADMINISTRADOR",
-            usuario: "dev_user",
-            permisos: ["*"], // Todos los permisos
-          }
+          const decoded = jwt.decode(token)
+          return decoded ? {
+            idUsuario: decoded.idUsuario,
+            nombre: decoded.nombre,
+            apellido: decoded.apellido,
+            correo: decoded.correo,
+            rol: decoded.rol,
+            usuario: decoded.usuario,
+            permisos: decoded.permisos || [],
+          } : null
         }
-
-        return null
       }
     } catch (error) {
       console.error("Error al obtener usuario desde token:", error)
-
-      // En modo desarrollo, devolver usuario ficticio en caso de error
-      if (process.env.NODE_ENV === "development") {
-        console.log("Modo desarrollo: Devolviendo usuario ficticio debido a error")
-        return {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "dev_user",
-          permisos: ["*"], // Todos los permisos
-        }
-      }
-
-      return null
     }
   }
 
@@ -1010,6 +977,8 @@ class AuthController {
         throw new Error("Usuario no encontrado")
       }
 
+      console.log("📡 Usuario encontrado en BD:", usuario?.idUsuario, usuario?.nombreUsuario)
+      console.log("🧠 Hash de BD:", usuario?.contrasena)
       // Verificar la contraseña actual
       const contrasenaValida = await bcrypt.compare(contrasenaActual, usuario.contrasena)
 

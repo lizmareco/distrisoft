@@ -54,7 +54,7 @@ export async function GET(request) {
         whereClause.fechaPedido.lte = fechaHastaCompleta
       }
     }
-
+    whereClause.deletedAt = null
     console.log("Cláusula WHERE construida:", JSON.stringify(whereClause, null, 2))
 
     // Calcular offset para paginación

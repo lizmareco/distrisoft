@@ -232,18 +232,17 @@ export async function POST(request) {
 
     // Registrar auditoría
     if (userData) {
-      await auditoriaService.registrarAuditoria({
-        entidad: "PedidoCliente",
-        idRegistro: resultado.pedido.idPedido,
-        accion: "CREACION",
-        valorAnterior: null,
-        valorNuevo: {
+      await auditoriaService.registrarCreacion(
+        "PedidoCliente",
+        resultado.pedido.idPedido,
+        {
           pedido: resultado.pedido,
           detalles: resultado.detalles,
         },
-        idUsuario: userData.idUsuario,
-        request,
-      })
+        userData.idUsuario,
+        auditoriaService.obtenerDireccionIP(request),
+        auditoriaService.obtenerInfoNavegador(request)
+      )
     }
 
     console.log(`API: Pedido creado con ID: ${resultado.pedido.idPedido}`)

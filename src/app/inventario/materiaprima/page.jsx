@@ -95,6 +95,12 @@ export default function MateriaPrimaPage() {
       console.log("Fetching URL:", url)
 
       const response = await fetch(url)
+      if (response.status === 401) {
+        setError("Debes iniciar sesión para acceder a este recurso.")
+        // Opcional: redirigir a login
+        // router.push("/login")
+        return
+      }
       if (!response.ok) {
         throw new Error("Error al cargar las materias primas")
       }

@@ -85,14 +85,10 @@ export async function GET(request) {
     return NextResponse.json(materiasPrimas, { status: 200 })
   } catch (error) {
     console.error("API MateriaPrima/stock - Error:", error)
-    return NextResponse.json(
-      {
-        message: "Error al obtener stock de materias primas",
-        error: error.message,
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-      },
-      { status: 500 },
-    )
+    if (error.message === "Sesión no iniciada") {
+      return NextResponse.json({ error: "Sesión no iniciada" }, { status: 401 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 

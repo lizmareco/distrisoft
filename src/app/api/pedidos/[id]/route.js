@@ -351,6 +351,8 @@ export async function PUT(request, { params }) {
 
     // Registrar auditoría
     if (userData) {
+      const direccionIP = auditoriaService.obtenerDireccionIP(request)
+      const navegador = auditoriaService.obtenerInfoNavegador(request)
       await auditoriaService.registrarActualizacion(
         "PedidoCliente",
         idPedido,
@@ -360,7 +362,8 @@ export async function PUT(request, { params }) {
           detalles: resultado.detalles,
         },
         userData.idUsuario,
-        request,
+        direccionIP,
+        navegador
       )
     }
 

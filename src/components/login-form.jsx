@@ -83,8 +83,7 @@ export default function LoginForm() {
     setDiasVencidos(0)
 
     try {
-      console.log("Enviando solicitud de login:", formData)
-
+      console.log("📤 Enviando login:", formData)
       // Primero, verificar si el usuario existe y obtener su información
       const checkUserResponse = await fetch(
         `/api/auth/check-user?nombreUsuario=${encodeURIComponent(formData.nombreUsuario)}`,
@@ -134,6 +133,7 @@ export default function LoginForm() {
         }
       }
 
+      console.log("📤 Enviando login:", formData)
       // Continuar con el proceso normal de login
       const response = await fetch(apis.login.url, {
         method: "POST",
@@ -145,8 +145,20 @@ export default function LoginForm() {
 
       console.log("Respuesta recibida:", response.status)
 
-      const data = await response.json()
-      console.log("Datos recibidos:", data)
+      let data = null
+try {
+  data = await response.json()
+} catch (err) {
+  console.error("Error al parsear JSON:", err)
+  const text = await response.text()
+  console.log("Respuesta en texto:", text)
+}
+
+if (!response.ok) {
+  console.log("Login fallido:", data?.message || "Error desconocido")
+} else {
+  console.log("Login exitoso:", data)
+}
 
       if (response.status === 200) {
         // Reiniciamos contador de intentos fallidos en caso de éxito
@@ -174,7 +186,11 @@ export default function LoginForm() {
           if (contextData.setState && contextData.setState.setSession) {
             try {
               console.log("Estableciendo sesión con datos:", data.user || data)
-
+              if (!data.accessToken) {
+                setError("No se recibió el token de autenticación. Contacte al administrador.");
+                setIsLoading(false);
+                return;
+              }
               // Decodificar el token para mostrar en depuración
               const tokenParts = data.accessToken.split(".")
               const header = JSON.parse(atob(tokenParts[0]))
