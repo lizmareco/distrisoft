@@ -37,7 +37,7 @@ import {
 import VistaPreviaFactura from "../../components/facturas/VistaPrevia"
 import VisorFacturaProveedor from "../../components/facturas/VisorFacturaProveedor"
 import Link from "next/link"
-import ArrowBack from "@mui/icons-material/ArrowBack"
+import { ArrowBack } from "@mui/icons-material"
 
 function TabPanel({ children, value, index, ...other }) {
   return (

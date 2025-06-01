@@ -32,6 +32,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { ArrowBack } from "@mui/icons-material"
 import ArrowBack from "@mui/icons-material/ArrowBack"
 
 
@@ -228,7 +229,7 @@ export default function CotizacionesProveedorPage() {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión
-        </Button>
+      </Button>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1">
           Cotizaciones de Proveedores
