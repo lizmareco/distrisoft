@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken"
 
 export const getUserData = (request, permission) => {
   const accessToken = request.cookies.get("at")?.value
-  if (!accessToken) throw new Error("No access token provided")
+  if (!accessToken) throw new Error("Sesión no iniciada")
   
   const userData = jwt.decode(accessToken)
 

@@ -40,7 +40,7 @@ export async function POST(request) {
     
 
     // Usuario ficticio para auditoría en desarrollo
-    const userData = getUserData(request)
+    const userData = getUserData(request, "CREATE_MATERIAPRIMA")
 
     const data = await request.json()
     console.log("API: Datos recibidos:", data)
