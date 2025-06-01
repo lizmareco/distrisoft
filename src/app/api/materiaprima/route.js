@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import { getUserData } from "src/lib/http/get-userdata"
 
 // GET - Obtener todas las materias primas
 export async function GET(request) {
   try {
     console.log("API: Obteniendo materias primas...")
 
-    console.log('🔥🔥🔥🔥 accessToken: ', request.cookies.get("at")?.value)
+    const userData = getUserData(request, "VIEW_MATERIAPRIMA")
 
     const materiasPrimas = await prisma.materiaPrima.findMany({
       where: {
@@ -36,9 +37,10 @@ export async function POST(request) {
   try {
     console.log("API: Creando nueva materia prima...")
     const auditoriaService = new AuditoriaService()
+    
 
     // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const userData = getUserData(request)
 
     const data = await request.json()
     console.log("API: Datos recibidos:", data)

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import { getUserData } from "src/lib/http/get-userdata"
 
 const auditoriaService = new AuditoriaService()
 
@@ -11,7 +12,7 @@ export async function GET(request) {
     console.log("API MateriaPrima/stock - Iniciando solicitud GET")
 
     // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const userData = getUserData(request)
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("query") || ""
