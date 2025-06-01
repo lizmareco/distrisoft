@@ -31,6 +31,13 @@ import {
 import { exportToExcel } from "@/src/utils/export-utils"
 import dynamic from "next/dynamic"
 
+function formatFecha(fechaStr) {
+  if (!fechaStr) return ""
+  const [y, m, d] = fechaStr.split("-")
+  if (y && m && d) return `${d}-${m}-${y}`
+  return fechaStr
+}
+
 // Importación dinámica de Chart.js para evitar problemas de SSR
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   ssr: false,
@@ -164,8 +171,15 @@ export default function ReporteVentasProducto({ onVolver }) {
     }
 
     try {
-      console.log("Exportando a Excel:", ventasDetalladas)
-      exportToExcel(ventasDetalladas, `reporte-ventas-producto-${productoSeleccionado?.nombreProducto || "producto"}`)
+      // Mapea los datos para formatear la fecha antes de exportar
+      const datosFormateados = ventasDetalladas.map((venta) => ({
+        "Producto": venta.NOMBRE_PRODUCTO || "",
+        "Fecha": formatFecha(venta.FECHA_VENTA),
+        "Cantidad": venta.CANTIDAD || 0,
+        "Precio Unitario": venta.CANTIDAD ? Math.floor(venta.SUBTOTAL / venta.CANTIDAD) : 0,
+        "Subtotal": venta.SUBTOTAL || 0,
+      }))
+      exportToExcel(datosFormateados, `reporte-ventas-producto-${productoSeleccionado?.nombreProducto || "producto"}`)
     } catch (error) {
       console.error("Error al exportar a Excel:", error)
       setError("Error al exportar a Excel: " + error.message)
@@ -187,6 +201,7 @@ export default function ReporteVentasProducto({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
+            <title>Distribuidora Las Niñas</title>
             <title>Reporte de Ventas por Producto</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
@@ -204,7 +219,7 @@ export default function ReporteVentasProducto({ onVolver }) {
             <div class="info">
               <p><strong>Producto:</strong> ${productoSeleccionado?.nombreProducto || ""}</p>
               <p><strong>Descripción:</strong> ${productoSeleccionado?.descripcion || ""}</p>
-              <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+              <p><strong>Período:</strong> ${formatFecha(fechaDesde)} al ${formatFecha(fechaHasta)}</p>
             </div>
             <table>
               <thead>
@@ -218,18 +233,18 @@ export default function ReporteVentasProducto({ onVolver }) {
               </thead>
               <tbody>
                 ${ventasDetalladas
-                  .map(
-                    (venta) => `
+          .map(
+            (venta) => `
                   <tr>
                     <td>${venta.NOMBRE_PRODUCTO || ""}</td>
-                    <td>${venta.FECHA_VENTA || ""}</td>
+                    <td>${formatFecha(venta.FECHA_VENTA) || ""}</td>
                     <td>${venta.CANTIDAD || 0}</td>
                     <td class="text-right">₲ ${(venta.PRECIO_UNITARIO || 0).toLocaleString("es-PY")}</td>
                     <td class="text-right">₲ ${(venta.SUBTOTAL || 0).toLocaleString("es-PY")}</td>
                   </tr>
                 `,
-                  )
-                  .join("")}
+          )
+          .join("")}
                 <tr class="total">
                   <td colspan="4"><strong>Total</strong></td>
                   <td class="text-right"><strong>₲ ${total.toLocaleString("es-PY")}</strong></td>
@@ -326,7 +341,7 @@ export default function ReporteVentasProducto({ onVolver }) {
     return {
       labels: datosOrdenados.map((item) => {
         // Mantener el formato original de la fecha para mostrar
-        return item.fecha
+        return formatFecha(item.fecha)
       }),
       datasets: [
         {
@@ -591,7 +606,7 @@ export default function ReporteVentasProducto({ onVolver }) {
                   <TableCell>Producto</TableCell>
                   <TableCell>Fecha</TableCell>
                   <TableCell align="right">Cantidad</TableCell>
-                  <TableCell align="right">Precio Unitario</TableCell>
+                  <TableCell align="right">Precio Unitario </TableCell>
                   <TableCell align="right">Subtotal</TableCell>
                 </TableRow>
               </TableHead>
@@ -599,9 +614,11 @@ export default function ReporteVentasProducto({ onVolver }) {
                 {ventasDetalladas.map((venta, index) => (
                   <TableRow key={index}>
                     <TableCell>{venta.NOMBRE_PRODUCTO || ""}</TableCell>
-                    <TableCell>{venta.FECHA_VENTA || ""}</TableCell>
+                    <TableCell>{formatFecha(venta.FECHA_VENTA) || ""}</TableCell>
                     <TableCell align="right">{venta.CANTIDAD || 0}</TableCell>
-                    <TableCell align="right">₲ {(venta.PRECIO_UNITARIO || 0).toLocaleString("es-PY")}</TableCell>
+                    <TableCell align="right">
+                      ₲ {venta.CANTIDAD ? Math.floor(venta.SUBTOTAL / venta.CANTIDAD).toLocaleString("es-PY") : "0"}
+                    </TableCell>
                     <TableCell align="right">₲ {(venta.SUBTOTAL || 0).toLocaleString("es-PY")}</TableCell>
                   </TableRow>
                 ))}

@@ -23,6 +23,12 @@ import {
 } from "@mui/icons-material"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, ChartTooltip, Legend)
+function formatFecha(fechaStr) {
+  if (!fechaStr) return ""
+  const [y, m, d] = fechaStr.split("-")
+  if (y && m && d) return `${d}-${m}-${y}`
+  return fechaStr
+}
 
 function formatMoneda(valor) {
     return new Intl.NumberFormat("es-PY", {
@@ -88,6 +94,7 @@ export default function ReporteClientesMasVentas({ onVolver }) {
             printWindow.document.write(`
             <html>
               <head>
+                <title>Distribuidora Las Niñas</title>
                 <title>Reporte de Clientes con Más Ventas</title>
                 <style>
                   body { font-family: Arial, sans-serif; margin: 20px; }
@@ -103,7 +110,7 @@ export default function ReporteClientesMasVentas({ onVolver }) {
               <body>
                 <h1>Reporte de Clientes con Más Ventas</h1>
                 <div class="info">
-                  <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+                  <p><strong>Período:</strong> ${formatFecha(fechaDesde)} al ${formatFecha(fechaHasta)}</p>
                 </div>
                 <table>
                   <thead>

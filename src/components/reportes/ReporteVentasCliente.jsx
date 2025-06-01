@@ -182,6 +182,7 @@ export default function ReporteVentasCliente({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
+          <title>Distribuidora Las Niñas</title>
             <title>Reporte de Ventas por Cliente</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
