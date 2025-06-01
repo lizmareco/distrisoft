@@ -18,6 +18,7 @@ import ReporteVentasProducto from "@/src/components/reportes/ReporteVentasProduc
 import ReporteVentasRangoFecha from "@/src/components/reportes/ReporteVentasRangoFecha"
 import ReporteVentasVendedor from "@/src/components/reportes/ReporteVentasVendedor"
 import ReporteProductosMasVendidos from "@/src/components/reportes/ReporteProductosMasVendidos"
+import ReporteClientesMasVentas from "@/src/components/reportes/ReporteClientesMasVentas"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -53,6 +54,7 @@ export default function ReportesPage() {
         { id: "ventas-rango-fecha", title: "Ventas por Rango de Fecha", icon: <DateRangeIcon fontSize="large" /> },
         { id: "ventas-vendedor", title: "Ventas por Vendedor", icon: <GroupIcon fontSize="large" /> },
         { id: "productos-mas-vendidos", title: "Productos Más Vendidos", icon: <TrendingUpIcon fontSize="large" /> },
+        { id: "clientes-mas-ventas", title: "Clientes con Más Ventas", icon: <GroupIcon fontSize="large" /> },
         //{ id: "cotizaciones", title: "Cotizaciones a Clientes", icon: <AttachMoneyIcon fontSize="large" /> },
       ],
       compras: [
@@ -105,6 +107,8 @@ export default function ReportesPage() {
         return <ReporteVentasVendedor onVolver={handleVolver} />
       case "productos-mas-vendidos":
         return <ReporteProductosMasVendidos onVolver={handleVolver} />
+      case "clientes-mas-ventas":
+        return <ReporteClientesMasVentas onVolver={handleVolver} />
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>
