@@ -58,7 +58,7 @@ export default function Navbar() {
       const response = await fetch("/api/notifications", {
         credentials: "include",
       })
-
+  
       if (response.ok) {
         const data = await response.json()
         setNotifications(data.notifications || [])
@@ -69,6 +69,60 @@ export default function Navbar() {
       setLoading(false)
     }
   }
+  
+
+  const fetchPasswordExpiry = async () => {
+    try {
+      const response = await fetch("/api/auth/password-expiry", { credentials: "include" })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.porVencer) {
+          setNotifications((prev) => [
+            ...prev,
+            {
+              idNotificacion: "password-expiry",
+              mensaje: `Tu contraseña vencerá en ${data.diasRestantes} días. Cambia tu contraseña pronto.`,
+              fechaEnvio: new Date().toISOString(),
+              leido: false,
+            },
+          ])
+        }
+      }
+    } catch (error) {
+      console.error("Error verificando vencimiento de contraseña:", error)
+    }
+  }
+
+  const fetchLowStock = async () => {
+    try {
+      const response = await fetch("/api/inventario/low-stock", { credentials: "include" })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.mostrarNotificacion) {
+          setNotifications((prev) => [
+            ...prev,
+            {
+              idNotificacion: "low-stock",
+              mensaje: "Hay materias primas que están con bajo stock, dirigite al inventario.",
+              fechaEnvio: new Date().toISOString(),
+              leido: false,
+              redireccion: "/inventario/materiaprima",
+            },
+          ])
+        }
+      }
+    } catch (error) {
+      console.error("Error verificando stock bajo:", error)
+    }
+  }
+  
+
+  useEffect(() => {
+    setMounted(true)
+    if (!isAuthPage && mounted) {
+      fetchNotifications()
+    }
+  }, [isAuthPage, mounted])
 
   // Función para abrir el diálogo de confirmación de cierre de sesión
   const confirmLogout = () => {
@@ -135,6 +189,14 @@ export default function Navbar() {
   // Funciones para el menú de notificaciones
   const handleNotificationOpen = (event) => {
     setNotificationAnchor(event.currentTarget)
+  
+    // Marcar todas como leídas al abrir el menú
+    setNotifications((prev) =>
+      prev.map((n) => ({
+        ...n,
+        leido: true,
+      }))
+    )
   }
 
   const handleNotificationClose = () => {
@@ -198,33 +260,35 @@ export default function Navbar() {
             </Box>
 
             <Box sx={{ maxHeight: 250, overflow: "auto" }}>
-              {notifications.length > 0 ? (
-                notifications.map((notification) => (
-                  <Box
-                    key={notification.idNotificacion}
-                    sx={{
-                      p: 2,
-                      borderBottom: "1px solid #eee",
-                      bgcolor: notification.leido ? "transparent" : "rgba(25, 118, 210, 0.08)",
-                    }}
-                  >
-                    <Typography variant="body1">{notification.mensaje}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(notification.fechaEnvio).toLocaleString()}
-                    </Typography>
-                  </Box>
-                ))
-              ) : (
-                <Box sx={{ p: 2 }}>
-                  <Typography variant="body2">No tienes notificaciones</Typography>
-                </Box>
-              )}
-            </Box>
-
-            <Box sx={{ p: 2 }}>
-              <Button variant="contained" color="primary" fullWidth onClick={handleChangePassword}>
-                Cambiar Contraseña
-              </Button>
+            {notifications.length > 0 ? (
+  notifications.map((notification) => (
+    <Box
+      key={`${notification.tipo}-${notification.mensaje}-${notification.fechaEnvio}`}
+      onClick={() => {
+        if (notification.redireccion) router.push(notification.redireccion)
+        handleNotificationClose()
+      }}
+      sx={{
+        p: 2,
+        borderBottom: "1px solid #eee",
+        bgcolor: notification.leido ? "transparent" : "rgba(25, 118, 210, 0.08)",
+        cursor: notification.redireccion ? "pointer" : "default",
+        "&:hover": {
+          bgcolor: notification.redireccion ? "rgba(25, 118, 210, 0.15)" : undefined,
+        },
+      }}
+    >
+      <Typography variant="body1">{notification.mensaje}</Typography>
+      <Typography variant="caption" color="text.secondary">
+        {new Date(notification.fechaEnvio).toLocaleString()}
+      </Typography>
+    </Box>
+  ))
+) : (
+  <Box sx={{ p: 2 }}>
+    <Typography variant="body2">No tienes notificaciones</Typography>
+  </Box>
+)}
             </Box>
           </Menu>
 
