@@ -465,7 +465,7 @@ export default function FormularioPedido() {
           // No incluimos fechaPedido, se usará la fecha actual en el backend
           fechaEntrega: pedido.fechaEntrega || null, // Incluir fecha de entrega si existe
           idCliente: Number.parseInt(pedido.idCliente),
-          vendedor: usuarioLogueado?.idUsuario || 1, // Usuario fijo con ID 1
+          //vendedor: usuarioLogueado?.idUsuario || 1, // Usuario fijo con ID 1
           idEstadoPedido: 1, // Estado "Pendiente" por defecto
           observacion: pedido.observacion || "",
           montoTotal: calcularTotal(), // Calculado como la suma de subtotales
