@@ -78,7 +78,7 @@ console.log("API login: Datos recibidos", { nombreUsuario: loginForm.nombreUsuar
         httpOnly: true,
         maxAge: ACCESS_TOKEN_MAX_AGE,
         secure:true,
-        sameSite: "strict",
+        sameSite: "lax",
       })
 
       response.cookies.set("rt", refreshToken, {
