@@ -19,6 +19,7 @@ import ReporteVentasRangoFecha from "@/src/components/reportes/ReporteVentasRang
 import ReporteVentasVendedor from "@/src/components/reportes/ReporteVentasVendedor"
 import ReporteProductosMasVendidos from "@/src/components/reportes/ReporteProductosMasVendidos"
 import ReporteClientesMasVentas from "@/src/components/reportes/ReporteClientesMasVentas"
+import ReporteCuentasPorCobrar from "@/src/components/reportes/ReporteCuentasPorCobrar"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -43,10 +44,12 @@ export default function ReportesPage() {
   // Renderizar tarjetas de reporte según la categoría
   const renderReportCards = () => {
     const reportsByCategory = {
-      financiero: [
-        { id: "balance", title: "Balance General", icon: <BarChartIcon fontSize="large" /> },
-        { id: "resultados", title: "Estado de Resultados", icon: <TrendingUpIcon fontSize="large" /> },
-        { id: "flujo", title: "Flujo de Caja", icon: <AttachMoneyIcon fontSize="large" /> },
+      administracion: [
+        { id: "cuentas_por_cobrar", title: "Cuentas por cobrar", icon: <BarChartIcon fontSize="large" /> },
+        { id: "cuentas_por_pagar", title: "Cuentas por pagar", icon: <TrendingUpIcon fontSize="large" /> },
+        { id: "utilidad_bruta", title: "Utilidad Bruta", icon: <AttachMoneyIcon fontSize="large" /> },
+        { id: "facturas_emtidas", title: "Facturas Emitidas", icon: <AttachMoneyIcon fontSize="large" /> },
+        { id: "resultados", title: "Estados de Resultados por periodo", icon: <AttachMoneyIcon fontSize="large" /> }
       ],
       ventas: [
         { id: "ventas-cliente", title: "Ventas por Cliente", icon: <PieChartIcon fontSize="large" /> },
@@ -97,6 +100,8 @@ export default function ReportesPage() {
   // Renderizar el reporte seleccionado
   const renderSelectedReport = () => {
     switch (selectedReport) {
+      case "cuentas_por_cobrar":
+        return <ReporteCuentasPorCobrar onVolver={handleVolver} />
       case "ventas-cliente":
         return <ReporteVentasCliente onVolver={handleVolver} />
       case "ventas-producto":
@@ -134,7 +139,7 @@ export default function ReportesPage() {
           scrollButtons="auto"
           sx={{ borderBottom: 1, borderColor: "divider" }}
         >
-          <Tab label="Financiero" value="financiero" icon={<AttachMoneyIcon />} iconPosition="start" />
+          <Tab label="Administracion" value="administracion" icon={<AttachMoneyIcon />} iconPosition="start" />
           <Tab label="Ventas" value="ventas" icon={<StorefrontIcon />} iconPosition="start" />
           <Tab label="Compras" value="compras" icon={<ShoppingCartIcon />} iconPosition="start" />
           <Tab label="Inventario" value="inventario" icon={<InventoryIcon />} iconPosition="start" />
