@@ -18,6 +18,7 @@ import ReporteVentasProducto from "@/src/components/reportes/ReporteVentasProduc
 import ReporteVentasRangoFecha from "@/src/components/reportes/ReporteVentasRangoFecha"
 import ReporteVentasVendedor from "@/src/components/reportes/ReporteVentasVendedor"
 import ReporteProductosMasVendidos from "@/src/components/reportes/ReporteProductosMasVendidos"
+import ReporteComprasProveedor from "@/src/components/reportes/ReporteComprasProveedor"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -105,6 +106,9 @@ export default function ReportesPage() {
         return <ReporteVentasVendedor onVolver={handleVolver} />
       case "productos-mas-vendidos":
         return <ReporteProductosMasVendidos onVolver={handleVolver} />
+      case "compras-proveedor":
+        return <ReporteComprasProveedor />
+      
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>

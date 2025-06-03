@@ -1225,12 +1225,12 @@ class AuthController {
           await prisma.recuperacionContrasena.updateMany({
            
             where: {
-              idUsuario: usuario.idUsuario,
+              id_usuario: usuario.idUsuario,
               usado: false
             },
             data: {
               usado: true,
-              updatedAt: new Date()
+              updated_at: new Date()
             }
           });
           
@@ -1239,7 +1239,7 @@ class AuthController {
             data: {
               token,
               expiracion,
-              idUsuario: usuario.idUsuario,
+              id_usuario: usuario.idUsuario,
               usado: false
             }
           });
@@ -1289,7 +1289,7 @@ class AuthController {
           }
         },
         include: {
-          usuario: true
+          Usuario: true
         }
       });
 
@@ -1299,9 +1299,9 @@ class AuthController {
 
       return { 
         valid: true, 
-        usuario: {
-          idUsuario: recoveryToken.usuario.idUsuario,
-          nombreUsuario: recoveryToken.usuario.nombreUsuario
+        Usuario: {
+          id_usuario: recoveryToken.Usuario.idUsuario,
+          nombreUsuario: recoveryToken.Usuario.nombreUsuario
         }
       };
     } catch (error) {
@@ -1331,7 +1331,7 @@ class AuthController {
           }
         },
         include: {
-          usuario: true
+          Usuario: true
         }
       });
 
@@ -1345,32 +1345,32 @@ class AuthController {
       // Actualizar contraseña del usuario
       await prisma.usuario.update({
         where: {
-          idUsuario: recoveryToken.usuario.idUsuario
+          idUsuario: recoveryToken.Usuario.idUsuario
         },
         data: {
           contrasena: hashedPassword,
           ultimoCambioContrasena: new Date(),
           updatedAt: new Date(),
           // Si el usuario estaba bloqueado o con contraseña vencida, activarlo
-          estado: ['BLOQUEADO', 'VENCIDO'].includes(recoveryToken.usuario.estado) ? 'ACTIVO' : recoveryToken.usuario.estado
+          estado: ['BLOQUEADO', 'VENCIDO'].includes(recoveryToken.Usuario.estado) ? 'ACTIVO' : recoveryToken.Usuario.estado
         }
       });
 
       // Invalidar el token de recuperación
       await prisma.recuperacionContrasena.update({
         where: {
-          idRecuperacion: recoveryToken.idRecuperacion
+          id_recuperacion: recoveryToken.id_recuperacion
         },
         data: {
           usado: true,
-          updatedAt: new Date()
+          updated_at: new Date()
         }
       });
 
       // Invalidar todas las sesiones existentes del usuario
       await prisma.accessToken.updateMany({
         where: {
-          idUsuario: recoveryToken.usuario.idUsuario,
+          idUsuario: recoveryToken.Usuario.idUsuario,
           deletedAt: null
         },
         data: {
@@ -1380,7 +1380,7 @@ class AuthController {
 
       await prisma.refreshToken.updateMany({
         where: {
-          idUsuario: recoveryToken.usuario.idUsuario,
+          idUsuario: recoveryToken.Usuario.idUsuario,
           deletedAt: null
         },
         data: {
