@@ -3,6 +3,7 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import { getUserData } from "src/lib/http/get-userdata"
 
 const authController = new AuthController()
 const auditoriaService = new AuditoriaService()
@@ -11,14 +12,13 @@ const auditoriaService = new AuditoriaService()
 export async function POST(request) {
   try {
     console.log("API: Registrando consumo de materias primas para producción")
+    const userData = getUserData(request)
 
     // Verificar autenticación
     const token = await authController.hasAccessToken(request)
     if (!token && process.env.NODE_ENV !== "development") {
       return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
     }
-
-    const userData = token ? await authController.getUserFromToken(token) : { idUsuario: 1, usuario: "desarrollo" }
 
     // Obtener datos del cuerpo de la solicitud
     const data = await request.json()

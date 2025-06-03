@@ -35,6 +35,7 @@ export async function GET(request) {
         const roles = await prisma.rol.findMany({
           where: {
             deletedAt: null,
+            estadoRol: "ACTIVO",
           },
           include: {
             rolPermiso: {
@@ -88,6 +89,7 @@ export async function GET(request) {
         const roles = await prisma.rol.findMany({
           where: {
             deletedAt: null,
+            estadoRol: "ACTIVO",
           },
           include: {
             rolPermiso: {
@@ -134,6 +136,7 @@ export async function GET(request) {
         const roles = await prisma.rol.findMany({
           where: {
             deletedAt: null,
+            estadoRol: "ACTIVO",
           },
           include: {
             rolPermiso: {
@@ -183,6 +186,7 @@ export async function GET(request) {
         const roles = await prisma.rol.findMany({
           where: {
             deletedAt: null,
+            estadoRol: "ACTIVO",
           },
           include: {
             rolPermiso: {

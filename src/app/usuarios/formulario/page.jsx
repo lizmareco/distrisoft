@@ -336,8 +336,7 @@ export default function FormularioUsuarioPage() {
 
       // Encriptar la contraseña si se proporciona
       if (formulario.contrasena) {
-        const hashedPassword = await bcrypt.hash(formulario.contrasena, 10) // 10 es el número de salt rounds
-        datosAEnviar.contrasena = hashedPassword
+        datosAEnviar.contrasena = formulario.contrasena
       }
 
       // Si estamos en modo edición y no se ha ingresado una nueva contraseña, eliminarla

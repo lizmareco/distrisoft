@@ -98,6 +98,7 @@ export async function PUT(request, { params }) {
     // Validar transiciones de estado permitidas
     const transicionesPermitidas = {
       1: [6], // Pendiente -> Cancelado
+      2: [1], // En Proceso -> Pendiente
       3: [4, 5], // Listo para Entrega -> Enviado, Entregado
       4: [5], // Enviado -> Entregado
     }
@@ -153,26 +154,28 @@ export async function PUT(request, { params }) {
         // Pedido cambia a "Enviado" → Facturas cambian a "Enviado" (ID 2)
         console.log(`API: Actualizando facturas a estado "Enviado" para pedido ${idPedido}`)
 
-        const facturasContado = await tx.facturaClienteContado.updateMany({
+        const facturasContado = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: 1, // Solo las que están en "Emitida"
+            esContado: true,
+            idEstadoFactuCliente: 1,
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 2, // Cambiar a "Enviado"
+            idEstadoFactuCliente: 2,
             updatedAt: new Date(),
           },
         })
 
-        const facturasCredito = await tx.facturaClienteCredito.updateMany({
+        const facturasCredito = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: 1, // Solo las que están en "Emitida"
+            esContado: false,
+            idEstadoFactuCliente: 1,
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 2, // Cambiar a "Enviado"
+            idEstadoFactuCliente: 2,
             updatedAt: new Date(),
           },
         })
@@ -194,47 +197,49 @@ export async function PUT(request, { params }) {
         console.log(`API: Facturas actualizadas - Contado: ${facturasContado.count}, Crédito: ${facturasCredito.count}`)
       } else if (nuevoEstadoId === 5) {
         // Pedido cambia a "Entregado" → Facturas cambian a "Cobrado" (ID 3)
-        console.log(`API: Actualizando facturas a estado "Cobrado" para pedido ${idPedido}`)
-
-        const facturasContado = await tx.facturaClienteContado.updateMany({
+        console.log(`API: Actualizando facturas a estado "Cobrado" para pedido ${idPedido}`);
+      
+        const facturasContado = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: { in: [1, 2] }, // "Emitida" o "Enviado"
+            esContado: true,
+            idEstadoFactuCliente: { in: [1, 2] }, // Emitida o Enviada
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 3, // Cambiar a "Cobrado"
+            idEstadoFactuCliente: 3, // COBRADA
             updatedAt: new Date(),
           },
-        })
-
-        const facturasCredito = await tx.facturaClienteCredito.updateMany({
+        });
+      
+        const facturasCredito = await tx.facturaCliente.updateMany({
           where: {
             idPedido,
-            idEstadoFactuCliente: { in: [1, 2] }, // "Emitida" o "Enviado"
+            esContado: false,
+            idEstadoFactuCliente: { in: [1, 2] }, // Emitida o Enviada
             deletedAt: null,
           },
           data: {
-            idEstadoFactuCliente: 3, // Cambiar a "Cobrado"
+            idEstadoFactuCliente: 3, // COBRADA
             updatedAt: new Date(),
           },
-        })
-
+        });
+      
         facturasActualizadas.push({
           tipo: "contado",
           cantidad: facturasContado.count,
-          estadoAnterior: "Emitida/Enviado",
+          estadoAnterior: "Emitida/Enviada",
           estadoNuevo: "Cobrado",
-        })
-
+        });
+      
         facturasActualizadas.push({
           tipo: "credito",
           cantidad: facturasCredito.count,
-          estadoAnterior: "Emitida/Enviado",
+          estadoAnterior: "Emitida/Enviada",
           estadoNuevo: "Cobrado",
-        })
-
-        console.log(`API: Facturas actualizadas - Contado: ${facturasContado.count}, Crédito: ${facturasCredito.count}`)
+        });
+      
+        console.log(`API: Facturas actualizadas - Contado: ${facturasContado.count}, Crédito: ${facturasCredito.count}`);
       }
 
       // Si el nuevo estado es "Entregado" (ID 5), procesar salidas de inventario
@@ -313,26 +318,26 @@ export async function PUT(request, { params }) {
 
     // Registrar auditoría del pedido
     if (userData) {
-      await auditoriaService.registrarAuditoria({
-        entidad: "PedidoCliente",
-        idRegistro: idPedido,
-        accion: "CAMBIO_ESTADO",
-        valorAnterior: valorAnterior,
-        valorNuevo: {
-          idEstadoPedido: resultado.pedidoActualizado.idEstadoPedido,
-          estadoPedido: resultado.pedidoActualizado.estadoPedido,
-          movimientosInventario: resultado.movimientosInventario,
-          facturasActualizadas: resultado.facturasActualizadas,
+      const direccionIP = auditoriaService.obtenerDireccionIP(request)
+      const navegador = auditoriaService.obtenerInfoNavegador(request)
+      await auditoriaService.registrarActualizacion(
+        "PedidoCliente",
+        idPedido,
+        valorAnterior,
+        {
+          pedido: resultado.pedido,
+          detalles: resultado.detalles,
         },
-        idUsuario: userData.idUsuario,
-        request,
-      })
+        userData.idUsuario,
+        direccionIP,
+        navegador
+      )
     }
 
     // Registrar auditoría específica para facturas actualizadas
     for (const facturaInfo of resultado.facturasActualizadas) {
       if (facturaInfo.cantidad > 0 && userData) {
-        await auditoriaService.registrarAuditoria({
+        await auditoriaService.registrarActualizacion({
           entidad: facturaInfo.tipo === "contado" ? "FacturaClienteContado" : "FacturaClienteCredito",
           idRegistro: `pedido-${idPedido}`,
           accion: "CAMBIO_ESTADO_AUTOMATICO",
@@ -345,7 +350,8 @@ export async function PUT(request, { params }) {
             motivoCambio: `Cambio automático por estado de pedido: ${resultado.pedidoActualizado.estadoPedido.descEstadoPedido}`,
           },
           idUsuario: userData.idUsuario,
-          request,
+          direccionIP: auditoriaService.obtenerDireccionIP(request),
+          navegador: auditoriaService.obtenerInfoNavegador(request),
         })
       }
     }
@@ -447,6 +453,7 @@ export async function GET(request, { params }) {
     // Definir transiciones permitidas
     const transicionesPermitidas = {
       1: [6], // Pendiente -> Cancelado
+      2: [1], // En Proceso -> Pendiente
       3: [4, 5], // Listo para Entrega -> Enviado, Entregado
       4: [5], // Enviado -> Entregado
     }

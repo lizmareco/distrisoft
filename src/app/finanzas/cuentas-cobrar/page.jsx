@@ -42,7 +42,7 @@ import {
 import VisorFactura from "@/src/components/facturas/VisorFactura"
 import HistorialPagos from "@/src/components/pagos/HistorialPagos"
 import Link from "next/link"
-import ArrowBack from "@mui/icons-material/ArrowBack"
+import { ArrowBack } from "@mui/icons-material"
 
 export default function CuentasPorCobrarPage() {
   const [cuentasPorCobrar, setCuentasPorCobrar] = useState([])

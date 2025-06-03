@@ -28,15 +28,16 @@ import {
   Security as SecurityIcon,
   History as HistoryIcon,
   Description as DescriptionIcon,
-  ReceiptLong as ReceiptLongIcon, // Nuevo icono para cotizaciones de proveedores
-  AttachMoney as AttachMoneyIcon, // Para finanzas
-  Science as ScienceIcon, // Para formulas
-  Inventory2 as InventoryGeneralIcon, // Para inventario general
-  ShoppingCart as ShoppingCartIcon, // Para pedidos
+  ReceiptLong as ReceiptLongIcon, 
+  AttachMoney as AttachMoneyIcon, 
+  Science as ScienceIcon, 
+  Inventory2 as InventoryGeneralIcon, 
+  ShoppingCart as ShoppingCartIcon, 
 } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 
 
 export default function DashboardPage() {
@@ -338,7 +339,7 @@ export default function DashboardPage() {
                       <DescriptionIcon sx={{ fontSize: 60, color: "#009688" }} /> {/* Teal */}
                     </Box>
                     <Typography variant="h5" component="h2" gutterBottom>
-                      Cotizaciones de Clientes
+                      Cotizaciones a Clientes
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       Administre las cotizaciones del sistema. Cree nuevas cotizaciones, consulte el historial y
@@ -805,6 +806,59 @@ export default function DashboardPage() {
           </Grid>
         </Paper>
       )}
+
+      {/* Sección de Gestión de Producción */}
+{visibleSections.ventas && (
+  <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+    <Typography
+      variant="h5"
+      sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}
+    >
+      Gestión de Producción
+    </Typography>
+
+    <Grid container spacing={3} justifyContent="center">
+      {/* Tarjeta de Gestión de Producción */}
+      {visibleItems.cotizaciones && (
+        <Grid item xs={12} sm={6} md={4}>
+          <Card
+            sx={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: 3,
+            }}
+          >
+            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <PrecisionManufacturingIcon sx={{ fontSize: 60, color: "#FFC107" }} />
+              </Box>
+              <Typography variant="h5" component="h2" gutterBottom>
+                Órdenes de Producción
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 2 }}
+              >
+                Administre las producciones de pedidos de clientes.
+              </Typography>
+            </CardContent>
+            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+              <Button
+                variant="contained"
+                onClick={() => navigateTo("/produccion/ordenes")}
+                sx={{ bgcolor: "#FFC107", "&:hover": { bgcolor: "#FFA000" } }}
+              >
+                ACCEDER
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      )}
+    </Grid>
+  </Paper>
+)}
 
       {/* Sección de Gestión de Usuarios y Roles */}
       {visibleSections.usuarios && (

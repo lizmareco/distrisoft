@@ -149,7 +149,7 @@ export default function RolesPage() {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <Button component={Link} href="/dashboard" variant="outlined" sx={{ mr: 2 }} startIcon={<ArrowBackIcon />}>
-            Volver al Dashboard
+            Volver a Gestión
           </Button>
           <Typography variant="h5" component="h1">
             Gestión de Roles

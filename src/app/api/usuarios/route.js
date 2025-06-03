@@ -126,8 +126,11 @@ export async function POST(request) {
       },
     })
 
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
     // Registrar la acción en auditoría
-    await auditoriaService.registrarCreacion("Usuario", usuario.idUsuario, usuario, idUsuario, request)
+    await auditoriaService.registrarCreacion("Usuario", usuario.idUsuario, usuario, idUsuario, direccionIP,
+      navegador,)
 
     console.log("API: Usuario creado correctamente", usuario)
     return NextResponse.json(

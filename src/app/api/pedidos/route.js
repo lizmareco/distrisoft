@@ -14,29 +14,12 @@ export async function GET(request) {
 
     // Verificar autenticación
     const token = await authController.hasAccessToken(request)
-    let userData = null
 
-    if (process.env.NODE_ENV === "development") {
-      if (!token) {
-        console.log("Modo desarrollo: Usando token especial de desarrollo")
-        userData = {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "desarrollo",
-          permisos: ["*"],
-        }
-      } else {
-        userData = await authController.getUserFromToken(token)
-      }
-    } else {
-      if (!token) {
-        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-      }
-      userData = await authController.getUserFromToken(token)
-    }
+if (!token) {
+  return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
+}
+
+const userData = await authController.getUserFromToken(token)
 
     // Modificar la consulta para usar los nombres de campos correctos
     const pedidos = await prisma.pedidoCliente.findMany({
@@ -187,14 +170,13 @@ export async function POST(request) {
       // Crear el pedido sin incluir idMetodoPago
       const pedido = await prisma.pedidoCliente.create({
         data: {
-          fechaPedido: fechaPedido,
-          fechaEntrega: fechaEntrega, // Incluir fecha de entrega si existe
+          fechaPedido: new Date(),
+          fechaEntrega: fechaEntrega,
           idCliente: datos.pedido.idCliente,
           idEstadoPedido: datos.pedido.idEstadoPedido,
           observacion: datos.pedido.observacion || "",
           montoTotal: datos.pedido.montoTotal || 0,
-          vendedor: datos.pedido.vendedor || datos.pedido.idUsuario || userData.idUsuario, // Usar idUsuario si vendedor no está disponible
-          // No incluir idMetodoPago
+          vendedor: userData.idUsuario, // ← SIEMPRE el usuario autenticado
         },
       })
 
@@ -232,18 +214,17 @@ export async function POST(request) {
 
     // Registrar auditoría
     if (userData) {
-      await auditoriaService.registrarAuditoria({
-        entidad: "PedidoCliente",
-        idRegistro: resultado.pedido.idPedido,
-        accion: "CREACION",
-        valorAnterior: null,
-        valorNuevo: {
+      await auditoriaService.registrarCreacion(
+        "PedidoCliente",
+        resultado.pedido.idPedido,
+        {
           pedido: resultado.pedido,
           detalles: resultado.detalles,
         },
-        idUsuario: userData.idUsuario,
-        request,
-      })
+        userData.idUsuario,
+        auditoriaService.obtenerDireccionIP(request),
+        auditoriaService.obtenerInfoNavegador(request)
+      )
     }
 
     console.log(`API: Pedido creado con ID: ${resultado.pedido.idPedido}`)

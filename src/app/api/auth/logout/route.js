@@ -17,8 +17,9 @@ export async function POST(request) {
     if (!accessToken) {
       console.log("API: No se encontró token de acceso para cerrar sesión")
       // Limpiar cookies de todas formas
-      cookies().delete("accessToken")
-      cookies().delete("refreshToken")
+      const cookieStore = await cookies()
+cookieStore.delete("at")
+cookieStore.delete("rt")
 
       return NextResponse.json({ message: "Sesión cerrada (no había token activo)" }, { status: HTTP_STATUS_CODES.ok })
     }
@@ -81,16 +82,18 @@ export async function POST(request) {
     }
 
     // Limpiar cookies
-    cookies().delete("accessToken")
-    cookies().delete("refreshToken")
+    const cookieStore = await cookies()
+cookieStore.delete("at")
+cookieStore.delete("rt")
 
     return NextResponse.json({ message: "Sesión cerrada exitosamente" }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
     console.error("API: Error al cerrar sesión:", error)
 
     // Intentar limpiar cookies de todas formas
-    cookies().delete("accessToken")
-    cookies().delete("refreshToken")
+    const cookieStore = await cookies()
+cookieStore.delete("at")
+cookieStore.delete("rt")
 
     return NextResponse.json(
       { message: "Error al cerrar sesión", error: error.message },

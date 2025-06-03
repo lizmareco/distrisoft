@@ -31,6 +31,7 @@ import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack } from "@mui/ic
 import InventarioNav from "@/src/components/inventario-nav"
 import Link from "next/link"
 
+
 export default function ProductosInventarioPage() {
   const [productos, setProductos] = useState([])
   const [loading, setLoading] = useState(false)

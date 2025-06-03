@@ -42,9 +42,7 @@ export async function PUT(request, { params }) {
     const id = Number.parseInt(params.id)
     console.log(`API: Actualizando materia prima con ID: ${id}`)
     const auditoriaService = new AuditoriaService()
-
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const userData = getUser(request)
 
     const data = await request.json()
     console.log("API: Datos recibidos:", data)

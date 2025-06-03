@@ -143,6 +143,8 @@ export async function PUT(request, { params }) {
       },
     })
 
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
     // Registrar la acción en auditoría
     await auditoriaService.registrarActualizacion(
       "Usuario",
@@ -150,7 +152,8 @@ export async function PUT(request, { params }) {
       usuarioExistente,
       usuarioActualizado,
       idUsuario,
-      request,
+      direccionIP,
+      navegador,
     )
 
     return NextResponse.json(
@@ -212,7 +215,10 @@ export async function DELETE(request, { params }) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarEliminacion("Usuario", id, usuarioExistente, idUsuario, request)
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+    await auditoriaService.registrarEliminacion("Usuario", id, usuarioExistente, idUsuario, direccionIP,
+      navegador,)
 
     return NextResponse.json(
       {

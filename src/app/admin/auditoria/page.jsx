@@ -29,10 +29,10 @@ import {
   Tooltip,
 } from "@mui/material"
 import { ExpandMore, Search, Refresh, VisibilityOutlined, FilterAlt, ClearAll, TableChart } from "@mui/icons-material"
-
-import { exportToExcel } from "@/src/utils/export-utils"
 import Link from "next/link"
-import ArrowBack from "@mui/icons-material/ArrowBack"
+import { ArrowBack } from "@mui/icons-material"
+import { exportToExcel } from "@/src/utils/export-utils"
+
 
 
 export default function AuditoriaPage() {
