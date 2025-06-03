@@ -17,9 +17,6 @@ const InventarioNav = ({ activeTab }) => {
       case "movimientos":
         router.push("/inventario/movimientos")
         break
-      case "reportes":
-        router.push("/inventario/reportes")
-        break
       default:
         router.push("/inventario")
     }
@@ -37,7 +34,6 @@ const InventarioNav = ({ activeTab }) => {
         <Tab label="Materias Primas" value="materiasprimas" />
         <Tab label="Productos" value="productos" />
         <Tab label="Movimientos" value="movimientos" />
-        <Tab label="Reportes" value="reportes" />
       </Tabs>
     </Box>
   )

@@ -59,6 +59,22 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, error: "Factura no encontrada" }, { status: 404 })
     }
 
+    // Obtener todas las notas de crédito asociadas a la factura
+    const notasCredito = await prisma.notaCredito.findMany({
+      where: { idFacturaOrigen: id },
+      include: {
+        detallesNota: true,
+      },
+    })
+    const totalNotasCredito = notasCredito.reduce((sum, n) => sum + Number(n.montoTotal), 0)
+    // Calcular total acreditado por cada detalle
+    const acreditadoPorDetalle = {}
+    notasCredito.forEach(nc => {
+      nc.detallesNota.forEach(det => {
+        acreditadoPorDetalle[det.idDetalleFactura] = (acreditadoPorDetalle[det.idDetalleFactura] || 0) + det.cantidad
+      })
+    })
+
     // Formatear respuesta con datos reales
     const facturaFormateada = {
       nroFactura: factura.nroFactura,
@@ -83,6 +99,7 @@ export async function GET(request, { params }) {
 
       // Detalles de la factura con datos reales
       detalles: factura.detalleFactura.map((detalle) => ({
+        idDetalleFactura: detalle.idDetalleFactura,
         cantidad: detalle.cantidad, // Cantidad en paquetes
         descripcion: detalle.producto?.nombreProducto || "Producto sin nombre",
         precioUnitario: Number.parseFloat(detalle.precioUnitario), // Precio por paquete
@@ -93,6 +110,7 @@ export async function GET(request, { params }) {
         pesoUnidad: detalle.producto?.pesoUnidad || 0,
         unidadesPorPaquete: detalle.producto?.unidadesPorPaquete || 1,
         impuesto: detalle.impuesto?.descImpuesto || "Sin impuesto",
+        acreditado: acreditadoPorDetalle[detalle.idDetalleFactura] || 0,
       })),
 
       // Información específica para crédito
@@ -116,6 +134,8 @@ export async function GET(request, { params }) {
           ? `${pago.usuario.persona.nombre} ${pago.usuario.persona.apellido}`
           : "Operador desconocido",
       })),
+
+      totalNotasCredito,
     }
 
     return NextResponse.json({

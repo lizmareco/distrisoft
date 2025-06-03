@@ -75,6 +75,7 @@ export async function GET(request) {
           },
         },
         pagos: true,
+        notas: true,
       },
       orderBy: {
         fechaEmision: "desc",
@@ -99,6 +100,12 @@ export async function GET(request) {
       diasVencido: f.cuentaPorCobrar?.diasVencido || 0,
       estadoCuenta: f.cuentaPorCobrar?.estadoCuenta?.descEstadoCuenta,
       totalPagos: f.pagos?.reduce((sum, pago) => sum + pago.montoPago, 0) || 0,
+      notasCredito: (f.notas || []).map(nc => ({
+        idNotaCredito: nc.idNota,
+        nroNota: nc.nroNota,
+        montoTotal: nc.montoTotal,
+      })),
+      debugNotas: f.notas
     }))
 
     const totalPaginas = Math.ceil(totalFacturas / limite)
