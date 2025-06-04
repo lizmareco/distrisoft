@@ -30,6 +30,7 @@ import {
 } from "@mui/icons-material"
 import { exportToExcel } from "@/src/utils/export-utils"
 import dynamic from "next/dynamic"
+import { Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemButton, ListItemText, IconButton } from "@mui/material"
 
 function formatFecha(fechaStr) {
   if (!fechaStr) return ""
@@ -62,6 +63,39 @@ export default function ReporteVentasProducto({ onVolver }) {
   const [error, setError] = useState(null)
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
   const [chartLoaded, setChartLoaded] = useState(false)
+  const [openDialog, setOpenDialog] = useState(false)
+  const [busqueda, setBusqueda] = useState("")
+  const [resultados, setResultados] = useState([])
+
+  // Buscar productos por nombre o descripción
+  const handleBuscarProducto = async () => {
+    setOpenDialog(true)
+    setBusqueda("")
+    setResultados([])
+  }
+
+  const handleInputBusqueda = async (e) => {
+    const valor = e.target.value
+    setBusqueda(valor)
+    if (valor.length > 2) {
+      try {
+        const response = await fetch(`/api/productos?search=${encodeURIComponent(valor)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setResultados(data)
+        }
+      } catch (error) {
+        setResultados([])
+      }
+    } else {
+      setResultados([])
+    }
+  }
+
+  const handleSeleccionarProducto = (producto) => {
+    setProductoSeleccionado(producto)
+    setOpenDialog(false)
+  }
 
   // Referencia al gráfico para poder descargarlo
   const chartRef = useRef(null)
@@ -422,15 +456,17 @@ export default function ReporteVentasProducto({ onVolver }) {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={3} alignItems="end">
           <Grid item xs={12} md={3}>
-            <Autocomplete
+            <Button
               fullWidth
-              options={productos}
-              getOptionLabel={(option) => `${option.nombreProducto || ""} - ${option.descripcion || ""}`}
-              value={productoSeleccionado}
-              onChange={(event, newValue) => setProductoSeleccionado(newValue)}
-              renderInput={(params) => <TextField {...params} label="Seleccionar Producto" />}
-              isOptionEqualToValue={(option, value) => option.idProducto === value?.idProducto}
-            />
+              variant="outlined"
+              startIcon={<SearchIcon />}
+              onClick={handleBuscarProducto}
+              sx={{ mb: 1 }}
+            >
+              {productoSeleccionado
+                ? `${productoSeleccionado.nombreProducto} - ${productoSeleccionado.descripcion}`
+                : "Buscar Producto"}
+            </Button>
           </Grid>
 
           <Grid item xs={12} md={3}>
@@ -638,6 +674,42 @@ export default function ReporteVentasProducto({ onVolver }) {
           </TableContainer>
         </>
       )}
+
+      {/* Diálogo de búsqueda de productos */}
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Buscar Producto</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Buscar por nombre o descripción"
+            type="text"
+            fullWidth
+            value={busqueda}
+            onChange={handleInputBusqueda}
+          />
+          <List>
+            {resultados.map((prod) => (
+              <ListItem key={prod.idProducto} disablePadding>
+                <ListItemButton onClick={() => handleSeleccionarProducto(prod)}>
+                  <ListItemText
+                    primary={prod.nombreProducto}
+                    secondary={prod.descripcion}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+            {busqueda.length > 2 && resultados.length === 0 && (
+              <ListItem>
+                <ListItemText primary="Sin resultados" />
+              </ListItem>
+            )}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
