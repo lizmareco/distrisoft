@@ -40,6 +40,13 @@ const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   ),
 })
 
+function formatFecha(fechaStr) {
+  if (!fechaStr) return ""
+  const [y, m, d] = fechaStr.split("-")
+  if (y && m && d) return `${d}-${m}-${y}`
+  return fechaStr
+}
+
 // Importación dinámica de los componentes de Chart.js
 const ChartJS = dynamic(() => import("chart.js").then((mod) => mod.Chart), { ssr: false })
 
@@ -181,6 +188,7 @@ export default function ReporteVentasRangoFecha({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
+            <title>Distribuidora Las Niñas</title>
             <title>Reporte de Ventas por Rango de Fecha</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
@@ -196,7 +204,7 @@ export default function ReporteVentasRangoFecha({ onVolver }) {
           <body>
             <h1>Reporte de Ventas por Rango de Fecha</h1>
             <div class="info">
-              <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+              <p><strong>Período:</strong> ${formatFecha(fechaDesde)} al ${formatFecha(fechaHasta)}</p>
             </div>
             <table>
               <thead>

@@ -21,7 +21,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material"
-import { FileDownload as FileDownloadIcon, ArrowBack as ArrowBackIcon } from "@mui/icons-material"
+import { FileDownload as FileDownloadIcon, ArrowBack as ArrowBackIcon, PictureAsPdf as PdfIcon } from "@mui/icons-material"
 import { format } from "date-fns"
 import { useToast } from "@/src/hooks/use-toast"
 import ExportarExcel from "@/src/components/ExportarExcel"
@@ -196,6 +196,77 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
     }))
   }
 
+  const handleExportarPDF = () => {
+    if (datosReporte.length === 0) {
+      setError("No hay datos para exportar")
+      return
+    }
+
+    try {
+      const printWindow = window.open("", "_blank")
+      const totalCantidad = datosReporte.reduce((sum, prod) => sum + (prod.CANTIDAD_VENDIDA || 0), 0)
+      const totalMonto = datosReporte.reduce((sum, prod) => sum + (prod.TOTAL_VENDIDO || 0), 0)
+
+      printWindow.document.write(`
+      <html>
+        <head>
+          <title>Distribuidora Las Niñas</title>
+          <title>Reporte de Productos Más Vendidos</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            .info { margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .total { font-weight: bold; background-color: #f9f9f9; }
+            .text-right { text-align: right; }
+          </style>
+        </head>
+        <body>
+          <h1>Reporte de Productos Más Vendidos</h1>
+          <div class="info">
+            <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cantidad Vendida</th>
+                <th>Monto Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${datosReporte
+          .map(
+            (prod) => `
+                <tr>
+                  <td>${prod.NOMBRE_PRODUCTO || ""}</td>
+                  <td class="text-right">${prod.CANTIDAD_VENDIDA || 0}</td>
+                  <td class="text-right">₲ ${(prod.TOTAL_VENDIDO || 0).toLocaleString("es-PY")}</td>
+                </tr>
+              `
+          )
+          .join("")}
+              <tr class="total">
+                <td><strong>Total</strong></td>
+                <td class="text-right"><strong>${totalCantidad}</strong></td>
+                <td class="text-right"><strong>₲ ${totalMonto.toLocaleString("es-PY")}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `)
+
+      printWindow.document.close()
+      printWindow.print()
+    } catch (error) {
+      console.error("Error al exportar a PDF:", error)
+      setError("Error al exportar a PDF: " + error.message)
+    }
+  }
+
   const estadisticas = calcularEstadisticas()
   const datosGrafico = prepararDatosGrafico()
 
@@ -300,9 +371,14 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
                   <Typography variant="h6">Top 10 Productos Más Vendidos</Typography>
                   <Tooltip title="Descargar Gráfico PNG">
-                    <IconButton onClick={handleDescargarGrafico}>
-                      <FileDownloadIcon />
-                    </IconButton>
+                    <Button
+                      variant="outlined"
+                      startIcon={<FileDownloadIcon />}
+                      onClick={handleDescargarGrafico}
+                      color="primary"
+                    >
+                      Descargar PNG
+                    </Button>
                   </Tooltip>
                 </Box>
                 <Box ref={chartRef} sx={{ height: 400 }}>
@@ -352,6 +428,14 @@ export default function ReporteProductosMasVendidos({ onVolver }) {
                   datos={prepararDatosExcel()}
                   nombreArchivo={`productos-mas-vendidos-${format(new Date(), "dd-MM-yyyy")}`}
                 />
+                <Button
+                  variant="outlined"
+                  startIcon={<PdfIcon />}
+                  onClick={handleExportarPDF}
+                  color="error"
+                >
+                  Exportar PDF
+                </Button>
               </Box>
             </Box>
             <TableContainer>

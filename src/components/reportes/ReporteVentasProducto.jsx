@@ -30,6 +30,14 @@ import {
 } from "@mui/icons-material"
 import { exportToExcel } from "@/src/utils/export-utils"
 import dynamic from "next/dynamic"
+import { Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemButton, ListItemText, IconButton } from "@mui/material"
+
+function formatFecha(fechaStr) {
+  if (!fechaStr) return ""
+  const [y, m, d] = fechaStr.split("-")
+  if (y && m && d) return `${d}-${m}-${y}`
+  return fechaStr
+}
 
 // Importación dinámica de Chart.js para evitar problemas de SSR
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
@@ -55,6 +63,39 @@ export default function ReporteVentasProducto({ onVolver }) {
   const [error, setError] = useState(null)
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
   const [chartLoaded, setChartLoaded] = useState(false)
+  const [openDialog, setOpenDialog] = useState(false)
+  const [busqueda, setBusqueda] = useState("")
+  const [resultados, setResultados] = useState([])
+
+  // Buscar productos por nombre o descripción
+  const handleBuscarProducto = async () => {
+    setOpenDialog(true)
+    setBusqueda("")
+    setResultados([])
+  }
+
+  const handleInputBusqueda = async (e) => {
+    const valor = e.target.value
+    setBusqueda(valor)
+    if (valor.length > 2) {
+      try {
+        const response = await fetch(`/api/productos?search=${encodeURIComponent(valor)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setResultados(data)
+        }
+      } catch (error) {
+        setResultados([])
+      }
+    } else {
+      setResultados([])
+    }
+  }
+
+  const handleSeleccionarProducto = (producto) => {
+    setProductoSeleccionado(producto)
+    setOpenDialog(false)
+  }
 
   // Referencia al gráfico para poder descargarlo
   const chartRef = useRef(null)
@@ -164,8 +205,15 @@ export default function ReporteVentasProducto({ onVolver }) {
     }
 
     try {
-      console.log("Exportando a Excel:", ventasDetalladas)
-      exportToExcel(ventasDetalladas, `reporte-ventas-producto-${productoSeleccionado?.nombreProducto || "producto"}`)
+      // Mapea los datos para formatear la fecha antes de exportar
+      const datosFormateados = ventasDetalladas.map((venta) => ({
+        "Producto": venta.NOMBRE_PRODUCTO || "",
+        "Fecha": formatFecha(venta.FECHA_VENTA),
+        "Cantidad": venta.CANTIDAD || 0,
+        "Precio Unitario": venta.CANTIDAD ? Math.floor(venta.SUBTOTAL / venta.CANTIDAD) : 0,
+        "Subtotal": venta.SUBTOTAL || 0,
+      }))
+      exportToExcel(datosFormateados, `reporte-ventas-producto-${productoSeleccionado?.nombreProducto || "producto"}`)
     } catch (error) {
       console.error("Error al exportar a Excel:", error)
       setError("Error al exportar a Excel: " + error.message)
@@ -187,6 +235,7 @@ export default function ReporteVentasProducto({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
+            <title>Distribuidora Las Niñas</title>
             <title>Reporte de Ventas por Producto</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
@@ -204,7 +253,7 @@ export default function ReporteVentasProducto({ onVolver }) {
             <div class="info">
               <p><strong>Producto:</strong> ${productoSeleccionado?.nombreProducto || ""}</p>
               <p><strong>Descripción:</strong> ${productoSeleccionado?.descripcion || ""}</p>
-              <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+              <p><strong>Período:</strong> ${formatFecha(fechaDesde)} al ${formatFecha(fechaHasta)}</p>
             </div>
             <table>
               <thead>
@@ -218,18 +267,18 @@ export default function ReporteVentasProducto({ onVolver }) {
               </thead>
               <tbody>
                 ${ventasDetalladas
-                  .map(
-                    (venta) => `
+          .map(
+            (venta) => `
                   <tr>
                     <td>${venta.NOMBRE_PRODUCTO || ""}</td>
-                    <td>${venta.FECHA_VENTA || ""}</td>
+                    <td>${formatFecha(venta.FECHA_VENTA) || ""}</td>
                     <td>${venta.CANTIDAD || 0}</td>
                     <td class="text-right">₲ ${(venta.PRECIO_UNITARIO || 0).toLocaleString("es-PY")}</td>
                     <td class="text-right">₲ ${(venta.SUBTOTAL || 0).toLocaleString("es-PY")}</td>
                   </tr>
                 `,
-                  )
-                  .join("")}
+          )
+          .join("")}
                 <tr class="total">
                   <td colspan="4"><strong>Total</strong></td>
                   <td class="text-right"><strong>₲ ${total.toLocaleString("es-PY")}</strong></td>
@@ -326,7 +375,7 @@ export default function ReporteVentasProducto({ onVolver }) {
     return {
       labels: datosOrdenados.map((item) => {
         // Mantener el formato original de la fecha para mostrar
-        return item.fecha
+        return formatFecha(item.fecha)
       }),
       datasets: [
         {
@@ -407,15 +456,17 @@ export default function ReporteVentasProducto({ onVolver }) {
       <Paper sx={{ p: 3, mb: 3 }}>
         <Grid container spacing={3} alignItems="end">
           <Grid item xs={12} md={3}>
-            <Autocomplete
+            <Button
               fullWidth
-              options={productos}
-              getOptionLabel={(option) => `${option.nombreProducto || ""} - ${option.descripcion || ""}`}
-              value={productoSeleccionado}
-              onChange={(event, newValue) => setProductoSeleccionado(newValue)}
-              renderInput={(params) => <TextField {...params} label="Seleccionar Producto" />}
-              isOptionEqualToValue={(option, value) => option.idProducto === value?.idProducto}
-            />
+              variant="outlined"
+              startIcon={<SearchIcon />}
+              onClick={handleBuscarProducto}
+              sx={{ mb: 1 }}
+            >
+              {productoSeleccionado
+                ? `${productoSeleccionado.nombreProducto} - ${productoSeleccionado.descripcion}`
+                : "Buscar Producto"}
+            </Button>
           </Grid>
 
           <Grid item xs={12} md={3}>
@@ -591,7 +642,7 @@ export default function ReporteVentasProducto({ onVolver }) {
                   <TableCell>Producto</TableCell>
                   <TableCell>Fecha</TableCell>
                   <TableCell align="right">Cantidad</TableCell>
-                  <TableCell align="right">Precio Unitario</TableCell>
+                  <TableCell align="right">Precio Unitario </TableCell>
                   <TableCell align="right">Subtotal</TableCell>
                 </TableRow>
               </TableHead>
@@ -599,9 +650,11 @@ export default function ReporteVentasProducto({ onVolver }) {
                 {ventasDetalladas.map((venta, index) => (
                   <TableRow key={index}>
                     <TableCell>{venta.NOMBRE_PRODUCTO || ""}</TableCell>
-                    <TableCell>{venta.FECHA_VENTA || ""}</TableCell>
+                    <TableCell>{formatFecha(venta.FECHA_VENTA) || ""}</TableCell>
                     <TableCell align="right">{venta.CANTIDAD || 0}</TableCell>
-                    <TableCell align="right">₲ {(venta.PRECIO_UNITARIO || 0).toLocaleString("es-PY")}</TableCell>
+                    <TableCell align="right">
+                      ₲ {venta.CANTIDAD ? Math.floor(venta.SUBTOTAL / venta.CANTIDAD).toLocaleString("es-PY") : "0"}
+                    </TableCell>
                     <TableCell align="right">₲ {(venta.SUBTOTAL || 0).toLocaleString("es-PY")}</TableCell>
                   </TableRow>
                 ))}
@@ -621,6 +674,42 @@ export default function ReporteVentasProducto({ onVolver }) {
           </TableContainer>
         </>
       )}
+
+      {/* Diálogo de búsqueda de productos */}
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Buscar Producto</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Buscar por nombre o descripción"
+            type="text"
+            fullWidth
+            value={busqueda}
+            onChange={handleInputBusqueda}
+          />
+          <List>
+            {resultados.map((prod) => (
+              <ListItem key={prod.idProducto} disablePadding>
+                <ListItemButton onClick={() => handleSeleccionarProducto(prod)}>
+                  <ListItemText
+                    primary={prod.nombreProducto}
+                    secondary={prod.descripcion}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+            {busqueda.length > 2 && resultados.length === 0 && (
+              <ListItem>
+                <ListItemText primary="Sin resultados" />
+              </ListItem>
+            )}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
