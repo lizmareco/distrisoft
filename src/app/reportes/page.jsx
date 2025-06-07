@@ -18,6 +18,11 @@ import ReporteVentasProducto from "@/src/components/reportes/ReporteVentasProduc
 import ReporteVentasRangoFecha from "@/src/components/reportes/ReporteVentasRangoFecha"
 import ReporteVentasVendedor from "@/src/components/reportes/ReporteVentasVendedor"
 import ReporteProductosMasVendidos from "@/src/components/reportes/ReporteProductosMasVendidos"
+import ReporteClientesMasVentas from "@/src/components/reportes/ReporteClientesMasVentas"
+import ReporteCuentasPorCobrar from "@/src/components/reportes/ReporteCuentasPorCobrar"
+import ReporteFacturasEmitidas from "@/src/components/reportes/ReporteFacturasEmitidas"
+import { LocalizationProvider } from "@mui/x-date-pickers"
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -42,10 +47,12 @@ export default function ReportesPage() {
   // Renderizar tarjetas de reporte según la categoría
   const renderReportCards = () => {
     const reportsByCategory = {
-      financiero: [
-        { id: "balance", title: "Balance General", icon: <BarChartIcon fontSize="large" /> },
-        { id: "resultados", title: "Estado de Resultados", icon: <TrendingUpIcon fontSize="large" /> },
-        { id: "flujo", title: "Flujo de Caja", icon: <AttachMoneyIcon fontSize="large" /> },
+      administracion: [
+        { id: "cuentas_por_cobrar", title: "Cuentas por cobrar", icon: <BarChartIcon fontSize="large" /> },
+        //{ id: "cuentas_por_pagar", title: "Cuentas por pagar", icon: <TrendingUpIcon fontSize="large" /> },
+        //{ id: "utilidad_bruta", title: "Utilidad Bruta", icon: <AttachMoneyIcon fontSize="large" /> },
+        { id: "facturas_emtidas", title: "Facturas Emitidas", icon: <AttachMoneyIcon fontSize="large" /> },
+        //{ id: "resultados", title: "Estados de Resultados por periodo", icon: <AttachMoneyIcon fontSize="large" /> }
       ],
       ventas: [
         { id: "ventas-cliente", title: "Ventas por Cliente", icon: <PieChartIcon fontSize="large" /> },
@@ -53,6 +60,7 @@ export default function ReportesPage() {
         { id: "ventas-rango-fecha", title: "Ventas por Rango de Fecha", icon: <DateRangeIcon fontSize="large" /> },
         { id: "ventas-vendedor", title: "Ventas por Vendedor", icon: <GroupIcon fontSize="large" /> },
         { id: "productos-mas-vendidos", title: "Productos Más Vendidos", icon: <TrendingUpIcon fontSize="large" /> },
+        { id: "clientes-mas-ventas", title: "Clientes con Más Ventas", icon: <GroupIcon fontSize="large" /> },
         //{ id: "cotizaciones", title: "Cotizaciones a Clientes", icon: <AttachMoneyIcon fontSize="large" /> },
       ],
       compras: [
@@ -95,6 +103,8 @@ export default function ReportesPage() {
   // Renderizar el reporte seleccionado
   const renderSelectedReport = () => {
     switch (selectedReport) {
+      case "cuentas_por_cobrar":
+        return <ReporteCuentasPorCobrar onVolver={handleVolver} />
       case "ventas-cliente":
         return <ReporteVentasCliente onVolver={handleVolver} />
       case "ventas-producto":
@@ -105,6 +115,10 @@ export default function ReportesPage() {
         return <ReporteVentasVendedor onVolver={handleVolver} />
       case "productos-mas-vendidos":
         return <ReporteProductosMasVendidos onVolver={handleVolver} />
+      case "clientes-mas-ventas":
+        return <ReporteClientesMasVentas onVolver={handleVolver} />
+      case "facturas_emtidas":
+        return <ReporteFacturasEmitidas onVolver={handleVolver} />
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>
@@ -117,33 +131,35 @@ export default function ReportesPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Reportes
-      </Typography>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          Reportes
+        </Typography>
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs
-          value={activeTab}
-          onChange={handleTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ borderBottom: 1, borderColor: "divider" }}
-        >
-          <Tab label="Financiero" value="financiero" icon={<AttachMoneyIcon />} iconPosition="start" />
-          <Tab label="Ventas" value="ventas" icon={<StorefrontIcon />} iconPosition="start" />
-          <Tab label="Compras" value="compras" icon={<ShoppingCartIcon />} iconPosition="start" />
-          <Tab label="Inventario" value="inventario" icon={<InventoryIcon />} iconPosition="start" />
-        </Tabs>
+        <Paper sx={{ mb: 3 }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: "divider" }}
+          >
+            <Tab label="Administracion" value="administracion" icon={<AttachMoneyIcon />} iconPosition="start" />
+            <Tab label="Ventas" value="ventas" icon={<StorefrontIcon />} iconPosition="start" />
+            <Tab label="Compras" value="compras" icon={<ShoppingCartIcon />} iconPosition="start" />
+            <Tab label="Inventario" value="inventario" icon={<InventoryIcon />} iconPosition="start" />
+          </Tabs>
 
-        <Box sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Reportes de {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-          </Typography>
-          {!selectedReport && renderReportCards()}
-          {selectedReport && renderSelectedReport()}
-        </Box>
-      </Paper>
-    </Box>
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Reportes de {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            </Typography>
+            {!selectedReport && renderReportCards()}
+            {selectedReport && renderSelectedReport()}
+          </Box>
+        </Paper>
+      </Box>
+    </LocalizationProvider>
   )
 }

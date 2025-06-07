@@ -40,6 +40,13 @@ const Bar = dynamic(() => import("react-chartjs-2").then((mod) => mod.Bar), {
   ),
 })
 
+function formatFecha(fechaStr) {
+  if (!fechaStr) return ""
+  const [y, m, d] = fechaStr.split("-")
+  if (y && m && d) return `${d}-${m}-${y}`
+  return fechaStr
+}
+
 export default function ReporteVentasVendedor({ onVolver }) {
   const [fechaDesde, setFechaDesde] = useState("")
   const [fechaHasta, setFechaHasta] = useState("")
@@ -127,6 +134,7 @@ export default function ReporteVentasVendedor({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
+            <title>Distribuidora Las Niñas</title>
             <title>Reporte de Ventas por Vendedor</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
@@ -142,7 +150,7 @@ export default function ReporteVentasVendedor({ onVolver }) {
           <body>
             <h1>Reporte de Ventas por Vendedor</h1>
             <div class="info">
-              <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+              <p><strong>Período:</strong> ${formatFecha(fechaDesde)} al ${(formatFecha(fechaHasta))}</p>
             </div>
             <table>
               <thead>

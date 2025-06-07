@@ -30,6 +30,13 @@ import {
 import { exportToExcel } from "@/src/utils/export-utils"
 import dynamic from "next/dynamic"
 
+function formatFecha(fechaStr) {
+  if (!fechaStr) return ""
+  const [y, m, d] = fechaStr.split("-")
+  if (y && m && d) return `${d}-${m}-${y}`
+  return fechaStr
+}
+
 // Importación dinámica de Chart.js para evitar problemas de SSR
 const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
   ssr: false,
@@ -145,8 +152,15 @@ export default function ReporteVentasCliente({ onVolver }) {
     }
 
     try {
-      console.log("Exportando a Excel:", ventasDetalladas)
-      exportToExcel(ventasDetalladas, `reporte-ventas-cliente-${nroDocumento}`)
+      // Mapea los datos para formatear la fecha antes de exportar
+      const datosFormateados = ventasDetalladas.map((venta) => ({
+        "ID Venta": venta.ID_VENTA || "",
+        "Cliente": `${venta.NOMBRE || ""} ${venta.APELLIDO || ""}`,
+        "Fecha": formatFecha(venta.FECHA_VENTA),
+        "Monto Total": venta.MONTO_TOTAL || 0,
+        "Vendedor": venta.VENDEDOR || "",
+      }))
+      exportToExcel(datosFormateados, `reporte-ventas-cliente-${nroDocumento}`)
     } catch (error) {
       console.error("Error al exportar a Excel:", error)
       setError("Error al exportar a Excel: " + error.message)
@@ -168,6 +182,7 @@ export default function ReporteVentasCliente({ onVolver }) {
       printWindow.document.write(`
         <html>
           <head>
+          <title>Distribuidora Las Niñas</title>
             <title>Reporte de Ventas por Cliente</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
@@ -184,7 +199,7 @@ export default function ReporteVentasCliente({ onVolver }) {
             <h1>Reporte de Ventas por Cliente</h1>
             <div class="info">
               <p><strong>Documento:</strong> ${nroDocumento}</p>
-              <p><strong>Período:</strong> ${fechaDesde} al ${fechaHasta}</p>
+              <p><strong>Período:</strong> ${formatFecha(fechaDesde)} al ${formatFecha(fechaHasta)}</p>
               <p><strong>Cliente:</strong> ${ventasDetalladas[0]?.NOMBRE || ""} ${ventasDetalladas[0]?.APELLIDO || ""}</p>
             </div>
             <table>
@@ -198,17 +213,17 @@ export default function ReporteVentasCliente({ onVolver }) {
               </thead>
               <tbody>
                 ${ventasDetalladas
-                  .map(
-                    (venta) => `
+          .map(
+            (venta) => `
                   <tr>
                     <td>${venta.ID_VENTA || ""}</td>
-                    <td>${venta.FECHA_VENTA || ""}</td>
+                    <td>${formatFecha(venta.FECHA_VENTA) || ""}</td>
                     <td class="text-right">₲ ${(venta.MONTO_TOTAL || 0).toLocaleString("es-PY")}</td>
                     <td>${venta.VENDEDOR || ""}</td>
                   </tr>
                 `,
-                  )
-                  .join("")}
+          )
+          .join("")}
                 <tr class="total">
                   <td colspan="2"><strong>Total</strong></td>
                   <td class="text-right"><strong>₲ ${total.toLocaleString("es-PY")}</strong></td>
@@ -306,7 +321,7 @@ export default function ReporteVentasCliente({ onVolver }) {
     return {
       labels: datosOrdenados.map((item) => {
         // Mantener el formato original de la fecha para mostrar
-        return item.fecha
+        return formatFecha(item.fecha)
       }),
       datasets: [
         {
@@ -446,7 +461,7 @@ export default function ReporteVentasCliente({ onVolver }) {
           </Typography>
           <Typography>
             No se encontraron ventas para el cliente con documento <strong>{nroDocumento}</strong> en el período del{" "}
-            <strong>{fechaDesde}</strong> al <strong>{fechaHasta}</strong>.
+            <strong>{formatFecha(fechaDesde)}</strong> al <strong>{formatFecha(fechaHasta)}</strong>.
           </Typography>
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" gutterBottom>
@@ -578,7 +593,7 @@ export default function ReporteVentasCliente({ onVolver }) {
                   <TableRow key={index}>
                     <TableCell>{venta.ID_VENTA || ""}</TableCell>
                     <TableCell>{`${venta.NOMBRE || ""} ${venta.APELLIDO || ""}`}</TableCell>
-                    <TableCell>{venta.FECHA_VENTA || ""}</TableCell>
+                    <TableCell>{formatFecha(venta.FECHA_VENTA) || ""}</TableCell>
                     <TableCell align="right">₲ {(venta.MONTO_TOTAL || 0).toLocaleString("es-PY")}</TableCell>
                     <TableCell>{venta.VENDEDOR || ""}</TableCell>
                   </TableRow>

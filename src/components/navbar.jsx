@@ -22,6 +22,7 @@ import {
   CircularProgress,
 } from "@mui/material"
 import { Logout, Dashboard, Notifications, NotificationsActive } from "@mui/icons-material"
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline"
 import { useRouter } from "next/navigation"
 import { useRootContext } from "@/src/app/context/root"
 
@@ -237,6 +238,17 @@ export default function Navbar() {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center" }}>
+          
+          {/* ayuda*/}
+          <Tooltip title="Ayuda">
+            <Button
+              color="inherit"
+              startIcon={<HelpOutlineIcon />}
+              onClick={() => router.push("/manual-de-usuario")}
+            >
+            </Button>
+          </Tooltip>
+
           {/* Notificaciones */}
           <Tooltip title="Notificaciones">
             <IconButton color="inherit" onClick={handleNotificationOpen}>
@@ -245,6 +257,8 @@ export default function Navbar() {
               </Badge>
             </IconButton>
           </Tooltip>
+
+          
 
           {/* Menú de notificaciones */}
           <Menu
