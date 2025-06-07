@@ -519,7 +519,7 @@ console.log("¿La contraseña coincide?:", match)
 
       // Generar tokens con la estructura adecuada
       const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: "1h",
+        expiresIn: "4h",
         algorithm: "HS256", // Especificar el algoritmo
       })
 
