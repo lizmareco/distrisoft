@@ -272,7 +272,7 @@ export default function EmpresasPage() {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Button component={Link} href="/dashboard" variant="outlined" sx={{ mr: 2 }} startIcon={<ArrowBackIcon />}>
+          <Button component={Link} href="/" variant="outlined" sx={{ mr: 2 }} startIcon={<ArrowBackIcon />}>
             Volver a Gestión
           </Button>
           <Typography variant="h5" component="h1">

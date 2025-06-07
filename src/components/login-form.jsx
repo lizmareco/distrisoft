@@ -209,7 +209,7 @@ if (!response.ok) {
               console.log("Preparando redirección al dashboard...")
               setTimeout(() => {
                 console.log("Redirigiendo al dashboard...")
-                router.push("/dashboard")
+                router.push("/")
               }, 1000)
             } catch (contextError) {
               console.error("Error al establecer la sesión:", contextError)

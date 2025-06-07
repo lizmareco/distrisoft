@@ -11,7 +11,7 @@ import { Button } from "@mui/material"
 export default function FormulasPage() {
   return (
     <Container maxWidth="xl">
-      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+      <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión
       </Button>
       <Box sx={{ py: 4 }}>

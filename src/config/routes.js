@@ -9,7 +9,7 @@ export const protectedRoutes = [
   "/empresas",
   "/cotizaciones-proveedor",
   "/cotizaciones",
-  "/dashboard",
+  "/",
   "/admin",
   "/materiaprima",
   "/producto",
