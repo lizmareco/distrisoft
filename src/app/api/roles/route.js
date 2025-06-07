@@ -122,6 +122,7 @@ async function obtenerRoles(includeInactive = false) {
   const whereCondition = {
     // Siempre excluir roles borrados (con deletedAt)
     deletedAt: null,
+    estadoRol: "ACTIVO",
   }
 
   // Si no se incluyen inactivos, filtrar por estado ACTIVO

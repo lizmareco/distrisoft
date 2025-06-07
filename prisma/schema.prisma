@@ -72,6 +72,7 @@ model Cliente {
   pedidoCliente         PedidoCliente[]
   facturaCliente        FacturaCliente[]
   cuentasPorCobrar      CuentaPorCobrar[]
+  notaCredito           NotaCredito[]
   @@map("Cliente")
 }
 
@@ -176,7 +177,7 @@ model FacturaCliente {
   detalleFactura       DetalleFacturaCliente[]
   pagos                PagoFacturaCliente[]
   cuentaPorCobrar      CuentaPorCobrar?   // Solo para facturas a crédito
-  nota                 Nota[]
+  notas                NotaCredito[]
 
   @@map("FacturaCliente")
 }
@@ -280,14 +281,6 @@ model EstadoMateriaPrima {
   materiaPrima           MateriaPrima[]
 }
 
-model EstadoNota {
-  idEstadoNota   Int       @id(map: "estado_nota_pk") @default(autoincrement()) @map("id_estado_nota")
-  descEstadoNota String    @map("desc_estado_nota") @db.VarChar
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime? @default(now()) @map("updated_at")
-  deletedAt      DateTime? @map("deleted_at")
-  nota           Nota[]
-}
 
 model EstadoOrdenCompra {
   idEstadoOrdenCompra   Int           @id(map: "estado_orden_compra_pk") @default(autoincrement()) @map("id_estado_orden_compra")
@@ -373,6 +366,7 @@ model Impuestos {
   deletedAt             DateTime?               @map("deleted_at")
   facturaCliente        FacturaCliente[]
   detalleFacturaCliente DetalleFacturaCliente[]
+  notas                 DetalleNotaCredito[]
   @@map("Impuestos")
 }
 
@@ -416,21 +410,55 @@ model MetodoPago {
   @@map("MetodoPago")
 }
 
-model Nota {
-  idNotaCredito         Int                    @id(map: "nota_pk") @default(autoincrement()) @map("id_nota_credito")
-  fechaEmision          DateTime               @map("fecha_emision") @db.Timestamp(6)
-  motivo                String                 @map("motivo") @db.VarChar
-  monto                 Float                  @map("monto")
-  idTipoNota            Int                    @map("id_tipo_nota")
-  idEstadoNota          Int                    @map("id_estado_nota")
-  nroFactura            Int?                   @map("nro_factura")
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime?              @default(now()) @map("updated_at")
-  deletedAt             DateTime?              @map("deleted_at")
-  estadoNota            EstadoNota             @relation(fields: [idEstadoNota], references: [idEstadoNota], onDelete: NoAction, onUpdate: NoAction, map: "estado_nota_nota_fk")
-  facturaCliente        FacturaCliente?        @relation(fields: [nroFactura], references: [nroFactura], onDelete: NoAction, onUpdate: NoAction, map: "factura_cliente_nota_fk")
-  tipoNota              TipoNota               @relation(fields: [idTipoNota], references: [idTipoNota], onDelete: NoAction, onUpdate: NoAction, map: "tipo_nota_nota_fk")
-  @@map("Nota")
+model EstadoNotaCredito {
+  idEstadoNota      Int               @id @default(autoincrement()) @map("id_estado_nota")
+  descEstadoNota    String            @map("desc_estado_nota") @db.VarChar
+
+  notas             NotaCredito[]  
+  @@map("EstadoNotaCredito")
+}
+
+model NotaCredito {
+  idNota            Int                  @id @default(autoincrement()) @map("id_nota")
+  nroNota           String               @unique @map("nro_nota") @db.VarChar(20)
+  fechaEmision      DateTime             @map("fecha_emision") @db.Timestamp(6)
+  idFacturaOrigen   Int                  @map("id_factura_origen")     // FK a FacturaCliente.nroFactura
+  idCliente         Int                  @map("id_cliente")
+  motivo            String               @map("motivo") @db.VarChar(255)
+  montoTotal        Float                @map("monto_total_nota")      // Total (incluye IVA del 10%)
+  idEstadoNota      Int                  @map("id_estado_nota")         // FK a EstadoNotaCredito
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime?            @default(now()) @map("updated_at")
+  deletedAt         DateTime?            @map("deleted_at")
+
+  // Relaciones
+  facturaOrigen     FacturaCliente       @relation(fields: [idFacturaOrigen], references: [nroFactura], onDelete: NoAction, onUpdate: NoAction)
+  cliente           Cliente              @relation(fields: [idCliente], references: [idCliente], onDelete: NoAction, onUpdate: NoAction)
+  estadoNotaCredito EstadoNotaCredito    @relation(fields: [idEstadoNota], references: [idEstadoNota])
+  detallesNota      DetalleNotaCredito[] /// Líneas de esta nota de crédito
+
+  @@map("NotaCredito")
+}
+
+model DetalleNotaCredito {
+  idDetalleNota       Int                    @id @default(autoincrement()) @map("id_detalle_nota")
+  idNota              Int                    @map("id_nota")                 // FK a NotaCredito.idNota
+  idDetalleFactura    Int                    @map("id_detalle_factura")      // FK a DetalleFacturaCliente.idDetalleFactura
+  cantidad            Int                    @map("cantidad")                // Cantidad que se acredita (≤ cantidad originalmente facturada)
+  precioUnitario      Float                  @map("precio_unitario")         // Tomar el mismo valor que en la factura original
+  idImpuesto          Int                    @map("id_impuesto")             // En este caso siempre IVA 10% → idImpuesto = 2
+  subtotal            Float                  @map("subtotal")                // cantidad * precioUnitario
+  montoImpuesto       Float                  @map("monto_impuesto")          // subtotal * 0.10 (redondeo entero)
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime?              @default(now()) @map("updated_at")
+  deletedAt           DateTime?              @map("deleted_at")
+
+  // Relaciones
+  notaCredito         NotaCredito            @relation(fields: [idNota], references: [idNota], onDelete: Cascade, onUpdate: Cascade)
+  detalleFacturaOrig  DetalleFacturaCliente  @relation(fields: [idDetalleFactura], references: [idDetalleFactura], onDelete: NoAction, onUpdate: NoAction)
+  impuesto            Impuestos              @relation(fields: [idImpuesto], references: [idImpuesto])
+
+  @@map("DetalleNotaCredito")
 }
 
 model Notificacion {
@@ -645,14 +673,6 @@ model TipoInforme {
   informe         Informe[]
 }
 
-model TipoNota {
-  idTipoNota   Int       @id @default(autoincrement()) @map("id_tipo_nota")
-  descTipoNota String    @map("desc_tipo_nota")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime? @default(now()) @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
-  nota         Nota[]
-}
 
 model TipoProducto {
   idTipoProducto   Int        @id(map: "tipo_producto_pk") @default(autoincrement()) @map("id_tipo_producto")
@@ -886,6 +906,7 @@ model DetalleFacturaCliente {
   facturaCliente       FacturaCliente     @relation(fields: [nroFactura], references: [nroFactura])
   producto             Producto           @relation(fields: [idProducto], references: [idProducto])
   impuesto             Impuestos          @relation(fields: [idImpuesto], references: [idImpuesto])
+  notas                DetalleNotaCredito[]
 
   @@map("DetalleFacturaCliente")
 }

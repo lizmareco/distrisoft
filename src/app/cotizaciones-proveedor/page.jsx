@@ -33,10 +33,11 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ArrowBack } from "@mui/icons-material"
-import ArrowBack from "@mui/icons-material/ArrowBack"
+import { Checkbox } from "@mui/material"
 
 
 export default function CotizacionesProveedorPage() {
+  const [cotizacionesSeleccionadas, setCotizacionesSeleccionadas] = useState([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [cotizaciones, setCotizaciones] = useState([])
@@ -79,6 +80,14 @@ export default function CotizacionesProveedorPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleToggleSeleccion = (id) => {
+    setCotizacionesSeleccionadas((prev) =>
+      prev.includes(id)
+        ? prev.filter((cid) => cid !== id)
+        : [...prev, id]
+    )
   }
 
   const handleCloseSnackbar = (event, reason) => {
@@ -292,6 +301,7 @@ export default function CotizacionesProveedorPage() {
                   <TableCell>Validez</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell>Acciones</TableCell>
+                  <TableCell>Seleccionar</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -334,6 +344,13 @@ export default function CotizacionesProveedorPage() {
                           </IconButton>
                         )}
                       </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Checkbox
+                        checked={cotizacionesSeleccionadas.includes(cotizacion.idCotizacionProveedor)}
+                        onChange={() => handleToggleSeleccion(cotizacion.idCotizacionProveedor)}
+                        color="primary"
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -385,6 +402,18 @@ export default function CotizacionesProveedorPage() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {cotizacionesSeleccionadas.length >= 2 && (
+  <Box my={2}>
+    <Button
+      variant="contained"
+      color="secondary"
+      onClick={() => router.push(`/cotizaciones-proveedor/comparar?ids=${cotizacionesSeleccionadas.join(",")}`)}
+    >
+      Comparar Cotizaciones Seleccionadas
+    </Button>
+  </Box>
+)}
     </Container>
   )
 }

@@ -39,6 +39,7 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday"
 import SearchIcon from "@mui/icons-material/Search"
 
 export default function FormularioPedido() {
+  const [usuarioLogueado, setUsuarioLogueado] = useState(null)
   const router = useRouter()
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -52,7 +53,7 @@ export default function FormularioPedido() {
   const [pedido, setPedido] = useState({
     // No incluimos fechaPedido ya que se usará la fecha actual
     fechaEntrega: "", // Nuevo campo para fecha de entrega
-    idCliente: "",
+    idCliente: usuarioLogueado?.idUsuario || 1,
     idUsuario: 1, // Usuario fijo con ID 1
     idEstadoPedido: 1, // Estado "Pendiente" por defecto
     observacion: "",
@@ -87,16 +88,24 @@ export default function FormularioPedido() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        setCargando(true)
-        // Solo cargamos productos, los clientes se buscarán manualmente
+        const res = await fetch("/api/auth/me", { credentials: "include" })
+        const usuario = await res.json()
+
+        if (!res.ok) {
+          throw new Error(usuario.error || "No autenticado")
+        }
+
+        setUsuarioLogueado(usuario) // ASIGNAMOS AL ESTADO
+
+        setPedido((prev) => ({
+          ...prev,
+          idUsuario: usuario.idUsuario || 1, // sobrescribe con el real
+        }))
+
         await cargarProductos()
       } catch (error) {
-        console.error("Error al cargar datos iniciales:", error)
-        setSnackbar({
-          abierto: true,
-          mensaje: "Error al cargar datos iniciales: " + error.message,
-          tipo: "error",
-        })
+        console.error("Error al obtener usuario:", error.message)
+        setSnackbar({ abierto: true, mensaje: "Error al obtener usuario: " + error.message, tipo: "error" })
       } finally {
         setCargando(false)
       }
@@ -456,7 +465,7 @@ export default function FormularioPedido() {
           // No incluimos fechaPedido, se usará la fecha actual en el backend
           fechaEntrega: pedido.fechaEntrega || null, // Incluir fecha de entrega si existe
           idCliente: Number.parseInt(pedido.idCliente),
-          vendedor: 1, // Usuario fijo con ID 1
+          //vendedor: usuarioLogueado?.idUsuario || 1, // Usuario fijo con ID 1
           idEstadoPedido: 1, // Estado "Pendiente" por defecto
           observacion: pedido.observacion || "",
           montoTotal: calcularTotal(), // Calculado como la suma de subtotales
@@ -622,8 +631,10 @@ export default function FormularioPedido() {
                 Vendedor:
               </Typography>
               <Typography variant="body1" fontWeight="bold">
-                Usuario ID: 1
-              </Typography>
+  {usuarioLogueado && usuarioLogueado.persona
+    ? `${usuarioLogueado.persona.nombre} ${usuarioLogueado.persona.apellido}`
+    : "Cargando..."}
+</Typography>
             </Box>
           </Grid>
         </Grid>

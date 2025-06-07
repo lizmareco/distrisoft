@@ -10,17 +10,23 @@ export async function POST(request) {
   try {
     console.log("API login: Recibiendo solicitud")
 
-    const authController = new AuthController()
-    const hasAccessToken = await authController.hasAccessToken(request)
-    if (hasAccessToken) {
-      console.log("API login: Usuario ya tiene sesión activa")
-      return NextResponse.json({ message: "Ya has iniciado sesión" }, { status: HTTP_STATUS_CODES.ok })
-    }
-
-    // Clonar la solicitud para poder leer el cuerpo múltiples veces
+    // Clonar para reutilizar el body después
     const requestClone = request.clone()
     const loginForm = await request.json()
     console.log("API login: Datos recibidos", { nombreUsuario: loginForm.nombreUsuario })
+
+    // Si no hay datos de login, verificar si ya hay sesión iniciada
+    const authController = new AuthController()
+    const hasAccessToken = await authController.hasAccessToken(request)
+    if (hasAccessToken && !loginForm?.nombreUsuario) {
+      const cookieToken = request.cookies.get("at")?.value
+      return NextResponse.json(
+    { message: "Ya has iniciado sesión", accessToken: cookieToken },
+    { status: HTTP_STATUS_CODES.ok }
+  )
+}
+
+console.log("API login: Datos recibidos", { nombreUsuario: loginForm.nombreUsuario })
 
     // Añadir logs para depuración de headers
     console.log("Headers de la solicitud:", {
@@ -34,7 +40,7 @@ export async function POST(request) {
       console.log("API login: Intentando autenticar usuario")
       // Pasar la solicitud completa al método login
       const result = await authController.login(loginForm, requestClone)
-
+      console.log("Resultado de login:", result); 
       if (!result || !result.accessToken) {
         console.log("API login: Autenticación fallida - No se generaron tokens")
         return NextResponse.json(
@@ -51,21 +57,28 @@ export async function POST(request) {
       const userData = await authController.getUserFromToken(accessToken)
       console.log("API login: Datos del usuario extraídos del token", userData)
 
+      console.log("Enviando respuesta con datos:", {
+        accessToken,
+        cuentaVencida,
+        userId: result.userId || userData.idUsuario,
+        user: user || userData
+      })
+      
       const response = NextResponse.json(
         {
           accessToken,
           cuentaVencida: cuentaVencida,
           userId: result.userId || userData.idUsuario,
-          user: user || userData, // Incluir los datos del usuario completos
+          user: user || userData,
         },
-        { status: HTTP_STATUS_CODES.ok },
+        { status: HTTP_STATUS_CODES.ok }
       )
 
       response.cookies.set("at", accessToken, {
         httpOnly: true,
         maxAge: ACCESS_TOKEN_MAX_AGE,
         secure:true,
-        sameSite: "strict",
+        sameSite: "lax",
       })
 
       response.cookies.set("rt", refreshToken, {

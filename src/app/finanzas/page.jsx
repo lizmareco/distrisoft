@@ -38,6 +38,10 @@ import VistaPreviaFactura from "../../components/facturas/VistaPrevia"
 import VisorFacturaProveedor from "../../components/facturas/VisorFacturaProveedor"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
+import CreditScoreSharpIcon from '@mui/icons-material/CreditScoreSharp';
+import { Menu} from "@mui/material"
+import MoreVertIcon from "@mui/icons-material/MoreVert"
+import VistaPreviaNotaCredito from "../../components/notas-credito/VistaPreviaNotaCredito"
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -99,7 +103,7 @@ export default function FinanzasPage() {
   )
 }
 
-// Componente para Facturación de Clientes (mantener el existente)
+// Componente para Facturación de Clientes 
 function FacturacionClientes() {
   const [facturas, setFacturas] = useState([])
   const [cargando, setCargando] = useState(false)
@@ -109,6 +113,19 @@ function FacturacionClientes() {
     fechaDesde: "",
     fechaHasta: "",
   })
+  const [anchorElNota, setAnchorElNota] = useState(null)
+const [facturaConNotas, setFacturaConNotas] = useState(null)
+
+const abrirMenuNotas = (event, factura) => {
+  setAnchorElNota(event.currentTarget)
+  setFacturaConNotas(factura)
+}
+
+const cerrarMenuNotas = () => {
+  setAnchorElNota(null)
+  setFacturaConNotas(null)
+}
+
 
   // Estados para paginación
   const [paginacion, setPaginacion] = useState({
@@ -130,6 +147,9 @@ function FacturacionClientes() {
 
   // Nuevo estado para controlar si se ha realizado una búsqueda
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
+
+  const [vistaPreviaNotaAbierta, setVistaPreviaNotaAbierta] = useState(false)
+  const [notaParaPrevia, setNotaParaPrevia] = useState(null)
 
   const cargarFacturas = async (nuevaPagina = paginacion.pagina) => {
     setCargando(true)
@@ -426,21 +446,74 @@ function FacturacionClientes() {
                               <Chip label={factura.estado} color={getEstadoColor(factura.estado)} size="small" />
                             </Grid>
                             <Grid item xs={1}>
-                              {/* Botones de acción */}
-                              <Box sx={{ display: "flex", gap: 0.5 }}>
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  title="Vista previa"
-                                  onClick={() => verFactura(factura)}
-                                  disabled={cargandoFactura}
-                                >
-                                  <VisibilityIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                            </Grid>
+  <Box sx={{ display: "flex", gap: 0.5 }}>
+    {/* Vista previa de factura */}
+    <IconButton
+      size="small"
+      color="primary"
+      title="Vista previa"
+      onClick={() => verFactura(factura)}
+      disabled={cargandoFactura}
+    >
+      <VisibilityIcon fontSize="small" />
+    </IconButton>
+
+    {/* Crear nueva nota de crédito */}
+    <IconButton
+      size="small"
+      color="secondary"
+      title="Generar Nota Crédito"
+      component={Link}
+      href={`/finanzas/notas-credito/nueva?nroFactura=${factura.nroFactura}`}
+    >
+      <CreditScoreSharpIcon fontSize="small" />
+    </IconButton>
+
+    {/* Mostrar nota de crédito en PDF si existe */}
+    {factura.notasCredito?.length === 1 && (
+      <IconButton
+        size="small"
+        color="success"
+        title="Descargar Nota Crédito PDF"
+        component="a"
+        href={`/api/finanzas/notas-credito/${factura.notasCredito[0].idNotaCredito}/pdf`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Assignment fontSize="small" />
+      </IconButton>
+    )}
+  </Box>
+</Grid>
                           </Grid>
                         </CardContent>
+                        {/* Mostrar notas de crédito asociadas (solo para clientes) */}
+                        {factura.notasCredito && factura.notasCredito.length > 0 && (
+                          <Box sx={{ mt: 2, ml: 4 }}>
+                            <Typography variant="subtitle2" color="primary" gutterBottom>
+                              Notas de Crédito Asociadas:
+                            </Typography>
+                            <Grid container spacing={1}>
+                              {factura.notasCredito.map((nota) => (
+                                <Grid item key={nota.idNotaCredito}>
+                                  <Button
+                                    variant="outlined"
+                                    color="success"
+                                    size="small"
+                                    startIcon={<Assignment />}
+                                    onClick={() => {
+                                      setNotaParaPrevia(nota.idNotaCredito)
+                                      setVistaPreviaNotaAbierta(true)
+                                    }}
+                                    sx={{ mr: 1 }}
+                                  >
+                                    {nota.nroNota} - ₲ {nota.montoTotal.toLocaleString("es-PY")}
+                                  </Button>
+                                </Grid>
+                              ))}
+                            </Grid>
+                          </Box>
+                        )}
                       </Card>
                     ))}
                   </Box>
@@ -471,6 +544,15 @@ function FacturacionClientes() {
           open={vistaPreviaAbierta}
           onClose={() => setVistaPreviaAbierta(false)}
           facturaId={facturaParaPrevia}
+        />
+      )}
+
+      {/* Vista previa de nota de crédito */}
+      {notaParaPrevia && (
+        <VistaPreviaNotaCredito
+          open={vistaPreviaNotaAbierta}
+          onClose={() => setVistaPreviaNotaAbierta(false)}
+          notaId={notaParaPrevia}
         />
       )}
 
@@ -844,6 +926,33 @@ function FacturasProveedores() {
                               </IconButton>
                             </Grid>
                           </Grid>
+                          {/* Mostrar notas de crédito asociadas */}
+                          {factura.notasCredito && factura.notasCredito.length > 0 && (
+                            <Box sx={{ mt: 2, ml: 4 }}>
+                              <Typography variant="subtitle2" color="primary" gutterBottom>
+                                Notas de Crédito Asociadas:
+                              </Typography>
+                              <Grid container spacing={1}>
+                                {factura.notasCredito.map((nota) => (
+                                  <Grid item key={nota.idNotaCredito}>
+                                    <Button
+                                      variant="outlined"
+                                      color="success"
+                                      size="small"
+                                      startIcon={<Assignment />}
+                                      onClick={() => {
+                                        setNotaParaPrevia(nota.idNotaCredito)
+                                        setVistaPreviaNotaAbierta(true)
+                                      }}
+                                      sx={{ mr: 1 }}
+                                    >
+                                      {nota.nroNota} - ₲ {nota.montoTotal.toLocaleString("es-PY")}
+                                    </Button>
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Box>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
