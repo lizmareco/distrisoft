@@ -250,7 +250,7 @@ export default function ProductosInventarioPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+      <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión
       </Button>
       <Typography variant="h4" gutterBottom>

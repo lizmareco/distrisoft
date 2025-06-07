@@ -38,7 +38,7 @@ export default function DashboardVencimientosPage() {
   const cargarDashboard = async () => {
     setLoading(true)
     try {
-      const respuesta = await fetch("/api/finanzas/dashboard-vencimientos")
+      const respuesta = await fetch("/api/finanzas/-vencimientos")
       if (respuesta.ok) {
         const datos = await respuesta.json()
         setDashboardData(datos.data)

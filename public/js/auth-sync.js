@@ -40,7 +40,7 @@
     if (window.location.pathname.includes("/auth/login") && token) {
       // Extraer la URL de redirección de los parámetros de consulta
       const urlParams = new URLSearchParams(window.location.search)
-      const redirectPath = urlParams.get("redirect") || "/dashboard"
+      const redirectPath = urlParams.get("redirect") || "/"
 
       console.log(`Redirigiendo desde login a: ${redirectPath}`)
       window.location.href = redirectPath

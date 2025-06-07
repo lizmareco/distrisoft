@@ -229,7 +229,7 @@ export default function Navbar() {
     <AppBar position="static">
       <Toolbar>
         <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
-          <IconButton color="inherit" edge="start" onClick={() => router.push("/dashboard")} sx={{ mr: 2 }}>
+          <IconButton color="inherit" edge="start" onClick={() => router.push("/")} sx={{ mr: 2 }}>
             <Dashboard />
           </IconButton>
           <Typography variant="h6" component="div">

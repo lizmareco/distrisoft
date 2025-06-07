@@ -246,7 +246,7 @@ export default function MovimientosPage() {
 
   return (
     <Container maxWidth="xl">
-      <Button component={Link} href="/dashboard" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+      <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión
       </Button>
       {/* 1. TÍTULO */}
