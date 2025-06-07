@@ -23,6 +23,8 @@ import ReporteCuentasPorCobrar from "@/src/components/reportes/ReporteCuentasPor
 import ReporteFacturasEmitidas from "@/src/components/reportes/ReporteFacturasEmitidas"
 import { LocalizationProvider } from "@mui/x-date-pickers"
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs"
+import Link from "next/link"
+import { ArrowBack } from "@mui/icons-material"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -132,6 +134,12 @@ export default function ReportesPage() {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
+      {/* Botón de Volver */}
+      <Box display="flex" alignItems="center" mb={3}>
+        <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
+          Volver a Gestión
+        </Button>
+      </Box>
       <Box sx={{ p: 3 }}>
         <Typography variant="h4" gutterBottom>
           Reportes

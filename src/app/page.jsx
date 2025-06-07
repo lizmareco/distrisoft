@@ -33,6 +33,7 @@ import {
   Science as ScienceIcon, 
   Inventory2 as InventoryGeneralIcon, 
   ShoppingCart as ShoppingCartIcon, 
+  InsertChart as InsertChartIcon,
 } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -953,6 +954,39 @@ export default function DashboardPage() {
           </Grid>
         </Paper>
       )}
+
+      {/* Tarjeta de Gestión de Reportes */}
+      <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
+          Gestión de Reportes
+        </Typography>
+        <Grid container spacing={3} justifyContent="center">
+          <Grid item xs={12} sm={6} md={4}>
+            <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
+              <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                  <InsertChartIcon sx={{ fontSize: 60, color: "#0288d1" }} /> {/* Azul claro */}
+                </Box>
+                <Typography variant="h5" component="h2" gutterBottom>
+                  Reportes
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Visualice y exporte los reportes de compras y ventas.
+                </Typography>
+              </CardContent>
+              <CardActions sx={{ justifyContent: "center", pb: 2 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => navigateTo("/reportes")}
+                  sx={{ bgcolor: "#0288d1", "&:hover": { bgcolor: "#01579b" } }}
+                >
+                  ACCEDER
+                </Button>
+              </CardActions>
+            </Card>
+          </Grid>
+        </Grid>
+      </Paper>
     </Container>
   )
 }
