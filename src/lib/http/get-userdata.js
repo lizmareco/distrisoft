@@ -1,7 +1,19 @@
 import jwt from "jsonwebtoken"
+import { cookies } from "next/headers"
 
 export const getUserData = (request, permission) => {
-  const accessToken = request.cookies.get("at")?.value
+  // 1. Intentar obtener el token de la cookie
+  const cookieStore = cookies()
+  let accessToken = cookieStore.get("at")?.value
+
+  // 2. Si no está en la cookie, buscar en el header Authorization
+  if (!accessToken && request.headers) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      accessToken = authHeader.substring(7)
+    }
+  }
+
   if (!accessToken) throw new Error("Sesión no iniciada")
   
   const userData = jwt.decode(accessToken)
