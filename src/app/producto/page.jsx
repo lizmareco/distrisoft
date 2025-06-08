@@ -25,6 +25,13 @@ import {
   FormControlLabel,
   Switch,
   Chip,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  InputAdornment,
 } from "@mui/material"
 import { Add, Edit, Delete, ArrowBack } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
@@ -42,34 +49,31 @@ export default function ListaProducto() {
     message: "",
     severity: "success",
   })
+  const [filtroId, setFiltroId] = useState("")
+  const [filtroNombre, setFiltroNombre] = useState("")
+  const [filtroDescripcion, setFiltroDescripcion] = useState("")
+  const [filtroTipo, setFiltroTipo] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const [tiposProducto, setTiposProducto] = useState([])
+  const [estadosProducto, setEstadosProducto] = useState([])
+  const [hasSearched, setHasSearched] = useState(false)
 
-  const fetchProductos = async () => {
+  const fetchProductos = async (params = {}) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/productos?includeInactive=${includeInactive}`)
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error("Error de API:", errorData)
-        showSnackbar(`Error al cargar los productos: ${errorData.error || response.statusText}`, "error")
-        return
-      }
-
+      setHasSearched(true)
+      const searchParams = new URLSearchParams()
+      if (params.id) searchParams.append("id", params.id)
+      if (params.nombre) searchParams.append("nombre", params.nombre)
+      if (params.descripcion) searchParams.append("descripcion", params.descripcion)
+      if (params.tipo) searchParams.append("tipo", params.tipo)
+      if (params.estado) searchParams.append("estado", params.estado)
+      if (params.all) searchParams.append("all", params.all)
+      const response = await fetch(`/api/productos?${searchParams.toString()}`)
+      if (!response.ok) throw new Error("Error al cargar productos")
       const data = await response.json()
-
-      // Agregar logs para depuración
-      console.log(`Productos cargados: ${data.length}`)
-      if (data.length > 0) {
-        console.log("Ejemplo de producto:", {
-          id: data[0].idProducto,
-          nombre: data[0].nombreProducto,
-          tipoProducto: data[0].tipoProducto,
-        })
-      }
-
       setProductos(data)
     } catch (error) {
-      console.error("Error de red:", error)
       showSnackbar(`Error al cargar los productos: ${error.message}`, "error")
     } finally {
       setLoading(false)
@@ -79,6 +83,19 @@ export default function ListaProducto() {
   useEffect(() => {
     fetchProductos()
   }, [includeInactive])
+
+  // Cargar tipos y estados para los filtros
+  useEffect(() => {
+    const fetchFiltros = async () => {
+      const tiposRes = await fetch("/api/tipoproducto")
+      const tipos = await tiposRes.ok ? await tiposRes.json() : []
+      setTiposProducto(tipos)
+      const estadosRes = await fetch("/api/estadoproducto")
+      const estados = await estadosRes.ok ? await estadosRes.json() : []
+      setEstadosProducto(estados)
+    }
+    fetchFiltros()
+  }, [])
 
   const handleEdit = (producto) => {
     router.push(`/producto/formulario?id=${producto.idProducto}`)
@@ -134,6 +151,36 @@ export default function ListaProducto() {
     })
   }
 
+  const handleBuscar = (e) => {
+    e.preventDefault()
+    fetchProductos({
+      id: filtroId,
+      nombre: filtroNombre,
+      descripcion: filtroDescripcion,
+      tipo: filtroTipo,
+      estado: filtroEstado,
+    })
+  }
+
+  const handleMostrarTodos = () => {
+    setFiltroId("")
+    setFiltroNombre("")
+    setFiltroDescripcion("")
+    setFiltroTipo("")
+    setFiltroEstado("")
+    fetchProductos({ all: "true" })
+  }
+
+  const handleLimpiarFiltros = () => {
+    setFiltroId("")
+    setFiltroNombre("")
+    setFiltroDescripcion("")
+    setFiltroTipo("")
+    setFiltroEstado("")
+    setProductos([])
+    setHasSearched(false)
+  }
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Botón de Volver */}
@@ -152,18 +199,57 @@ export default function ListaProducto() {
         </Button>
       </Box>
 
-      {/* Switch para mostrar/ocultar productos inactivos */}
-      <Box display="flex" justifyContent="flex-end" mb={2}>
-        <FormControlLabel
-          control={<Switch checked={includeInactive} onChange={handleIncludeInactiveChange} color="primary" />}
-          label="Mostrar productos inactivos"
-        />
-      </Box>
+      <form onSubmit={handleBuscar} style={{ marginBottom: 24 }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={2}>
+            <TextField label="ID" value={filtroId} onChange={e => setFiltroId(e.target.value)} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField label="Nombre" value={filtroNombre} onChange={e => setFiltroNombre(e.target.value)} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <TextField label="Descripción" value={filtroDescripcion} onChange={e => setFiltroDescripcion(e.target.value)} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Tipo</InputLabel>
+              <Select value={filtroTipo} label="Tipo" onChange={e => setFiltroTipo(e.target.value)}>
+                <MenuItem value="">Todos</MenuItem>
+                {tiposProducto.map(tipo => (
+                  <MenuItem key={tipo.idTipoProducto} value={tipo.idTipoProducto}>{tipo.nombreTipoProducto}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Estado</InputLabel>
+              <Select value={filtroEstado} label="Estado" onChange={e => setFiltroEstado(e.target.value)}>
+                <MenuItem value="">Todos</MenuItem>
+                {estadosProducto.map(estado => (
+                  <MenuItem key={estado.idEstadoProducto} value={estado.idEstadoProducto}>{estado.descEstadoProducto}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={1} display="flex" alignItems="center">
+            <Button type="submit" variant="outlined" fullWidth>Buscar</Button>
+          </Grid>
+          <Grid item xs={12} sm={1} display="flex" alignItems="center">
+            <Button variant="text" onClick={handleMostrarTodos} fullWidth>Mostrar todos</Button>
+          </Grid>
+          <Grid item xs={12} sm={1} display="flex" alignItems="center">
+            <Button variant="text" onClick={handleLimpiarFiltros} fullWidth>Limpiar filtros</Button>
+          </Grid>
+        </Grid>
+      </form>
 
       {loading ? (
         <Box display="flex" justifyContent="center" my={4}>
           <CircularProgress />
         </Box>
+      ) : !hasSearched && !loading ? (
+        <Alert severity="info">Utilice los filtros de búsqueda para visualizar los productos.</Alert>
       ) : (
         <TableContainer component={Paper}>
           <Table>

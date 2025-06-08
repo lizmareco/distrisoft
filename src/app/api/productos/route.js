@@ -12,18 +12,52 @@ export async function GET(request) {
     // Obtener parámetros de la URL
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get("includeInactive") === "true"
+    const id = searchParams.get("id")
+    const nombre = searchParams.get("nombre")
+    const descripcion = searchParams.get("descripcion")
+    const tipo = searchParams.get("tipo")
+    const estado = searchParams.get("estado")
+    const all = searchParams.get("all") === "true"
 
     console.log(`API: Incluir inactivos: ${includeInactive}`)
 
-    // Construir la consulta
-    const whereClause = {
-      // Siempre excluir productos eliminados (con deletedAt)
-      deletedAt: null,
+    // Si recibe all=true, traer todos los productos (sin filtros, solo deletedAt: null)
+    if (all) {
+      const productos = await prisma.producto.findMany({
+        where: { deletedAt: null },
+        include: {
+          unidadMedida: true,
+          tipoProducto: true,
+          estadoProducto: true,
+        },
+        orderBy: { nombreProducto: "asc" },
+      })
+      const productosFormateados = productos.map((producto) => {
+        const productoFormateado = { ...producto }
+        if (productoFormateado.tipoProducto) {
+          productoFormateado.tipoProducto = {
+            ...productoFormateado.tipoProducto,
+            nombreTipoProducto: productoFormateado.tipoProducto.descTipoProducto,
+          }
+        }
+        return productoFormateado
+      })
+      return NextResponse.json(productosFormateados)
+    }
+    // Si no hay filtros, devolver array vacío
+    if (!id && !nombre && !descripcion && !tipo && !estado) {
+      return NextResponse.json([])
     }
 
-    // Si no se incluyen inactivos, filtrar por estado activo (idEstadoProducto = 1)
-    if (!includeInactive) {
-      whereClause.idEstadoProducto = 1 // Asumiendo que 1 es el ID del estado "Activo"
+    // Construir la consulta
+    const whereClause = { deletedAt: null }
+    if (id) whereClause.idProducto = Number(id)
+    if (nombre) whereClause.nombreProducto = { contains: nombre, mode: "insensitive" }
+    if (descripcion) whereClause.descripcion = { contains: descripcion, mode: "insensitive" }
+    if (tipo) whereClause.idTipoProducto = Number(tipo)
+    if (estado) whereClause.idEstadoProducto = Number(estado)
+    if (!includeInactive && !estado) {
+      whereClause.idEstadoProducto = 1
     }
 
     const productos = await prisma.producto.findMany({
