@@ -31,9 +31,13 @@ import { ArrowBack, PictureAsPdf, CheckCircle, Cancel } from "@mui/icons-materia
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function VerCotizacionPage({ params }) {
-  const router = useRouter()
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "UPDATE_CLIENTE")
 
   // Usar React.use() para "unwrap" los parámetros
   // Esto es necesario para futuras versiones de Next.js
@@ -54,6 +58,7 @@ export default function VerCotizacionPage({ params }) {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success")
 
   useEffect(() => {
+    if (!hasPermission) return
     const fetchCotizacion = async () => {
       try {
         setLoading(true)
@@ -232,6 +237,14 @@ export default function VerCotizacionPage({ params }) {
   const isEstadoPendiente =
     cotizacion?.estadoCotizacionCliente?.descEstadoCotizacionCliente?.toLowerCase() === "pendiente"
 
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
+  }
+  
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" alignItems="center" mb={3}>

@@ -36,6 +36,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState([])
@@ -45,6 +46,10 @@ export default function ClientesPage() {
   const [tiposDocumento, setTiposDocumento] = useState([])
   const [loadingTipos, setLoadingTipos] = useState(true)
   const router = useRouter()
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_CLIENTE")
 
   // Estado para el formulario de búsqueda
   const [busqueda, setBusqueda] = useState({
@@ -64,6 +69,7 @@ export default function ClientesPage() {
 
   // Cargar tipos de documento al iniciar
   useEffect(() => {
+    if (!hasPermission) return
     const fetchTiposDocumento = async () => {
       try {
         setLoadingTipos(true)
@@ -194,6 +200,14 @@ export default function ClientesPage() {
   const handleEdit = (id) => {
     console.log(`Navegando a /clientes/${id}`)
     router.push(`/clientes/${id}`)
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (
