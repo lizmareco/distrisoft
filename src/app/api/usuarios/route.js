@@ -13,31 +13,72 @@ const prisma = new PrismaClient()
 export async function GET(request) {
   try {
     console.log("API: Recibida solicitud para obtener usuarios")
+    const { searchParams } = new URL(request.url)
+    const nombreUsuario = searchParams.get("nombreUsuario")
+    const persona = searchParams.get("persona")
+    const rol = searchParams.get("rol")
+    const estado = searchParams.get("estado")
+    const all = searchParams.get("all") === "true"
+
+    // Si all=true, traer todos
+    if (all) {
+      const usuarios = await prisma.usuario.findMany({
+        where: { deletedAt: null },
+        include: {
+          persona: { select: { nombre: true, apellido: true, nroDocumento: true } },
+          rol: { select: { nombreRol: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+      return NextResponse.json({ usuarios }, { status: 200 })
+    }
+
+    // Si no hay filtros, devolver array vacío
+    if (!nombreUsuario && !persona && !rol && !estado) {
+      return NextResponse.json({ usuarios: [] }, { status: 200 })
+    }
+
+    // Construir condiciones de búsqueda
+    const where = { deletedAt: null }
+    if (nombreUsuario) where.nombreUsuario = { contains: nombreUsuario, mode: "insensitive" }
+    if (rol) where.idRol = Number(rol)
+    if (estado) where.estado = estado
+
+    // Filtro de persona (nombre o apellido)
+    let personaWhere = undefined
+    if (persona) {
+      personaWhere = {
+        OR: [
+          { nombre: { contains: persona, mode: "insensitive" } },
+          { apellido: { contains: persona, mode: "insensitive" } },
+        ],
+      }
+    }
+
     const usuarios = await prisma.usuario.findMany({
-      where: {
-        deletedAt: null, // Solo excluimos los eliminados lógicamente
-      },
+      where,
       include: {
-        persona: {
-          select: {
-            nombre: true,
-            apellido: true,
-            nroDocumento: true,
-          },
-        },
-        rol: {
-          select: {
-            nombreRol: true,
-          },
-        },
+        persona: { select: { nombre: true, apellido: true, nroDocumento: true } },
+        rol: { select: { nombreRol: true } },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     })
-    console.log("DataSource: Usuarios encontrados:", usuarios.length)
-    console.log("API: Usuarios obtenidos correctamente", { usuarios })
-    return NextResponse.json({ usuarios }, { status: 200 })
+
+    // Si hay filtro de persona, filtrar en JS
+    let usuariosFiltrados = usuarios
+    if (persona) {
+      const personaLower = persona.toLowerCase()
+      usuariosFiltrados = usuarios.filter(
+        u =>
+          u.persona &&
+          (
+            (u.persona.nombre && u.persona.nombre.toLowerCase().includes(personaLower)) ||
+            (u.persona.apellido && u.persona.apellido.toLowerCase().includes(personaLower))
+          )
+      )
+    }
+
+    return NextResponse.json({ usuarios: usuariosFiltrados }, { status: 200 })
   } catch (error) {
     console.error("API: Error al obtener usuarios:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
