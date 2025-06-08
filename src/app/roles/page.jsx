@@ -26,6 +26,13 @@ import {
   Snackbar,
   FormControlLabel,
   Switch,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  InputAdornment,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
@@ -38,7 +45,7 @@ export default function RolesPage() {
   const router = useRouter()
   const { session } = useRootContext()
   const [roles, setRoles] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [rolADesactivar, setRolADesactivar] = useState(null)
   const [dialogoAbierto, setDialogoAbierto] = useState(false)
@@ -48,23 +55,33 @@ export default function RolesPage() {
     mensaje: "",
     tipo: "success",
   })
+  const [filtroNombre, setFiltroNombre] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const [filtroPermiso, setFiltroPermiso] = useState("")
+  const [hasSearched, setHasSearched] = useState(false)
+  const [estadosRol] = useState([
+    { value: "", label: "Todos" },
+    { value: "ACTIVO", label: "Activo" },
+    { value: "INACTIVO", label: "Inactivo" },
+  ])
 
-  const cargarRoles = async () => {
+  const cargarRoles = async (params = {}) => {
     try {
       setLoading(true)
-      // Incluir parámetro para indicar si queremos incluir roles inactivos
-      const response = await fetch(`/api/roles?includeInactive=${includeInactive}`, {
+      setHasSearched(true)
+      const searchParams = new URLSearchParams()
+      if (params.nombreRol) searchParams.append("nombreRol", params.nombreRol)
+      if (params.estadoRol) searchParams.append("estadoRol", params.estadoRol)
+      if (params.permiso) searchParams.append("permiso", params.permiso)
+      if (includeInactive) searchParams.append("includeInactive", "true")
+      const response = await fetch(`/api/roles?${searchParams.toString()}`, {
         method: "GET",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
       })
-
-      if (!response.ok) {
-        throw new Error(`Error al cargar roles: ${response.status}`)
-      }
-
+      if (!response.ok) throw new Error(`Error al cargar roles: ${response.status}`)
       const data = await response.json()
       setRoles(data.roles || [])
       setError(null)
@@ -74,10 +91,6 @@ export default function RolesPage() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    cargarRoles()
-  }, [includeInactive])
 
   const irACrearRol = () => {
     router.push("/roles/formulario")
@@ -144,6 +157,30 @@ export default function RolesPage() {
     setSnackbar({ ...snackbar, abierto: false })
   }
 
+  const handleBuscar = (e) => {
+    e.preventDefault()
+    cargarRoles({
+      nombreRol: filtroNombre,
+      estadoRol: filtroEstado,
+      permiso: filtroPermiso,
+    })
+  }
+
+  const handleMostrarTodos = () => {
+    setFiltroNombre("")
+    setFiltroEstado("")
+    setFiltroPermiso("")
+    cargarRoles({})
+  }
+
+  const handleLimpiarFiltros = () => {
+    setFiltroNombre("")
+    setFiltroEstado("")
+    setFiltroPermiso("")
+    setRoles([])
+    setHasSearched(false)
+  }
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
@@ -166,89 +203,106 @@ export default function RolesPage() {
         </Alert>
       )}
 
-      {/* Switch para mostrar/ocultar roles inactivos */}
-      <Box display="flex" justifyContent="flex-end" mb={2}>
-        <FormControlLabel
-          control={<Switch checked={includeInactive} onChange={handleIncludeInactiveChange} color="primary" />}
-          label="Mostrar roles inactivos"
-        />
-      </Box>
 
-      <Paper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Nombre del Rol</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell>Permisos</TableCell>
-                <TableCell>Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
+      <form onSubmit={handleBuscar} style={{ marginBottom: 24 }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={4}>
+            <TextField label="Nombre del Rol" value={filtroNombre} onChange={e => setFiltroNombre(e.target.value)} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12} sm={3}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Estado</InputLabel>
+              <Select value={filtroEstado} label="Estado" onChange={e => setFiltroEstado(e.target.value)}>
+                {estadosRol.map(e => (
+                  <MenuItem key={e.value} value={e.value}>{e.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField label="Permiso (buscar por nombre)" value={filtroPermiso} onChange={e => setFiltroPermiso(e.target.value)} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12} sm={1} display="flex" alignItems="center">
+            <Button type="submit" variant="outlined" fullWidth>Buscar</Button>
+          </Grid>
+          <Grid item xs={12} sm={1} display="flex" alignItems="center">
+            <Button variant="text" onClick={handleMostrarTodos} fullWidth>Mostrar todos</Button>
+          </Grid>
+          <Grid item xs={12} sm={1} display="flex" alignItems="center">
+            <Button variant="text" onClick={handleLimpiarFiltros} fullWidth>Limpiar filtros</Button>
+          </Grid>
+        </Grid>
+      </form>
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" my={4}>
+          <CircularProgress />
+        </Box>
+      ) : !hasSearched && !loading ? (
+        <Alert severity="info">Utilice los filtros de búsqueda para visualizar los roles.</Alert>
+      ) : roles.length === 0 ? (
+        <Alert severity="info">No hay roles registrados</Alert>
+      ) : (
+        <Paper>
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    <CircularProgress />
-                  </TableCell>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Nombre del Rol</TableCell>
+                  <TableCell>Estado</TableCell>
+                  <TableCell>Permisos</TableCell>
+                  <TableCell>Acciones</TableCell>
                 </TableRow>
-              ) : roles.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    No hay roles registrados
-                  </TableCell>
-                </TableRow>
-              ) : (
-                roles.map((rol) => (
-                  <TableRow
-                    key={rol.idRol}
-                    sx={{
-                      opacity: rol.estadoRol === "INACTIVO" ? 0.7 : 1,
-                      backgroundColor: rol.estadoRol === "INACTIVO" ? "rgba(0, 0, 0, 0.04)" : "inherit",
-                    }}
-                  >
+              </TableHead>
+              <TableBody>
+                {roles.map((rol) => (
+                  <TableRow key={rol.idRol}>
                     <TableCell>{rol.idRol}</TableCell>
                     <TableCell>{rol.nombreRol}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={rol.estadoRol}
-                        color={rol.estadoRol === "ACTIVO" ? "success" : "default"}
-                        size="small"
-                        sx={{ fontWeight: "medium" }}
-                      />
+                      <Chip label={rol.estadoRol} color={rol.estadoRol === "ACTIVO" ? "success" : "default"} size="small" />
                     </TableCell>
                     <TableCell>
-                      {rol.permisos && rol.permisos.length > 0
-                        ? rol.permisos.map((permiso) => (
-                            <Chip
-                              key={permiso.idPermiso}
-                              label={permiso.nombrePermiso}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                              sx={{ m: 0.3 }}
-                            />
-                          ))
-                        : "Sin permisos"}
+                      {rol.permisos.map((permiso, idx) => {
+                        const match = filtroPermiso && permiso.nombrePermiso.toLowerCase().includes(filtroPermiso.toLowerCase())
+                        return (
+                          <Chip
+                            key={permiso.idPermiso}
+                            label={permiso.nombrePermiso}
+                            variant="outlined"
+                            sx={{
+                              m: 0.3,
+                              borderColor: match ? "primary.main" : undefined,
+                              color: match ? "primary.main" : undefined,
+                              fontWeight: match ? "bold" : undefined,
+                              backgroundColor: match ? "#e3f2fd" : undefined,
+                            }}
+                          />
+                        )
+                      })}
                     </TableCell>
                     <TableCell>
-                      <IconButton color="primary" onClick={() => irAEditarRol(rol.idRol)} title="Editar">
+                      <IconButton color="primary" onClick={() => irAEditarRol(rol.idRol)} size="small" title="Editar">
                         <EditIcon />
                       </IconButton>
-                      {rol.estadoRol === "ACTIVO" && (
-                        <IconButton color="error" onClick={() => confirmarDesactivar(rol)} title="Desactivar">
-                          <DeleteIcon />
-                        </IconButton>
-                      )}
+                      <IconButton
+                        color="error"
+                        onClick={() => confirmarDesactivar(rol)}
+                        disabled={rol.estadoRol !== "ACTIVO"}
+                        size="small"
+                        title="Desactivar"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
       {/* Diálogo de confirmación para desactivar */}
       <Dialog open={dialogoAbierto} onClose={cerrarDialogo}>
