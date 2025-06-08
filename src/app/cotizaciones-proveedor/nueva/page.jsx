@@ -30,8 +30,13 @@ import {
 } from "@mui/material"
 import { ArrowBack, Search, Business, Add, Delete } from "@mui/icons-material"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function NuevaCotizacionProveedorPage() {
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "CREATE_COTIZACIONPROVEEDOR")
   const router = useRouter()
 
   // Estados para el formulario principal
@@ -74,6 +79,7 @@ export default function NuevaCotizacionProveedorPage() {
 
   // Obtener el token de autenticación al cargar el componente
   useEffect(() => {
+    if (!hasPermission) return
     // Intentar obtener el token de diferentes fuentes
     const token =
       localStorage.getItem("accessToken") ||
@@ -354,6 +360,14 @@ export default function NuevaCotizacionProveedorPage() {
       return
     }
     setOpenSnackbar(false)
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

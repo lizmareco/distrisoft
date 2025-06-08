@@ -27,8 +27,13 @@ import EmailIcon from "@mui/icons-material/Email"
 import PhoneIcon from "@mui/icons-material/Phone"
 import LocationOnIcon from "@mui/icons-material/LocationOn"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function EditarEmpresaPage({ params }) {
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "UPDATE_EMPRESA")
   // Usar React.use para acceder a los parámetros de ruta
   const { id } = use(params)
   const router = useRouter()
@@ -54,6 +59,7 @@ export default function EditarEmpresaPage({ params }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    if (!hasPermission) return
     const fetchData = async () => {
       try {
         setLoading(true)
@@ -167,6 +173,14 @@ export default function EditarEmpresaPage({ params }) {
     return (
       <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
         <CircularProgress />
+      </Container>
+    )
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
       </Container>
     )
   }

@@ -37,7 +37,7 @@ export default function VerCotizacionPage({ params }) {
   const context = useRootContext()
   // Verificación de permisos
   const permisos = context.session?.permisos || []
-  const hasPermission = permisos.find((permiso) => permiso === "UPDATE_CLIENTE")
+  const hasPermission = permisos.find((permiso) => permiso === "UPDATE_COTIZACIONCLIENTE")
 
   // Usar React.use() para "unwrap" los parámetros
   // Esto es necesario para futuras versiones de Next.js
@@ -244,7 +244,7 @@ export default function VerCotizacionPage({ params }) {
       </Container>
     )
   }
-  
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" alignItems="center" mb={3}>

@@ -34,9 +34,14 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ArrowBack } from "@mui/icons-material"
 import { Checkbox } from "@mui/material"
+import { useRootContext } from "@/src/app/context/root"
 
 
 export default function CotizacionesProveedorPage() {
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_COTIZACIONPROVEEDOR")
   const [cotizacionesSeleccionadas, setCotizacionesSeleccionadas] = useState([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -53,6 +58,7 @@ export default function CotizacionesProveedorPage() {
   // Ya no cargamos automáticamente las cotizaciones al inicio
 
   const loadAllCotizaciones = async () => {
+    if (!hasPermission) return
     setLoading(true)
     try {
       const response = await fetch("/api/cotizaciones-proveedor")
@@ -234,10 +240,18 @@ export default function CotizacionesProveedorPage() {
     return "Sin información"
   }
 
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
+  }
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
-          Volver a Gestión
+        Volver a Gestión
       </Button>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1">
@@ -404,16 +418,16 @@ export default function CotizacionesProveedorPage() {
       </Snackbar>
 
       {cotizacionesSeleccionadas.length >= 2 && (
-  <Box my={2}>
-    <Button
-      variant="contained"
-      color="secondary"
-      onClick={() => router.push(`/cotizaciones-proveedor/comparar?ids=${cotizacionesSeleccionadas.join(",")}`)}
-    >
-      Comparar Cotizaciones Seleccionadas
-    </Button>
-  </Box>
-)}
+        <Box my={2}>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => router.push(`/cotizaciones-proveedor/comparar?ids=${cotizacionesSeleccionadas.join(",")}`)}
+          >
+            Comparar Cotizaciones Seleccionadas
+          </Button>
+        </Box>
+      )}
     </Container>
   )
 }

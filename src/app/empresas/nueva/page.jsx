@@ -27,8 +27,13 @@ import EmailIcon from "@mui/icons-material/Email"
 import PhoneIcon from "@mui/icons-material/Phone"
 import LocationOnIcon from "@mui/icons-material/LocationOn"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function NuevaEmpresaPage() {
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "CREATE_EMPRESA")
   const router = useRouter()
 
   const [formData, setFormData] = useState({
@@ -51,6 +56,7 @@ export default function NuevaEmpresaPage() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    if (!hasPermission) return
     const fetchData = async () => {
       try {
         setLoading(true)
@@ -161,6 +167,14 @@ export default function NuevaEmpresaPage() {
     return (
       <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
         <CircularProgress />
+      </Container>
+    )
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
       </Container>
     )
   }

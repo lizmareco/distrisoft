@@ -30,8 +30,13 @@ import {
 } from "@mui/material"
 import { ArrowBack, Add, Delete, Search, PersonAdd } from "@mui/icons-material"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function NuevaCotizacionPage() {
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "CREATE_COTIZACIONCLIENTE")
   const router = useRouter()
 
   // Estados para el formulario principal
@@ -342,6 +347,14 @@ export default function NuevaCotizacionPage() {
       return
     }
     setOpenSnackbar(false)
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

@@ -34,8 +34,13 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function EmpresasPage() {
+  const context = useRootContext()
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_EMPRESA")
   const [empresas, setEmpresas] = useState([])
   const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
@@ -266,6 +271,14 @@ export default function EmpresasPage() {
   const handleEdit = (id) => {
     console.log(`Navegando a /empresas/${id}`)
     router.push(`/empresas/${id}`)
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (
