@@ -19,6 +19,8 @@ import ReporteVentasRangoFecha from "@/src/components/reportes/ReporteVentasRang
 import ReporteVentasVendedor from "@/src/components/reportes/ReporteVentasVendedor"
 import ReporteProductosMasVendidos from "@/src/components/reportes/ReporteProductosMasVendidos"
 import ReporteComprasProveedor from "@/src/components/reportes/ReporteComprasProveedor"
+import ReporteComprasProducto from "@/src/components/reportes/ReporteComprasProducto"
+import ReporteComprasOrden from "@/src/components/reportes/ReporteComprasOrden"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -108,6 +110,10 @@ export default function ReportesPage() {
         return <ReporteProductosMasVendidos onVolver={handleVolver} />
       case "compras-proveedor":
         return <ReporteComprasProveedor />
+      case "compras-producto":
+        return <ReporteComprasProducto />
+      case "ordenes":
+        return <ReporteComprasOrden onVolver={handleVolver} />
       
       default:
         return (

@@ -1,34 +1,16 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from "@/prisma/client"
 
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url)
-    const fechaDesde = searchParams.get('fechaDesde')
-    const fechaHasta = searchParams.get('fechaHasta')
     const idMateriaPrima = searchParams.get('idMateriaPrima')
     const idEstado = searchParams.get('idEstado')
     const agruparPorProveedor = searchParams.get('agruparPorProveedor') === 'true'
 
-    // Validar parámetros requeridos
-    if (!fechaDesde || !fechaHasta) {
-      return NextResponse.json(
-        { error: 'Los parámetros fechaDesde y fechaHasta son obligatorios' },
-        { status: 400 }
-      )
-    }
-
     // Construir condiciones de filtrado
-    const whereCondition = {
-      facturaProveedor: {
-        fechaEmision: {
-          gte: new Date(fechaDesde),
-          lte: new Date(fechaHasta)
-        }
-      }
-    }
+    let whereCondition = {}
 
-    // Agregar filtros opcionales
     if (idMateriaPrima) {
       whereCondition.detalleCotizacion = {
         ...whereCondition.detalleCotizacion,
@@ -56,6 +38,12 @@ export async function GET(req) {
               include: {
                 empresa: true
               }
+            },
+            // La orden de compra se puede incluir para otros usos
+            ordenCompra: {
+              include: {
+                estadoOrdenCompra: true
+              }
             }
           }
         },
@@ -76,7 +64,6 @@ export async function GET(req) {
       }
     })
 
-    // Si no hay resultados
     if (!detallesFactura.length) {
       return NextResponse.json(
         { message: 'No se encontraron compras para los filtros seleccionados' },
@@ -84,14 +71,14 @@ export async function GET(req) {
       )
     }
 
-    // Procesar y agrupar datos
+    // Procesar y agrupar datos por producto (y proveedor si se requiere)
     const resultado = {}
 
     detallesFactura.forEach(detalle => {
       const materiaPrima = detalle.detalleCotizacion.materiaPrima
       const factura = detalle.facturaProveedor
       const proveedor = factura.proveedor.empresa.razonSocial
-      
+
       const clave = agruparPorProveedor 
         ? `${materiaPrima.idMateriaPrima}-${proveedor}`
         : materiaPrima.idMateriaPrima.toString()
@@ -108,41 +95,53 @@ export async function GET(req) {
             comprasTotales: 0,
             cantidadTotal: 0,
             montoTotal: 0,
-            precioPromedio: 0
+            // Se agregarán nuevos campos: promedioPorDia, compraMaxima, compraMinima y diasConCompras
+            promedioPorDia: 0,
+            compraMaxima: 0,
+            compraMinima: 0,
+            diasConCompras: 0
           },
           detalle: []
         }
       }
 
-      // Actualizar estadísticas
+      // Actualizar estadísticas globales
       resultado[clave].estadisticas.comprasTotales += 1
-      resultado[clave].estadisticas.cantidadTotal += detalle.cantidadFacturada
-      resultado[clave].estadisticas.montoTotal += detalle.subtotalFinal
+      resultado[clave].estadisticas.cantidadTotal += Number(detalle.cantidadFacturada)
+      resultado[clave].estadisticas.montoTotal += Number(detalle.subtotalFinal)
 
-      // Agregar detalle
+      // Agregar detalle (se asume que "fecha" viene de factura.fechaEmision)
       resultado[clave].detalle.push({
         idDetalle: detalle.idDetalleFactura,
-        fecha: factura.fechaEmision,
+        fecha: factura.fechaEmision, // se usará para agrupar por día
         nroFactura: factura.nroFactura,
         proveedor: proveedor,
-        cantidad: detalle.cantidadFacturada,
-        precioUnitario: detalle.precioUnitarioFinal,
-        subtotal: detalle.subtotalFinal
+        cantidad: Number(detalle.cantidadFacturada),
+        precioUnitario: Number(detalle.precioUnitarioFinal),
+        subtotal: Number(detalle.subtotalFinal)
       })
     })
 
-    // Calcular promedios
+    // Calcular estadísticas diarias para cada grupo
     Object.keys(resultado).forEach(clave => {
       const item = resultado[clave]
-      // Evitar división por cero
-      if (item.estadisticas.cantidadTotal > 0) {
-        item.estadisticas.precioPromedio = item.estadisticas.montoTotal / item.estadisticas.cantidadTotal
-      } else {
-        item.estadisticas.precioPromedio = 0
+      // Agrupar totales diarios según la fecha (YYYY-MM-DD)
+      const dailyTotals = {}
+      item.detalle.forEach(det => {
+        const day = new Date(det.fecha).toISOString().split('T')[0]
+        dailyTotals[day] = (dailyTotals[day] || 0) + Number(det.subtotal)
+      })
+      const dailyValues = Object.values(dailyTotals)
+      if (dailyValues.length > 0) {
+        const totalDaily = dailyValues.reduce((sum, value) => sum + value, 0)
+        item.estadisticas.promedioPorDia = totalDaily / dailyValues.length
+        item.estadisticas.compraMaxima = Math.max(...dailyValues)
+        item.estadisticas.compraMinima = Math.min(...dailyValues)
+        item.estadisticas.diasConCompras = dailyValues.length
       }
     })
 
-    // Convertir a array y ordenar
+    // Convertir a array y ordenar por montoTotal descendente
     const responseData = Object.values(resultado).sort((a, b) => 
       b.estadisticas.montoTotal - a.estadisticas.montoTotal
     )
