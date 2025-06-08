@@ -11,8 +11,7 @@ export async function GET(request) {
   try {
     console.log("API MateriaPrima/buscar - Iniciando solicitud GET")
 
-
-    const userData = getUserData(request, "VIEW_MATERIAPRIMA")
+    const userData = await getUserData(request, "VIEW_MATERIAPRIMA")
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("query") || ""

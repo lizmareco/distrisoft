@@ -1,9 +1,9 @@
 import jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
 
-export const getUserData = (request, permission) => {
+export const getUserData = async (request, permission) => {
   // 1. Intentar obtener el token de la cookie
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   let accessToken = cookieStore.get("at")?.value
 
   // 2. Si no está en la cookie, buscar en el header Authorization
