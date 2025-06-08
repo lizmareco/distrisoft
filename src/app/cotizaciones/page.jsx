@@ -62,11 +62,11 @@ export default function CotizacionesPage() {
 
   // Verificación de permisos
   const permisos = context.session?.permisos || []
-  const cotizacionesPermiso = permisos.find((permiso) => permiso === "VIEW_COTIZACIONCLIENTE")
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_COTIZACIONCLIENTE")
 
   // Cargar estados al montar el componente
   useEffect(() => {
-    if (!cotizacionesPermiso) return
+    if (!hasPermission) return
 
     const cargarEstados = async () => {
       try {
@@ -83,7 +83,7 @@ export default function CotizacionesPage() {
     }
 
     cargarEstados()
-  }, [cotizacionesPermiso])
+  }, [hasPermission])
 
   // Buscar clientes cuando se escribe en el campo
   const buscarClientes = async (searchTerm) => {
@@ -242,7 +242,7 @@ export default function CotizacionesPage() {
     return `${nombre}${empresa ? ` - ${empresa}` : ""} (${documento})`
   }
 
-  if (!cotizacionesPermiso) {
+  if (!hasPermission) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Alert severity="error">No tiene permisos para ver esta página</Alert>

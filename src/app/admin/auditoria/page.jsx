@@ -32,6 +32,7 @@ import { ExpandMore, Search, Refresh, VisibilityOutlined, FilterAlt, ClearAll, T
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
 import { exportToExcel } from "@/src/utils/export-utils"
+import { useRootContext } from "@/src/app/context/root"
 
 
 
@@ -60,6 +61,7 @@ export default function AuditoriaPage() {
 
   // Estado para exportación
   const [exportLoading, setExportLoading] = useState(false)
+    const context = useRootContext()
 
   // Lista de acciones para el filtro
   const acciones = [
@@ -85,8 +87,13 @@ export default function AuditoriaPage() {
     { value: "OrdenCompra", label: "Orden de Compra" },
   ]
 
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_AUDITORIA")
+
   // Cargar datos al montar el componente y cuando cambien los filtros o paginación
   useEffect(() => {
+    if (!hasPermission) return;
     cargarDatos()
     cargarUsuarios()
   }, [page, rowsPerPage])
@@ -322,6 +329,14 @@ export default function AuditoriaPage() {
     } finally {
       setExportLoading(false)
     }
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

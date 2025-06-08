@@ -32,9 +32,12 @@ import BusinessIcon from "@mui/icons-material/Business"
 import SearchIcon from "@mui/icons-material/Search"
 import CheckCircleIcon from "@mui/icons-material/CheckCircle"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
+
 
 export default function NuevoClientePage() {
   const router = useRouter()
+  const context = useRootContext()
 
   // Estado para controlar el tipo de cliente (persona o empresa)
   const [tipoCliente, setTipoCliente] = useState("persona")
@@ -77,6 +80,10 @@ export default function NuevoClientePage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  // Verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "CREATE_CLIENTE")
 
   useEffect(() => {
     const fetchData = async () => {
@@ -293,6 +300,14 @@ export default function NuevoClientePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   // Renderizar un mensaje de carga mientras se obtienen los datos
