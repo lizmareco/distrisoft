@@ -25,6 +25,9 @@ import { LocalizationProvider } from "@mui/x-date-pickers"
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
+import ReporteComprasProveedor from "@/src/components/reportes/ReporteComprasProveedor"
+import ReporteComprasProducto from "@/src/components/reportes/ReporteComprasProducto"
+import ReporteComprasOrden from "@/src/components/reportes/ReporteComprasOrden"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
@@ -121,6 +124,13 @@ export default function ReportesPage() {
         return <ReporteClientesMasVentas onVolver={handleVolver} />
       case "facturas_emtidas":
         return <ReporteFacturasEmitidas onVolver={handleVolver} />
+      case "compras-proveedor":
+        return <ReporteComprasProveedor />
+      case "compras-producto":
+        return <ReporteComprasProducto />
+      case "ordenes":
+        return <ReporteComprasOrden onVolver={handleVolver} />
+      
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>
