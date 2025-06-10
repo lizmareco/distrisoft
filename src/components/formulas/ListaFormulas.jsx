@@ -36,32 +36,46 @@ import { useRouter } from 'next/navigation';
 export default function ListaFormulas() {
   const router = useRouter();
   const [formulas, setFormulas] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [busqueda, setBusqueda] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const [formulaAEliminar, setFormulaAEliminar] = useState(null);
   const [dialogoEliminarAbierto, setDialogoEliminarAbierto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  // Cargar fórmulas al montar el componente
-  useEffect(() => {
-    cargarFormulas();
-  }, []);
+  // Ya no cargar fórmulas al montar el componente
+  // useEffect(() => { cargarFormulas(); }, []);
 
-  // Función para cargar fórmulas
-  const cargarFormulas = async () => {
+  // Función para buscar fórmulas
+  const buscarFormulas = async (e) => {
+    if (e) e.preventDefault();
     try {
       setLoading(true);
-      const respuesta = await fetch('/api/formulas');
-      
-      if (!respuesta.ok) {
-        throw new Error(`Error al cargar fórmulas: ${respuesta.status}`);
-      }
-      
+      setHasSearched(true);
+      const params = new URLSearchParams();
+      if (busqueda) params.append('query', busqueda);
+      const respuesta = await fetch(`/api/formulas?${params.toString()}`);
+      if (!respuesta.ok) throw new Error(`Error al buscar fórmulas: ${respuesta.status}`);
       const datos = await respuesta.json();
       setFormulas(datos);
     } catch (error) {
-      console.error('Error:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para mostrar todas las fórmulas
+  const mostrarTodas = async () => {
+    try {
+      setLoading(true);
+      setHasSearched(true);
+      const respuesta = await fetch('/api/formulas?all=true');
+      if (!respuesta.ok) throw new Error(`Error al cargar fórmulas: ${respuesta.status}`);
+      const datos = await respuesta.json();
+      setFormulas(datos);
+    } catch (error) {
       setError(error.message);
     } finally {
       setLoading(false);
@@ -158,26 +172,33 @@ export default function ListaFormulas() {
           Nueva Fórmula
         </Button>
       </Box>
-      
-      <TextField
-        fullWidth
-        placeholder="Buscar fórmulas..."
-        value={busqueda}
-        onChange={(e) => setBusqueda(e.target.value)}
-        sx={{ mb: 3 }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon />
-            </InputAdornment>
-          ),
-        }}
-      />
-      
-      {formulasFiltradas.length === 0 ? (
-        <Alert severity="info">
-          No se encontraron fórmulas. {busqueda ? 'Intenta con otra búsqueda.' : 'Crea una nueva fórmula para comenzar.'}
-        </Alert>
+      <form onSubmit={buscarFormulas} style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <TextField
+          fullWidth
+          placeholder="Buscar fórmulas..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Button type="submit" variant="outlined">Buscar</Button>
+        <Button variant="text" onClick={mostrarTodas}>Mostrar todos</Button>
+      </form>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : !hasSearched ? (
+        <Alert severity="info">Utilice el buscador o el botón "Mostrar todos" para visualizar las fórmulas.</Alert>
+      ) : error ? (
+        <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
+      ) : formulas.length === 0 ? (
+        <Alert severity="info">No se encontraron fórmulas. {busqueda ? 'Intenta con otra búsqueda.' : 'Crea una nueva fórmula para comenzar.'}</Alert>
       ) : (
         <TableContainer component={Paper}>
           <Table>

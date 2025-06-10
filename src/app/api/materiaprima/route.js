@@ -8,7 +8,7 @@ export async function GET(request) {
   try {
     console.log("API: Obteniendo materias primas...")
 
-    const userData = getUserData(request, "VIEW_MATERIAPRIMA")
+    const userData = await getUserData(request, "VIEW_MATERIAPRIMA")
 
     const materiasPrimas = await prisma.materiaPrima.findMany({
       where: {

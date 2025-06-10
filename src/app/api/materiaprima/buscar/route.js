@@ -11,17 +11,20 @@ export async function GET(request) {
   try {
     console.log("API MateriaPrima/buscar - Iniciando solicitud GET")
 
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = getUserData(request)
+    const userData = await getUserData(request, "VIEW_MATERIAPRIMA")
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("query") || ""
     const activas = searchParams.get("activas") === "true"
+    const id = searchParams.get("id")
+    const estado = searchParams.get("estado")
 
     // Añadir logs para depuración
     console.log("API MateriaPrima/buscar - Parámetros recibidos:", {
       query,
       activas,
+      id,
+      estado,
       url: request.url,
       searchParams: Object.fromEntries(searchParams.entries()),
     })
@@ -31,6 +34,11 @@ export async function GET(request) {
       deletedAt: null,
     }
 
+    // Si hay id, buscar por id exacto
+    if (id) {
+      where.idMateriaPrima = Number(id)
+    }
+
     // Si hay término de búsqueda, añadir condición OR
     if (query.trim()) {
       where.OR = [
@@ -38,6 +46,11 @@ export async function GET(request) {
         { descMateriaPrima: { contains: query, mode: "insensitive" } },
       ]
       console.log("API MateriaPrima/buscar - Aplicando filtro de búsqueda:", query)
+    }
+
+    // Si hay estado, filtrar por idEstadoMateriaPrima
+    if (estado) {
+      where.idEstadoMateriaPrima = Number(estado)
     }
 
     // Si se especifica activas=true, filtrar por estado activo
@@ -77,7 +90,7 @@ export async function GET(request) {
       idRegistro: "busqueda",
       accion: "CONSULTAR",
       valorAnterior: null,
-      valorNuevo: { query, activas },
+      valorNuevo: { query, activas, id, estado },
       idUsuario: userData.idUsuario,
     })
 

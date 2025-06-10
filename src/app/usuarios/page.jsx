@@ -23,6 +23,13 @@ import {
   DialogContentText,
   DialogTitle,
   Snackbar,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  InputAdornment,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
@@ -44,6 +51,19 @@ export default function UsuariosPage() {
     mensaje: "",
     tipo: "success",
   })
+  const [filtroUsuario, setFiltroUsuario] = useState("")
+  const [filtroPersona, setFiltroPersona] = useState("")
+  const [filtroRol, setFiltroRol] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const [roles, setRoles] = useState([])
+  const [hasSearched, setHasSearched] = useState(false)
+  const estadosUsuario = [
+    { value: "", label: "Todos" },
+    { value: "ACTIVO", label: "Activo" },
+    { value: "INACTIVO", label: "Inactivo" },
+    { value: "BLOQUEADO", label: "Bloqueado" },
+    { value: "VENCIDO", label: "Vencido" },
+  ]
 
   // Cargar usuarios
   useEffect(() => {
@@ -79,6 +99,16 @@ export default function UsuariosPage() {
     }
 
     cargarUsuarios()
+  }, [])
+
+  // Cargar roles para el filtro
+  useEffect(() => {
+    const fetchRoles = async () => {
+      const res = await fetch("/api/rol")
+      const data = await res.ok ? await res.json() : []
+      setRoles(Array.isArray(data) ? data : data.roles || [])
+    }
+    fetchRoles()
   }, [])
 
   // Navegar a la página de crear usuario
@@ -162,6 +192,58 @@ export default function UsuariosPage() {
     }
   }
 
+  const cargarUsuarios = async (params = {}) => {
+    try {
+      setLoading(true)
+      setHasSearched(true)
+      const searchParams = new URLSearchParams()
+      if (params.nombreUsuario) searchParams.append("nombreUsuario", params.nombreUsuario)
+      if (params.persona) searchParams.append("persona", params.persona)
+      if (params.rol) searchParams.append("rol", params.rol)
+      if (params.estado) searchParams.append("estado", params.estado)
+      if (params.all) searchParams.append("all", params.all)
+      const respuesta = await fetch(`/api/usuarios?${searchParams.toString()}`, {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      })
+      const datos = await respuesta.json()
+      setUsuarios(datos.usuarios || [])
+      setError(null)
+    } catch (error) {
+      setError("No se pudieron cargar los usuarios. Por favor, intenta de nuevo más tarde.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBuscar = (e) => {
+    e.preventDefault()
+    cargarUsuarios({
+      nombreUsuario: filtroUsuario,
+      persona: filtroPersona,
+      rol: filtroRol,
+      estado: filtroEstado,
+    })
+  }
+
+  const handleMostrarTodos = () => {
+    setFiltroUsuario("")
+    setFiltroPersona("")
+    setFiltroRol("")
+    setFiltroEstado("")
+    cargarUsuarios({ all: "true" })
+  }
+
+  const handleLimpiarFiltros = () => {
+    setFiltroUsuario("")
+    setFiltroPersona("")
+    setFiltroRol("")
+    setFiltroEstado("")
+    setUsuarios([])
+    setHasSearched(false)
+  }
+
   if (loading) {
     return (
       <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
@@ -189,7 +271,54 @@ export default function UsuariosPage() {
           </Button>
         </Box>
 
-        {error && (
+        <form onSubmit={handleBuscar} style={{ marginBottom: 24 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={3}>
+              <TextField label="Usuario" value={filtroUsuario} onChange={e => setFiltroUsuario(e.target.value)} fullWidth size="small" />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <TextField label="Persona (nombre o apellido)" value={filtroPersona} onChange={e => setFiltroPersona(e.target.value)} fullWidth size="small" />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Rol</InputLabel>
+                <Select value={filtroRol} label="Rol" onChange={e => setFiltroRol(e.target.value)}>
+                  <MenuItem value="">Todos</MenuItem>
+                  {roles.map(rol => (
+                    <MenuItem key={rol.idRol} value={rol.idRol}>{rol.nombreRol}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Estado</InputLabel>
+                <Select value={filtroEstado} label="Estado" onChange={e => setFiltroEstado(e.target.value)}>
+                  {estadosUsuario.map(e => (
+                    <MenuItem key={e.value} value={e.value}>{e.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={1} display="flex" alignItems="center">
+              <Button type="submit" variant="outlined" fullWidth>Buscar</Button>
+            </Grid>
+            <Grid item xs={12} sm={1} display="flex" alignItems="center">
+              <Button variant="text" onClick={handleMostrarTodos} fullWidth>Mostrar todos</Button>
+            </Grid>
+            <Grid item xs={12} sm={1} display="flex" alignItems="center">
+              <Button variant="text" onClick={handleLimpiarFiltros} fullWidth>Limpiar filtros</Button>
+            </Grid>
+          </Grid>
+        </form>
+
+        {loading ? (
+          <Box display="flex" justifyContent="center" my={4}>
+            <CircularProgress />
+          </Box>
+        ) : !hasSearched && !loading ? (
+          <Alert severity="info">Utilice los filtros de búsqueda para visualizar los usuarios.</Alert>
+        ) : error ? (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
             <Button
@@ -219,64 +348,64 @@ export default function UsuariosPage() {
               Reintentar
             </Button>
           </Alert>
-        )}
-
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Usuario</TableCell>
-                <TableCell>Persona</TableCell>
-                <TableCell>Rol</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell>Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {usuarios.length === 0 ? (
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    No hay usuarios registrados
-                  </TableCell>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Usuario</TableCell>
+                  <TableCell>Persona</TableCell>
+                  <TableCell>Rol</TableCell>
+                  <TableCell>Estado</TableCell>
+                  <TableCell>Acciones</TableCell>
                 </TableRow>
-              ) : (
-                usuarios.map((usuario) => (
-                  <TableRow key={usuario.idUsuario}>
-                    <TableCell>{usuario.idUsuario}</TableCell>
-                    <TableCell>{usuario.nombreUsuario}</TableCell>
-                    <TableCell>
-                      {usuario.persona ? (
-                        <Chip
-                          icon={<PersonIcon />}
-                          label={`${usuario.persona.nombre} ${usuario.persona.apellido}`}
-                          variant="outlined"
-                          size="small"
-                        />
-                      ) : (
-                        <Typography variant="caption" color="error">
-                          Sin asignar
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>{usuario.rol?.nombreRol || usuario.idRol}</TableCell>
-                    <TableCell>
-                      <Chip label={usuario.estado} color={getEstadoColor(usuario.estado)} size="small" />
-                    </TableCell>
-                    <TableCell>
-                      <IconButton color="primary" onClick={() => irAEditarUsuario(usuario.idUsuario)} title="Editar">
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton color="error" onClick={() => confirmarEliminar(usuario)} title="Eliminar">
-                        <DeleteIcon />
-                      </IconButton>
+              </TableHead>
+              <TableBody>
+                {usuarios.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      No hay usuarios registrados
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                ) : (
+                  usuarios.map((usuario) => (
+                    <TableRow key={usuario.idUsuario}>
+                      <TableCell>{usuario.idUsuario}</TableCell>
+                      <TableCell>{usuario.nombreUsuario}</TableCell>
+                      <TableCell>
+                        {usuario.persona ? (
+                          <Chip
+                            icon={<PersonIcon />}
+                            label={`${usuario.persona.nombre} ${usuario.persona.apellido}`}
+                            variant="outlined"
+                            size="small"
+                          />
+                        ) : (
+                          <Typography variant="caption" color="error">
+                            Sin asignar
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{usuario.rol?.nombreRol || usuario.idRol}</TableCell>
+                      <TableCell>
+                        <Chip label={usuario.estado} color={getEstadoColor(usuario.estado)} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton color="primary" onClick={() => irAEditarUsuario(usuario.idUsuario)} title="Editar">
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton color="error" onClick={() => confirmarEliminar(usuario)} title="Eliminar">
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
 
       {/* Diálogo de confirmación para eliminar */}

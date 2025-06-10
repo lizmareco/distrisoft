@@ -20,6 +20,12 @@ import {
   DialogTitle,
   Box,
   CircularProgress,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
 } from "@mui/material"
 import { Add, Edit, Delete, ArrowBack } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
@@ -30,12 +36,47 @@ export default function ListaMateriaPrima() {
   const [materiasPrimas, setMateriasPrimas] = useState([])
   const [openDelete, setOpenDelete] = useState(false)
   const [selectedMateriaPrima, setSelectedMateriaPrima] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  // Filtros
+  const [filtroId, setFiltroId] = useState("")
+  const [filtroDescripcion, setFiltroDescripcion] = useState("")
+  const [filtroEstado, setFiltroEstado] = useState("")
+  const [estados, setEstados] = useState([])
+  const [hasSearched, setHasSearched] = useState(false)
 
-  const fetchMateriasPrimas = async () => {
+  // Cargar estados para el filtro
+  useEffect(() => {
+    const fetchEstados = async () => {
+      try {
+        const res = await fetch("/api/estadomateriaprima")
+        if (res.ok) {
+          const data = await res.json()
+          setEstados(data)
+        }
+      } catch (e) {
+        // No hacer nada
+      }
+    }
+    fetchEstados()
+  }, [])
+
+  const fetchMateriasPrimas = async (params = {}) => {
     try {
       setLoading(true)
-      const response = await fetch("/api/materiaprima")
+      setHasSearched(true)
+      const token = localStorage.getItem("accessToken")
+      let url = "/api/materiaprima/buscar?"
+      const searchParams = new URLSearchParams()
+      if (params.id) searchParams.append("id", params.id)
+      if (params.descripcion) searchParams.append("query", params.descripcion)
+      if (params.estado) searchParams.append("estado", params.estado)
+      url += searchParams.toString()
+      const response = await fetch(url, {
+        credentials: "include",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      })
       if (!response.ok) throw new Error("Error al cargar materias primas")
       const data = await response.json()
       setMateriasPrimas(data)
@@ -47,9 +88,21 @@ export default function ListaMateriaPrima() {
     }
   }
 
-  useEffect(() => {
-    fetchMateriasPrimas()
-  }, [])
+  const handleBuscar = (e) => {
+    e.preventDefault()
+    fetchMateriasPrimas({
+      id: filtroId,
+      descripcion: filtroDescripcion,
+      estado: filtroEstado,
+    })
+  }
+
+  const handleMostrarTodos = () => {
+    setFiltroId("")
+    setFiltroDescripcion("")
+    setFiltroEstado("")
+    fetchMateriasPrimas({})
+  }
 
   const handleEdit = (materiaPrima) => {
     router.push(`/materiaprima/formulario?id=${materiaPrima.idMateriaPrima}`)
@@ -103,52 +156,113 @@ export default function ListaMateriaPrima() {
         </Button>
       </Box>
 
+      <Paper sx={{ mb: 3, p: 2 }}>
+        <form onSubmit={handleBuscar}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={3} md={2}>
+              <TextField
+                label="ID"
+                value={filtroId}
+                onChange={e => setFiltroId(e.target.value)}
+                fullWidth
+                size="small"
+                type="number"
+              />
+            </Grid>
+            <Grid item xs={12} sm={5} md={4}>
+              <TextField
+                label="Descripción o Nombre"
+                value={filtroDescripcion}
+                onChange={e => setFiltroDescripcion(e.target.value)}
+                fullWidth
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Estado</InputLabel>
+                <Select
+                  value={filtroEstado}
+                  label="Estado"
+                  onChange={e => setFiltroEstado(e.target.value)}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  {estados.map((estado) => (
+                    <MenuItem key={estado.idEstadoMateriaPrima} value={estado.idEstadoMateriaPrima}>
+                      {estado.descEstadoMateriaPrima}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <Button type="submit" variant="contained" color="primary" fullWidth>
+                Buscar
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <Button variant="outlined" color="secondary" fullWidth onClick={handleMostrarTodos}>
+                Mostrar Todos
+              </Button>
+            </Grid>
+          </Grid>
+        </form>
+      </Paper>
+
       {loading ? (
         <Box display="flex" justifyContent="center" my={4}>
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Nombre</TableCell>
-                <TableCell>Descripción</TableCell>
-                <TableCell>Estado</TableCell>
-                <TableCell>Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {materiasPrimas.length > 0 ? (
-                materiasPrimas.map((materiaPrima) => (
-                  <TableRow key={materiaPrima.idMateriaPrima}>
-                    <TableCell>{materiaPrima.idMateriaPrima}</TableCell>
-                    <TableCell>{materiaPrima.nombreMateriaPrima}</TableCell>
-                    <TableCell>{materiaPrima.descMateriaPrima}</TableCell>
-                    <TableCell>
-                      {materiaPrima.estadoMateriaPrima ? materiaPrima.estadoMateriaPrima.descEstadoMateriaPrima : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <IconButton color="primary" onClick={() => handleEdit(materiaPrima)} size="small">
-                        <Edit />
-                      </IconButton>
-                      <IconButton color="error" onClick={() => handleOpenDelete(materiaPrima)} size="small">
-                        <Delete />
-                      </IconButton>
+        hasSearched ? (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Nombre</TableCell>
+                  <TableCell>Descripción</TableCell>
+                  <TableCell>Estado</TableCell>
+                  <TableCell>Acciones</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {materiasPrimas.length > 0 ? (
+                  materiasPrimas.map((materiaPrima) => (
+                    <TableRow key={materiaPrima.idMateriaPrima}>
+                      <TableCell>{materiaPrima.idMateriaPrima}</TableCell>
+                      <TableCell>{materiaPrima.nombreMateriaPrima}</TableCell>
+                      <TableCell>{materiaPrima.descMateriaPrima}</TableCell>
+                      <TableCell>
+                        {materiaPrima.estadoMateriaPrima ? materiaPrima.estadoMateriaPrima.descEstadoMateriaPrima : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        <IconButton color="primary" onClick={() => handleEdit(materiaPrima)} size="small">
+                          <Edit />
+                        </IconButton>
+                        <IconButton color="error" onClick={() => handleOpenDelete(materiaPrima)} size="small">
+                          <Delete />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      No hay materias primas registradas
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    No hay materias primas registradas
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+            <Typography variant="body1" color="text.secondary">
+              Favor utilizar los filtros de búsqueda para visualizar las materias primas.
+            </Typography>
+          </Box>
+        )
       )}
 
       {/* Confirmación de Eliminación */}

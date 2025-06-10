@@ -14,6 +14,9 @@ export async function GET(request) {
     // Verificar si se debe incluir roles inactivos
     const { searchParams } = new URL(request.url)
     const includeInactive = searchParams.get("includeInactive") === "true"
+    const nombreRol = searchParams.get("nombreRol")
+    const estadoRol = searchParams.get("estadoRol")
+    const permiso = searchParams.get("permiso")
 
     console.log(`API roles: Incluir inactivos: ${includeInactive}`)
 
@@ -38,7 +41,7 @@ export async function GET(request) {
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso sin token")
         // Obtener roles con sus permisos
-        const roles = await obtenerRoles(includeInactive)
+        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
         console.log("API: Roles obtenidos en modo desarrollo sin token", { cantidad: roles.length })
         return NextResponse.json({ roles }, { status: 200 })
       }
@@ -57,7 +60,7 @@ export async function GET(request) {
       // En desarrollo, permitir acceso con token inválido
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso con token inválido")
-        const roles = await obtenerRoles(includeInactive)
+        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
         console.log("API: Roles obtenidos en modo desarrollo con token inválido", { cantidad: roles.length })
         return NextResponse.json({ roles }, { status: 200 })
       }
@@ -69,7 +72,7 @@ export async function GET(request) {
       // En desarrollo, permitir acceso sin datos de usuario
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso sin datos de usuario")
-        const roles = await obtenerRoles(includeInactive)
+        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
         console.log("API: Roles obtenidos en modo desarrollo sin permisos adecuados", { cantidad: roles.length })
         return NextResponse.json({ roles }, { status: 200 })
       }
@@ -84,7 +87,7 @@ export async function GET(request) {
       // En desarrollo, permitir acceso sin importar el rol
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso sin importar el rol")
-        const roles = await obtenerRoles(includeInactive)
+        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
         console.log("API: Roles obtenidos en modo desarrollo sin permisos adecuados", { cantidad: roles.length })
         return NextResponse.json({ roles }, { status: 200 })
       }
@@ -93,7 +96,7 @@ export async function GET(request) {
     }
 
     // Obtener roles con sus permisos
-    const roles = await obtenerRoles(includeInactive)
+    const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
 
     console.log("API: Roles obtenidos correctamente", { cantidad: roles.length })
     return NextResponse.json({ roles }, { status: 200 })
@@ -116,8 +119,8 @@ export async function GET(request) {
   }
 }
 
-// Función auxiliar para obtener roles
-async function obtenerRoles(includeInactive = false) {
+// Función auxiliar para obtener roles con filtros
+async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol = "", permiso = "") {
   // Construir la condición where basada en si se incluyen inactivos o no
   const whereCondition = {
     // Siempre excluir roles borrados (con deletedAt)
@@ -128,6 +131,12 @@ async function obtenerRoles(includeInactive = false) {
   // Si no se incluyen inactivos, filtrar por estado ACTIVO
   if (!includeInactive) {
     whereCondition.estadoRol = "ACTIVO"
+  }
+  if (estadoRol) {
+    whereCondition.estadoRol = estadoRol
+  }
+  if (nombreRol) {
+    whereCondition.nombreRol = { contains: nombreRol, mode: "insensitive" }
   }
 
   console.log(`Obteniendo roles con condición:`, whereCondition)
@@ -155,8 +164,19 @@ async function obtenerRoles(includeInactive = false) {
     },
   })
 
+  // Si hay filtro de permiso, filtrar los roles en JS
+  let rolesFiltrados = roles
+  if (permiso) {
+    const permisoLower = permiso.toLowerCase()
+    rolesFiltrados = roles.filter(rol =>
+      rol.rolPermiso.some(rp =>
+        rp.permiso.nombrePermiso.toLowerCase().includes(permisoLower)
+      )
+    )
+  }
+
   // Transformar los datos para una respuesta más limpia
-  return roles.map((rol) => ({
+  return rolesFiltrados.map((rol) => ({
     idRol: rol.idRol,
     nombreRol: rol.nombreRol,
     estadoRol: rol.estadoRol,

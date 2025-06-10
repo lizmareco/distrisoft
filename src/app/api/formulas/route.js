@@ -16,11 +16,28 @@ export async function GET(request) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Obtener todas las fórmulas que no están eliminadas lógicamente
+    // Obtener parámetros de búsqueda
+    const { searchParams } = new URL(request.url)
+    const query = searchParams.get("query") || ""
+    const all = searchParams.get("all") === "true"
+
+    // Si no hay parámetros, no devolver nada
+    if (!query && !all) {
+      return NextResponse.json([])
+    }
+
+    // Construir condiciones de búsqueda
+    const where = { deletedAt: null }
+    if (query) {
+      where.OR = [
+        { nombre: { contains: query, mode: "insensitive" } },
+        { descripcion: { contains: query, mode: "insensitive" } },
+        { producto: { nombreProducto: { contains: query, mode: "insensitive" } } },
+      ]
+    }
+
     const formulas = await prisma.formula.findMany({
-      where: {
-        deletedAt: null // Asegurar que solo se obtienen las no eliminadas
-      },
+      where,
       include: {
         producto: true,
         FormulaDetalle: {

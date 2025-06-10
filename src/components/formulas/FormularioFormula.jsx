@@ -77,7 +77,13 @@ export default function FormularioFormula({ formulaId }) {
         setProductos(datosProductos);
         
         // Cargar materias primas
-        const respuestaMP = await fetch('/api/materiaprima');
+        const token = localStorage.getItem("accessToken")
+        const respuestaMP = await fetch('/api/materiaprima', {
+          credentials: 'include',
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        });
         if (!respuestaMP.ok) {
           throw new Error(`Error al cargar materias primas: ${respuestaMP.status}`);
         }
