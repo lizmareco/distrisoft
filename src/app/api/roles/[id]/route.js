@@ -2,9 +2,38 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
 
 const prisma = new PrismaClient()
 const auditoriaService = new AuditoriaService()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET /api/roles/[id] - Obtener un rol específico
 export async function GET(request, { params }) {
@@ -47,7 +76,6 @@ export async function GET(request, { params }) {
     }
 
     console.log(`API: Rol con ID ${id} obtenido correctamente:`, rolFormateado)
-    console.log("Permisos del rol:", rolFormateado.permisos)
 
     return NextResponse.json({ rol: rolFormateado }, { status: 200 })
   } catch (error) {
@@ -61,28 +89,15 @@ export async function PUT(request, { params }) {
   try {
     const { id } = params
     console.log(`API: Recibida solicitud para actualizar rol con ID: ${id}`)
-    const authController = new AuthController()
-
-    // Obtener el usuario autenticado para la auditoría
-    let idUsuario = 1 // Valor por defecto para desarrollo
-    let userData = null
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userDataResponse = await authController.getUserFromToken(accessToken)
-      if (userDataResponse) {
-        userData = userDataResponse
-        idUsuario = userData.idUsuario
-      }
-    }
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Verificar que el usuario tenga rol de administrador
     if (
       process.env.NODE_ENV !== "development" &&
       userData &&
       userData.rol !== "ADMINISTRADOR" &&
-      userData.rol !== "ADMINISTRADOR_SISTEMA"
+      userData.rol !== "ADMINISTRADORSISTEMA"
     ) {
       return NextResponse.json({ message: "No tienes permisos para actualizar roles" }, { status: 403 })
     }
@@ -196,6 +211,8 @@ export async function PUT(request, { params }) {
     })
 
     // Registrar la acción en auditoría
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
     try {
       await auditoriaService.registrarAuditoria({
         entidad: "Rol",
@@ -204,7 +221,8 @@ export async function PUT(request, { params }) {
         valorAnterior: rolAnterior,
         valorNuevo: rolCompletoActualizado,
         idUsuario,
-        request,
+        direccionIP,
+        navegador,
       })
     } catch (auditoriaError) {
       console.error("Error al registrar auditoría:", auditoriaError)
@@ -229,28 +247,15 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = params
     console.log(`API: Eliminando rol con ID: ${id}`)
-    const authController = new AuthController()
-
-    // Obtener el usuario autenticado para la auditoría
-    let idUsuario = 1 // Valor por defecto para desarrollo
-    let userData = null
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userDataResponse = await authController.getUserFromToken(accessToken)
-      if (userDataResponse) {
-        userData = userDataResponse
-        idUsuario = userData.idUsuario
-      }
-    }
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Verificar que el usuario tenga rol de administrador
     if (
       process.env.NODE_ENV !== "development" &&
       userData &&
       userData.rol !== "ADMINISTRADOR" &&
-      userData.rol !== "ADMINISTRADOR_SISTEMA"
+      userData.rol !== "ADMINISTRADORSISTEMA"
     ) {
       return NextResponse.json({ message: "No tienes permisos para eliminar roles" }, { status: 403 })
     }
@@ -279,6 +284,8 @@ export async function DELETE(request, { params }) {
     })
 
     // Registrar la acción en auditoría
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
     await auditoriaService.registrarAuditoria({
       entidad: "Rol",
       idRegistro: id.toString(),
@@ -286,7 +293,8 @@ export async function DELETE(request, { params }) {
       valorAnterior: rolAnterior,
       valorNuevo: { ...rolAnterior, estadoRol: "INACTIVO" },
       idUsuario,
-      request,
+      direccionIP,
+      navegador,
     })
 
     console.log(`API: Rol con ID ${id} desactivado correctamente`)

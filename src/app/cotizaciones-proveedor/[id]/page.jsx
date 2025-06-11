@@ -371,16 +371,6 @@ export default function VerCotizacionProveedorPage({ params }) {
                   >
                     Rechazar
                   </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={<Delete />}
-                    onClick={handleOpenDeleteDialog}
-                    sx={{ mr: 1 }}
-                    disabled={procesandoAccion}
-                  >
-                    Eliminar
-                  </Button>
                 </>
               )}
             </Box>

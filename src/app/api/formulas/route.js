@@ -3,6 +3,35 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/prisma/client";
 import AuthController from "@/src/backend/controllers/auth-controller";
 import AuditoriaService from "@/src/backend/services/auditoria-service";
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET /api/formulas - Obtener todas las fórmulas
 export async function GET(request) {
@@ -65,23 +94,9 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Verificar autenticación
-    const authController = new AuthController();
-    const token = await authController.hasAccessToken(request);
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
     
-    let userData = null; // Inicializar userData
-    
-    if (!token && process.env.NODE_ENV !== "development") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    
-    // Si hay token, obtener el usuario
-    if (token) {
-      userData = await authController.getUserFromToken(token);
-      if (!userData) {
-        return NextResponse.json({ error: "Token inválido" }, { status: 401 });
-      }
-    }
-
     const datos = await request.json();
     
     if (!datos.idProducto || !datos.nombre || !datos.rendimiento || !datos.detalles || datos.detalles.length === 0) {
@@ -122,8 +137,7 @@ export async function POST(request) {
       return { formula, detalles };
     });
 
-    // Registrar en auditoría
-    const auditoriaService = new AuditoriaService();
+
     
     // Construir el objeto valorNuevo
     const valorNuevo = {
@@ -138,14 +152,19 @@ export async function POST(request) {
       }))
     };
     
+
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     await auditoriaService.registrarAuditoria({
       entidad: "Formula",
       idRegistro: resultado.formula.idFormula,
       accion: "CREAR",
       valorAnterior: null,
       valorNuevo,
-      idUsuario: userData ? userData.idUsuario : 1, // Usar el ID del usuario del token
-      request // Pasar el objeto request completo
+      idUsuario, 
+      direccionIP,
+      navegador
     });
 
     return NextResponse.json({

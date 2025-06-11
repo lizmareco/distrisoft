@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/prisma/client" // ← FALTA ESTA IMPORTACIÓN
+import { prisma } from "@/prisma/client" 
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
+
+async function getUserIdFromRequest(request, authController) {
+  let token = null
+  if (request.cookies && typeof request.cookies.get === "function") {
+    token = request.cookies.get("at")?.value
+  }
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+  if (!token) return 1 // O null
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function GET(request) {
   try {
@@ -61,15 +77,8 @@ export async function POST(request) {
     // Inicializar servicio de auditoría
     const auditoriaService = new AuditoriaService()
     const authController = new AuthController()
+    const idUsuario = await getUserIdFromRequest(request, authController)
 
-    // Obtener el usuario actual desde el token (si está autenticado)
-    const accessToken = await authController.hasAccessToken(request)
-    let idUsuario = 1 // Usuario por defecto
-
-    if (accessToken) {
-      const userData = await authController.getUserFromToken(accessToken)
-      idUsuario = userData?.idUsuario || 1
-    }
 
     // Validar datos requeridos
     if (!data.idPersona || !data.idSectorCliente) {

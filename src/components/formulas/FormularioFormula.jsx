@@ -69,7 +69,7 @@ export default function FormularioFormula({ formulaId }) {
         setLoadingData(true);
         
         // Cargar productos
-        const respuestaProductos = await fetch('/api/productos');
+        const respuestaProductos = await fetch('/api/productos?estado=1');
         if (!respuestaProductos.ok) {
           throw new Error(`Error al cargar productos: ${respuestaProductos.status}`);
         }
@@ -285,7 +285,8 @@ export default function FormularioFormula({ formulaId }) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(datosFormula)
+        body: JSON.stringify(datosFormula),
+        credentials: 'include',
       });
       
       if (!respuesta.ok) {

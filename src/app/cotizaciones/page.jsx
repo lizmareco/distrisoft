@@ -34,6 +34,11 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useRootContext } from "@/src/app/context/root"
+import { Delete } from "@mui/icons-material"
+import Dialog from "@mui/material/Dialog"
+import DialogTitle from "@mui/material/DialogTitle"
+import DialogContent from "@mui/material/DialogContent"
+import DialogActions from "@mui/material/DialogActions"
 
 export default function CotizacionesPage() {
   const router = useRouter()
@@ -47,6 +52,9 @@ export default function CotizacionesPage() {
   const [loadingClientes, setLoadingClientes] = useState(false)
   const [error, setError] = useState(null)
   const [hasSearched, setHasSearched] = useState(false)
+
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false)
+  const [cotizacionAEliminar, setCotizacionAEliminar] = useState(null)
 
   // Estados para filtros
   const [filtros, setFiltros] = useState({
@@ -250,6 +258,41 @@ export default function CotizacionesPage() {
     )
   }
 
+  const handleOpenConfirmDialog = (cotizacion) => {
+    setCotizacionAEliminar(cotizacion)
+    setOpenConfirmDialog(true)
+  }
+
+  const handleCloseConfirmDialog = () => {
+    setOpenConfirmDialog(false)
+    setCotizacionAEliminar(null)
+  }
+
+  const handleEliminarCotizacion = async () => {
+    if (!cotizacionAEliminar) return
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/cotizaciones/${cotizacionAEliminar.idCotizacionCliente}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Error al eliminar cotización")
+      setSnackbarMessage("Cotización eliminada correctamente")
+      setSnackbarSeverity("success")
+      setOpenSnackbar(true)
+      buscarCotizaciones()
+    } catch (error) {
+      setSnackbarMessage("Error al eliminar cotización: " + error.message)
+      setSnackbarSeverity("error")
+      setOpenSnackbar(true)
+    } finally {
+      setLoading(false)
+      handleCloseConfirmDialog()
+    }
+  }
+
+  
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" alignItems="center" mb={3}>
@@ -441,6 +484,18 @@ export default function CotizacionesPage() {
                       >
                         <Visibility />
                       </IconButton>
+                      {/* Mostrar solo si es PENDIENTE */}
+                      {cotizacion.estadoCotizacionCliente?.idEstadoCotizacionCliente === 1 && (
+    <IconButton
+      color="error"
+      onClick={() => handleOpenConfirmDialog(cotizacion)}
+      title="Eliminar cotización"
+      size="small"
+      disabled={loading}
+    >
+      <Delete />
+    </IconButton>
+  )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -468,6 +523,28 @@ export default function CotizacionesPage() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Dialog para confirmar eliminación */}
+      <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog} maxWidth="xs" fullWidth>
+      <DialogTitle>Confirmar eliminación</DialogTitle>
+      <DialogContent>
+        ¿Está seguro que desea eliminar la cotización
+        {cotizacionAEliminar ? ` #${cotizacionAEliminar.idCotizacionCliente}` : ""}? Esta acción no se puede deshacer.
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleCloseConfirmDialog} color="secondary" variant="outlined">
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleEliminarCotizacion}
+          color="error"
+          variant="contained"
+          disabled={loading}
+        >
+          Eliminar
+        </Button>
+      </DialogActions>
+    </Dialog>
     </Container>
   )
 }

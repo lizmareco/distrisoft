@@ -25,8 +25,8 @@ export async function GET(request) {
         return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
       }
 
-      // Verificar que el usuario tenga permisos de administrador
-      if (userData.rol !== "ADMINISTRADOR") {
+      // Verificar que el usuario tenga el permiso VIEW_AUDITORIA
+      if (!userData.permisos || !userData.permisos.includes("VIEW_AUDITORIA")) {
         return NextResponse.json(
           { message: "No tienes permisos para acceder a esta información" },
           { status: HTTP_STATUS_CODES.forbidden },
@@ -47,17 +47,24 @@ export async function GET(request) {
     const fechaInicio = searchParams.get("fechaInicio")
     const fechaFin = searchParams.get("fechaFin")
 
+    
     // Obtener registros de auditoría
-    const resultado = await auditoriaService.obtenerRegistros({
-      page,
-      limit,
-      entidad,
-      idRegistro,
-      accion,
-      idUsuario,
-      fechaInicio,
-      fechaFin,
-    })
+    let resultado;
+    try {
+      resultado = await auditoriaService.obtenerRegistros({
+        page,
+        limit,
+        entidad,
+        idRegistro,
+        accion,
+        idUsuario,
+        fechaInicio,
+        fechaFin,
+      });
+    } catch (err) {
+      console.error("[API AUDITORIA] Error en obtenerRegistros:", err, err?.stack);
+      throw err;
+    }
 
     return NextResponse.json(resultado, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {

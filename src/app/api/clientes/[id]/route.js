@@ -1,6 +1,23 @@
 import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
+
+async function getUserIdFromRequest(request, authController) {
+  let token = null
+  if (request.cookies && typeof request.cookies.get === "function") {
+    token = request.cookies.get("at")?.value
+  }
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+  if (!token) return 1 // O null
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function GET(request, { params }) {
   try {
@@ -36,9 +53,9 @@ export async function PUT(request, { params }) {
   try {
     console.log(`Actualizando cliente con ID: ${params.id}...`)
     const auditoriaService = new AuditoriaService()
+    const authController = new AuthController()
+    const idUsuario = await getUserIdFromRequest(request, authController)
 
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
 
     const { id } = params
     const data = await request.json()
@@ -86,7 +103,7 @@ export async function PUT(request, { params }) {
       Number.parseInt(id),
       clienteAnterior,
       cliente,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )
@@ -103,12 +120,10 @@ export async function DELETE(request, { params }) {
   try {
     console.log(`Eliminando cliente con ID: ${params.id}...`)
     const auditoriaService = new AuditoriaService()
-
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const authController = new AuthController()
+    const idUsuario = await getUserIdFromRequest(request, authController)
 
     const { id } = params
-
     // Obtener el cliente actual para auditoría
     const clienteAnterior = await prisma.cliente.findUnique({
       where: { idCliente: Number.parseInt(id) },
@@ -142,7 +157,7 @@ export async function DELETE(request, { params }) {
       "Cliente",
       Number.parseInt(id),
       clienteAnterior,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )

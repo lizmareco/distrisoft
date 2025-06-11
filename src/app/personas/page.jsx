@@ -240,8 +240,14 @@ export default function PersonasPage() {
   const handleConfirmDelete = async () => {
     try {
       setLoading(true)
+      // Obtener el accessToken de localStorage
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       const response = await fetch(`/api/personas/${confirmDialog.personaId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {}),
+        },
       })
 
       if (!response.ok) {

@@ -3,39 +3,42 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
 
-const authController = new AuthController()
-const auditoriaService = new AuditoriaService()
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // PUT /api/pedidos/[id]/estado - Actualizar estado de un pedido
 export async function PUT(request, { params }) {
   let idPedido
   try {
-    // Verificar autenticación
-    const token = await authController.hasAccessToken(request)
-    let userData = null
-
-    if (process.env.NODE_ENV === "development") {
-      if (!token) {
-        console.log("Modo desarrollo: Usando token especial de desarrollo")
-        userData = {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "desarrollo",
-          permisos: ["*"],
-        }
-      } else {
-        userData = await authController.getUserFromToken(token)
-      }
-    } else {
-      if (!token) {
-        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-      }
-      userData = await authController.getUserFromToken(token)
-    }
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Extraer y convertir el ID de manera segura
     const paramId = params ? String(params.id || "0") : "0"
@@ -316,10 +319,11 @@ export async function PUT(request, { params }) {
       }
     })
 
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar auditoría del pedido
-    if (userData) {
-      const direccionIP = auditoriaService.obtenerDireccionIP(request)
-      const navegador = auditoriaService.obtenerInfoNavegador(request)
+    
       await auditoriaService.registrarActualizacion(
         "PedidoCliente",
         idPedido,
@@ -328,11 +332,10 @@ export async function PUT(request, { params }) {
           pedido: resultado.pedido,
           detalles: resultado.detalles,
         },
-        userData.idUsuario,
+        idUsuario,
         direccionIP,
         navegador
       )
-    }
 
     // Registrar auditoría específica para facturas actualizadas
     for (const facturaInfo of resultado.facturasActualizadas) {
@@ -349,7 +352,7 @@ export async function PUT(request, { params }) {
             cantidadFacturas: facturaInfo.cantidad,
             motivoCambio: `Cambio automático por estado de pedido: ${resultado.pedidoActualizado.estadoPedido.descEstadoPedido}`,
           },
-          idUsuario: userData.idUsuario,
+          idUsuario,
           direccionIP: auditoriaService.obtenerDireccionIP(request),
           navegador: auditoriaService.obtenerInfoNavegador(request),
         })
@@ -393,32 +396,6 @@ export async function PUT(request, { params }) {
 export async function GET(request, { params }) {
   let idPedido
   try {
-    // Verificar autenticación
-    const token = await authController.hasAccessToken(request)
-    let userData = null
-
-    if (process.env.NODE_ENV === "development") {
-      if (!token) {
-        console.log("Modo desarrollo: Usando token especial de desarrollo")
-        userData = {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "desarrollo",
-          permisos: ["*"],
-        }
-      } else {
-        userData = await authController.getUserFromToken(token)
-      }
-    } else {
-      if (!token) {
-        return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-      }
-      userData = await authController.getUserFromToken(token)
-    }
-
     // Extraer y convertir el ID de manera segura
     const paramId = params ? String(params.id || "0") : "0"
     idPedido = Number.parseInt(paramId)

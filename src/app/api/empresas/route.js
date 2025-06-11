@@ -2,6 +2,7 @@ import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
 
 // Función auxiliar para obtener el ID del tipo de documento RUC
 async function getTipoDocumentoRUC() {
@@ -97,13 +98,32 @@ export async function GET(request) {
   }
 }
 
+
+async function getUserIdFromRequest(request, authController) {
+  let token = null
+  if (request.cookies && typeof request.cookies.get === "function") {
+    token = request.cookies.get("at")?.value
+  }
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+  if (!token) return 1 // O null
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 export async function POST(request) {
   try {
     console.log("Creando nueva empresa...")
+    // Obtener el usuario autenticado desde el header Authorization
     const auditoriaService = new AuditoriaService()
+    const authController = new AuthController()
+    const idUsuario = await getUserIdFromRequest(request, authController)
 
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+
 
     const data = await request.json()
     console.log("Datos recibidos:", data)
@@ -120,22 +140,25 @@ export async function POST(request) {
     // Verificar si ya existe una empresa con el mismo RUC
     const empresaExistente = await prisma.empresa.findFirst({
       where: {
-        ruc: data.ruc,
-        deletedAt: null, // Solo considerar empresas activas
-      },
+        deletedAt: null,
+        OR: [
+          { ruc: { equals: data.ruc, mode: "insensitive" } },
+        ]
+      }
     })
 
     if (empresaExistente) {
-      console.log(`Ya existe una empresa con el RUC ${data.ruc}: ID ${empresaExistente.idEmpresa}`)
+      let campoDuplicado = empresaExistente.ruc.toLowerCase() === data.ruc.toLowerCase() ? "RUC" : "razón social";
       return NextResponse.json(
         {
-          error: `Ya existe una empresa registrada con el RUC ${data.ruc}`,
+          error: `Ya existe una empresa registrada con el ${campoDuplicado} ${campoDuplicado === "RUC" ? data.ruc : data.razonSocial}`,
           empresaExistente: {
             id: empresaExistente.idEmpresa,
             razonSocial: empresaExistente.razonSocial,
-          },
+            ruc: empresaExistente.ruc
+          }
         },
-        { status: HTTP_STATUS_CODES.conflict }, // 409 Conflict
+        { status: HTTP_STATUS_CODES.conflict }
       )
     }
 
@@ -170,7 +193,7 @@ await auditoriaService.registrarCreacion(
   "Empresa", 
   empresa.idEmpresa, 
   empresa, 
-  userData.idUsuario, 
+  idUsuario, 
   direccionIP, 
   navegador
 )

@@ -2,6 +2,7 @@ import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
 
 export async function GET(request, { params }) {
   try {
@@ -41,8 +42,17 @@ export async function PUT(request, { params }) {
     console.log("Datos recibidos:", data)
 
     const auditoriaService = new AuditoriaService()
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const authController = new AuthController()
+    // Obtener el usuario autenticado desde el token
+    let idUsuario = 1
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userData = await authController.getUserFromToken(accessToken)
+      if (userData?.idUsuario) {
+        idUsuario = userData.idUsuario
+      }
+    }
+    console.log("[PERSONA API] idUsuario usado para auditoría:", idUsuario)
 
     // Obtener la persona actual para auditoría
     const personaAnterior = await prisma.persona.findUnique({
@@ -126,7 +136,7 @@ await auditoriaService.registrarActualizacion(
   Number.parseInt(id),
   personaAnterior,
   persona,
-  userData.idUsuario,
+  idUsuario,
   direccionIP,
   navegador
 )
@@ -147,8 +157,16 @@ export async function DELETE(request, { params }) {
     console.log(`API: Eliminando persona con ID: ${id}`)
 
     const auditoriaService = new AuditoriaService()
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const authController = new AuthController()
+    // Obtener el usuario autenticado desde el token
+    let idUsuario = 1
+    const accessToken = await authController.hasAccessToken(request)
+    if (accessToken) {
+      const userData = await authController.getUserFromToken(accessToken)
+      if (userData?.idUsuario) {
+        idUsuario = userData.idUsuario
+      }
+    }
 
     // Obtener la persona actual para auditoría
     const personaAnterior = await prisma.persona.findUnique({
@@ -181,7 +199,7 @@ await auditoriaService.registrarEliminacion(
   "Persona",
   Number.parseInt(id),
   personaAnterior,
-  userData.idUsuario,
+  idUsuario,
   direccionIP,
   navegador
 )

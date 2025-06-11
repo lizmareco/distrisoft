@@ -117,10 +117,13 @@ export default function NuevaPersonaPage() {
     setError(null)
 
     try {
+      // Obtener el accessToken de localStorage
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       const response = await fetch("/api/personas", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify(formData),
       })

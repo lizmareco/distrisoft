@@ -61,7 +61,10 @@ export default function AuditoriaPage() {
 
   // Estado para exportación
   const [exportLoading, setExportLoading] = useState(false)
-    const context = useRootContext()
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_AUDITORIA")
+  const { isLoading } = context;
 
   // Lista de acciones para el filtro
   const acciones = [
@@ -87,16 +90,12 @@ export default function AuditoriaPage() {
     { value: "OrdenCompra", label: "Orden de Compra" },
   ]
 
-  // Verificación de permisos
-  const permisos = context.session?.permisos || []
-  const hasPermission = permisos.find((permiso) => permiso === "VIEW_AUDITORIA")
-
-  // Cargar datos al montar el componente y cuando cambien los filtros o paginación
+  // Cargar datos al montar el componente y cuando cambien los filtros, paginación o permisos
   useEffect(() => {
     if (!hasPermission) return;
     cargarDatos()
     cargarUsuarios()
-  }, [page, rowsPerPage])
+  }, [page, rowsPerPage, hasPermission, context.session])
 
   // Función para cargar la lista de usuarios
   const cargarUsuarios = async () => {
@@ -331,12 +330,22 @@ export default function AuditoriaPage() {
     }
   }
 
+  // Mostrar loading mientras el contexto se está cargando
+  if (isLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  // Mostrar error si no tiene permiso
   if (!hasPermission) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Alert severity="error">No tiene permisos para ver esta página</Alert>
       </Container>
-    )
+    );
   }
 
   return (

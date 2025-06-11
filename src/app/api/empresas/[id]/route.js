@@ -2,6 +2,31 @@ import { prisma } from "@/prisma/client"
 import { NextResponse } from "next/server"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie"
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Lee las cookies del header 'cookie' (importante para app router)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at // <-- así obtenés la cookie at
+  }
+
+  // Fallback: Authorization header
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function GET(request, { params }) {
   try {
@@ -34,6 +59,7 @@ export async function GET(request, { params }) {
   }
 }
 
+
 export async function PUT(request, { params }) {
   try {
     const { id } = params
@@ -42,8 +68,7 @@ export async function PUT(request, { params }) {
     console.log("Datos recibidos:", data)
 
     const auditoriaService = new AuditoriaService()
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener la empresa actual para auditoría
     const empresaAnterior = await prisma.empresa.findUnique({
@@ -106,14 +131,19 @@ export async function PUT(request, { params }) {
     })
 
     // Registrar la acción en auditoría
+
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     await auditoriaService.registrarAuditoria({
       entidad: "Empresa",
       idRegistro: id.toString(),
       accion: "ACTUALIZAR",
       valorAnterior: empresaAnterior,
       valorNuevo: empresa,
-      idUsuario: userData.idUsuario,
-      request: request,
+      idUsuario: idUsuario, 
+      direccionIP, 
+      navegador
     })
 
     return NextResponse.json(empresa, { status: HTTP_STATUS_CODES.ok })
@@ -132,8 +162,7 @@ export async function DELETE(request, { params }) {
     console.log(`API: Eliminando empresa con ID: ${id}`)
 
     const auditoriaService = new AuditoriaService()
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener la empresa actual para auditoría
     const empresaAnterior = await prisma.empresa.findUnique({
@@ -157,14 +186,19 @@ export async function DELETE(request, { params }) {
     })
 
     // Registrar la acción en auditoría
+
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     await auditoriaService.registrarAuditoria({
       entidad: "Empresa",
       idRegistro: id.toString(),
       accion: "ELIMINAR",
       valorAnterior: empresaAnterior,
       valorNuevo: null,
-      idUsuario: userData.idUsuario,
-      request: request,
+      idUsuario,
+      direccionIP, 
+      navegador
     })
 
     return NextResponse.json({ message: "Empresa eliminada correctamente" }, { status: HTTP_STATUS_CODES.ok })

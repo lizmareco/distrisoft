@@ -6,8 +6,36 @@ import { validatePasswordComplexity } from "../../../utils/passwordUtils"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
-
+import cookie from "cookie" 
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET /api/usuarios - Obtener todos los usuarios
 export async function GET(request) {
@@ -16,7 +44,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const nombreUsuario = searchParams.get("nombreUsuario")
     const persona = searchParams.get("persona")
-    const rol = searchParams.get("rol")
+    const rol = searchParams.get("rol")      // ID del rol
+    const descripcionRol = searchParams.get("descripcionRol") // Nueva: descripción del rol (ej: "PRODUCCION")
     const estado = searchParams.get("estado")
     const all = searchParams.get("all") === "true"
 
@@ -34,7 +63,7 @@ export async function GET(request) {
     }
 
     // Si no hay filtros, devolver array vacío
-    if (!nombreUsuario && !persona && !rol && !estado) {
+    if (!nombreUsuario && !persona && !rol && !estado && !descripcionRol) {
       return NextResponse.json({ usuarios: [] }, { status: 200 })
     }
 
@@ -55,7 +84,8 @@ export async function GET(request) {
       }
     }
 
-    const usuarios = await prisma.usuario.findMany({
+    // Buscar usuarios incluyendo el rol
+    let usuarios = await prisma.usuario.findMany({
       where,
       include: {
         persona: { select: { nombre: true, apellido: true, nroDocumento: true } },
@@ -64,11 +94,10 @@ export async function GET(request) {
       orderBy: { createdAt: "desc" },
     })
 
-    // Si hay filtro de persona, filtrar en JS
-    let usuariosFiltrados = usuarios
+    // Filtrar por persona si corresponde
     if (persona) {
       const personaLower = persona.toLowerCase()
-      usuariosFiltrados = usuarios.filter(
+      usuarios = usuarios.filter(
         u =>
           u.persona &&
           (
@@ -78,7 +107,18 @@ export async function GET(request) {
       )
     }
 
-    return NextResponse.json({ usuarios: usuariosFiltrados }, { status: 200 })
+    // Filtrar por descripciónRol ("PRODUCCION") en JS
+    if (descripcionRol) {
+      const descripcionRolLower = descripcionRol.toLowerCase()
+      usuarios = usuarios.filter(
+        u =>
+          u.rol &&
+          u.rol.nombreRol &&
+          u.rol.nombreRol.toLowerCase() === descripcionRolLower
+      )
+    }
+
+    return NextResponse.json({ usuarios }, { status: 200 })
   } catch (error) {
     console.error("API: Error al obtener usuarios:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -89,19 +129,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const auditoriaService = new AuditoriaService()
-    const authController = new AuthController()
-
-    // Obtener el usuario autenticado para la auditoría
-    let idUsuario = 1 // Valor por defecto para desarrollo
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userData = await authController.getUserFromToken(accessToken)
-      if (userData) {
-        idUsuario = userData.idUsuario
-      }
-    }
+    const idUsuario = await getUserIdFromRequest(request)
 
     const datos = await request.json()
     console.log("API: Recibida solicitud para crear usuario", datos)
@@ -170,7 +198,7 @@ export async function POST(request) {
     const direccionIP = auditoriaService.obtenerDireccionIP(request)
     const navegador = auditoriaService.obtenerInfoNavegador(request)
     // Registrar la acción en auditoría
-    await auditoriaService.registrarCreacion("Usuario", usuario.idUsuario, usuario, idUsuario, direccionIP,
+    await auditoriaService.registrarCreacion("Usuario", idUsuario, usuario, idUsuario, direccionIP,
       navegador,)
 
     console.log("API: Usuario creado correctamente", usuario)

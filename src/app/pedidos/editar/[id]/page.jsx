@@ -230,7 +230,7 @@ export default function EditarPedidoPage({ params }) {
   const cargarProductos = async () => {
     setCargandoProductos(true)
     try {
-      const respuesta = await fetch("/api/productos")
+      const respuesta = await fetch('/api/productos?estado=1');
       if (respuesta.ok) {
         const datos = await respuesta.json()
         console.log("Datos de productos cargados:", datos)

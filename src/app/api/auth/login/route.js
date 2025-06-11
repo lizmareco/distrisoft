@@ -77,14 +77,14 @@ console.log("API login: Datos recibidos", { nombreUsuario: loginForm.nombreUsuar
       response.cookies.set("at", accessToken, {
         httpOnly: true,
         maxAge: ACCESS_TOKEN_MAX_AGE,
-        secure:true,
+        secure:process.env.NODE_ENV === "production",
         sameSite: "lax",
       })
 
       response.cookies.set("rt", refreshToken, {
         httpOnly: true,
         maxAge: REFRESH_TOKEN_MAX_AGE,
-        secure: true,
+        secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
       })
 
