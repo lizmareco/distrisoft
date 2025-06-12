@@ -49,9 +49,14 @@ import {
 } from "@mui/icons-material"
 import VisorFacturaProveedor from "@/src/components/facturas/VisorFacturaProveedor"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function CuentasPorPagarPage() {
   const router = useRouter()
+    // Verificación de permisos
+  const context = useRootContext()  
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_CUENTAPORPAGAR") || context.session?.isAdmin
   const [cuentas, setCuentas] = useState([])
   const [resumen, setResumen] = useState(null)
   const [cargando, setCargando] = useState(false)
@@ -302,6 +307,13 @@ export default function CuentasPorPagarPage() {
 
   const handleVerHistorial = (cuenta) => {
     verHistorialPagos(cuenta)
+  }
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

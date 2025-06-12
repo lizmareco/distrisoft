@@ -26,10 +26,12 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Container,
 } from "@mui/material"
-import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack} from "@mui/icons-material"
+import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack } from "@mui/icons-material"
 import InventarioNav from "@/src/components/inventario-nav"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 // Estilos personalizados para los botones de acción
 const actionButtonStyles = {
@@ -50,6 +52,7 @@ const actionButtonStyles = {
 }
 
 export default function MateriaPrimaPage() {
+  // Llamadas incondicionales a hooks
   const [materiasPrimas, setMateriasPrimas] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -67,12 +70,21 @@ export default function MateriaPrimaPage() {
   })
   const [hasSearched, setHasSearched] = useState(false)
 
+  // Obtener contexto y permisos incondicionalmente
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  console.log("Permisos:", permisos) // Debug
+  console.log("Is Admin:", context.session?.isAdmin) // Debug
+
+  const hasPermission =
+    permisos.find((permiso) => permiso === "VIEW_MATERIAPRIMAaaa") || context.session?.isAdmin
+
   // Cargar estados de materia prima al inicio
   useEffect(() => {
     fetchEstadosMateriaPrima()
   }, [])
 
-  // Cargar materias primas
+  // Función para cargar materias primas
   const fetchMateriasPrimas = async () => {
     setLoading(true)
     setHasSearched(true)
@@ -83,7 +95,7 @@ export default function MateriaPrimaPage() {
       if (searchTerm) params.append("query", searchTerm)
       if (filtroEstado && filtroEstado !== "todos") params.append("estado", filtroEstado)
 
-      // Si el estado es "Todos" o hay un término de búsqueda, cargar todos los datos
+      // Si el estado es "todos" o hay un término de búsqueda, cargar todos los datos
       if (filtroEstado === "todos" || searchTerm) {
         params.append("loadAll", "true")
       }
@@ -97,8 +109,6 @@ export default function MateriaPrimaPage() {
       const response = await fetch(url)
       if (response.status === 401) {
         setError("Debes iniciar sesión para acceder a este recurso.")
-        // Opcional: redirigir a login
-        // router.push("/login")
         return
       }
       if (!response.ok) {
@@ -118,7 +128,7 @@ export default function MateriaPrimaPage() {
     }
   }
 
-  // Cargar estados de materia prima
+  // Función para cargar estados de materia prima
   const fetchEstadosMateriaPrima = async () => {
     try {
       const response = await fetch("/api/estadomateriaprima")
@@ -179,14 +189,14 @@ export default function MateriaPrimaPage() {
       })
 
       if (!response.ok) {
-  const errorData = await response.json()
-  setSnackbar({
-    open: true,
-    message: errorData.error || errorData.mensaje || "Error al actualizar stock",
-    severity: "error",
-  })
-  return
-}
+        const errorData = await response.json()
+        setSnackbar({
+          open: true,
+          message: errorData.error || errorData.mensaje || "Error al actualizar stock",
+          severity: "error",
+        })
+        return
+      }
 
       const data = await response.json()
 
@@ -231,10 +241,15 @@ export default function MateriaPrimaPage() {
     }
   }
 
-  return (
+  // Definimos el contenido a renderizar según permiso
+  const content = !hasPermission ? (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Container>
+  ) : (
     <Box sx={{ p: 3 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
-          Volver a Gestión
+        Volver a Gestión
       </Button>
       <Typography variant="h4" gutterBottom>
         Stock de Materias Primas
@@ -433,4 +448,6 @@ export default function MateriaPrimaPage() {
       </Snackbar>
     </Box>
   )
+
+  return content
 }

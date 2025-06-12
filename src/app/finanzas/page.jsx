@@ -38,10 +38,11 @@ import VistaPreviaFactura from "../../components/facturas/VistaPrevia"
 import VisorFacturaProveedor from "../../components/facturas/VisorFacturaProveedor"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
-import CreditScoreSharpIcon from '@mui/icons-material/CreditScoreSharp';
-import { Menu} from "@mui/material"
+import CreditScoreSharpIcon from "@mui/icons-material/CreditScoreSharp"
+import { Menu } from "@mui/material"
 import MoreVertIcon from "@mui/icons-material/MoreVert"
 import VistaPreviaNotaCredito from "../../components/notas-credito/VistaPreviaNotaCredito"
+import { useRootContext } from "@/src/app/context/root"
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -65,17 +66,29 @@ export default function FinanzasPage() {
     setTabValue(newValue)
   }
 
-  return (
+  // Obtener contexto para permisos
+  const context = useRootContext()
+
+  // Después de declarar todos los hooks, realizamos la verificación de permisos
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find((permiso) => permiso === "VIEW_NOTACREDITO") || context.session?.isAdmin
+
+  // Definimos el contenido a renderizar según permisos
+  const content = !hasPermission ? (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Container>
+  ) : (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
-          Volver a Gestión
+        Volver a Gestión
       </Button>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
           Gestión Financiera
         </Typography>
       </Box>
-
       {/* Navegación por pestañas */}
       <Paper sx={{ width: "100%", mb: 3 }}>
         <Tabs
@@ -90,17 +103,17 @@ export default function FinanzasPage() {
           <Tab label="Facturas Proveedores" icon={<Assignment />} />
         </Tabs>
       </Paper>
-
       {/* Contenido de las pestañas */}
       <TabPanel value={tabValue} index={0}>
         <FacturacionClientes />
       </TabPanel>
-
       <TabPanel value={tabValue} index={1}>
         <FacturasProveedores />
       </TabPanel>
     </Container>
   )
+
+  return content
 }
 
 // Componente para Facturación de Clientes 
@@ -114,19 +127,15 @@ function FacturacionClientes() {
     fechaHasta: "",
   })
   const [anchorElNota, setAnchorElNota] = useState(null)
-const [facturaConNotas, setFacturaConNotas] = useState(null)
-
-const abrirMenuNotas = (event, factura) => {
-  setAnchorElNota(event.currentTarget)
-  setFacturaConNotas(factura)
-}
-
-const cerrarMenuNotas = () => {
-  setAnchorElNota(null)
-  setFacturaConNotas(null)
-}
-
-
+  const [facturaConNotas, setFacturaConNotas] = useState(null)
+  const abrirMenuNotas = (event, factura) => {
+    setAnchorElNota(event.currentTarget)
+    setFacturaConNotas(factura)
+  }
+  const cerrarMenuNotas = () => {
+    setAnchorElNota(null)
+    setFacturaConNotas(null)
+  }
   // Estados para paginación
   const [paginacion, setPaginacion] = useState({
     pagina: 1,
@@ -134,7 +143,6 @@ const cerrarMenuNotas = () => {
     totalRegistros: 0,
     registrosPorPagina: 10,
   })
-
   // Estados para vista previa
   const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false)
   const [facturaParaPrevia, setFacturaParaPrevia] = useState(null)
@@ -144,10 +152,8 @@ const cerrarMenuNotas = () => {
     mensaje: "",
     tipo: "success",
   })
-
   // Nuevo estado para controlar si se ha realizado una búsqueda
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
-
   const [vistaPreviaNotaAbierta, setVistaPreviaNotaAbierta] = useState(false)
   const [notaParaPrevia, setNotaParaPrevia] = useState(null)
 
@@ -446,45 +452,45 @@ const cerrarMenuNotas = () => {
                               <Chip label={factura.estado} color={getEstadoColor(factura.estado)} size="small" />
                             </Grid>
                             <Grid item xs={1}>
-  <Box sx={{ display: "flex", gap: 0.5 }}>
-    {/* Vista previa de factura */}
-    <IconButton
-      size="small"
-      color="primary"
-      title="Vista previa"
-      onClick={() => verFactura(factura)}
-      disabled={cargandoFactura}
-    >
-      <VisibilityIcon fontSize="small" />
-    </IconButton>
+                              <Box sx={{ display: "flex", gap: 0.5 }}>
+                                {/* Vista previa de factura */}
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  title="Vista previa"
+                                  onClick={() => verFactura(factura)}
+                                  disabled={cargandoFactura}
+                                >
+                                  <VisibilityIcon fontSize="small" />
+                                </IconButton>
 
-    {/* Crear nueva nota de crédito */}
-    <IconButton
-      size="small"
-      color="secondary"
-      title="Generar Nota Crédito"
-      component={Link}
-      href={`/finanzas/notas-credito/nueva?nroFactura=${factura.nroFactura}`}
-    >
-      <CreditScoreSharpIcon fontSize="small" />
-    </IconButton>
+                                {/* Crear nueva nota de crédito */}
+                                <IconButton
+                                  size="small"
+                                  color="secondary"
+                                  title="Generar Nota Crédito"
+                                  component={Link}
+                                  href={`/finanzas/notas-credito/nueva?nroFactura=${factura.nroFactura}`}
+                                >
+                                  <CreditScoreSharpIcon fontSize="small" />
+                                </IconButton>
 
-    {/* Mostrar nota de crédito en PDF si existe */}
-    {factura.notasCredito?.length === 1 && (
-      <IconButton
-        size="small"
-        color="success"
-        title="Descargar Nota Crédito PDF"
-        component="a"
-        href={`/api/finanzas/notas-credito/${factura.notasCredito[0].idNotaCredito}/pdf`}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <Assignment fontSize="small" />
-      </IconButton>
-    )}
-  </Box>
-</Grid>
+                                {/* Mostrar nota de crédito en PDF si existe */}
+                                {factura.notasCredito?.length === 1 && (
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    title="Descargar Nota Crédito PDF"
+                                    component="a"
+                                    href={`/api/finanzas/notas-credito/${factura.notasCredito[0].idNotaCredito}/pdf`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Assignment fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Box>
+                            </Grid>
                           </Grid>
                         </CardContent>
                         {/* Mostrar notas de crédito asociadas (solo para clientes) */}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Box,
   Container,
@@ -43,8 +44,13 @@ import VisorFactura from "@/src/components/facturas/VisorFactura"
 import HistorialPagos from "@/src/components/pagos/HistorialPagos"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function CuentasPorCobrarPage() {
+  const router = useRouter()
+  const context = useRootContext()
+
+  // Llamamos a TODOS los hooks siempre, sin condicionales:
   const [cuentasPorCobrar, setCuentasPorCobrar] = useState([])
   const [cargando, setCargando] = useState(false)
   const [resumen, setResumen] = useState(null)
@@ -54,16 +60,12 @@ export default function CuentasPorCobrarPage() {
     fechaDesde: "",
     fechaHasta: "",
   })
-
-  // Estados para paginación
   const [paginacion, setPaginacion] = useState({
     pagina: 1,
     totalPaginas: 1,
     totalRegistros: 0,
     registrosPorPagina: 10,
   })
-
-  // Estados para diálogo de pago
   const [openPagoDialog, setOpenPagoDialog] = useState(false)
   const [cuentaSeleccionada, setCuentaSeleccionada] = useState(null)
   const [cargandoPago, setCargandoPago] = useState(false)
@@ -73,23 +75,27 @@ export default function CuentasPorCobrarPage() {
     comprobantePago: "",
     observaciones: "",
   })
-
-  // Estados para diálogos adicionales
   const [openVisorFactura, setOpenVisorFactura] = useState(false)
   const [openHistorialPagos, setOpenHistorialPagos] = useState(false)
   const [facturaSeleccionada, setFacturaSeleccionada] = useState(null)
-
-  // Agregar después de los estados para diálogos adicionales
-
-  // Estados para snackbar
   const [snackbar, setSnackbar] = useState({
     abierto: false,
     mensaje: "",
     tipo: "success",
   })
-
-  // Estado para búsqueda realizada
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
+
+  // Después de ejecutar todos los hooks, realiza la verificación de permisos:
+  const permisos = context.session?.permisos || []
+  const hasPermission = permisos.find((permiso) => permiso === "VIEW_CUENTAPORCOBRAR") || context.session?.isAdmin
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
+  }
 
   // Cargar cuentas por cobrar
   const cargarCuentasPorCobrar = async (nuevaPagina = paginacion.pagina) => {

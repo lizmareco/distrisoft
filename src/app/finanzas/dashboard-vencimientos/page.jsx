@@ -21,17 +21,34 @@ import {
   Button,
   LinearProgress,
 } from "@mui/material"
-import { Warning, Schedule, TrendingUp, AccountBalance, Refresh, Payment, Visibility } from "@mui/icons-material"
+import {
+  Warning,
+  Schedule,
+  TrendingUp,
+  AccountBalance,
+  Refresh,
+  Payment,
+  Visibility,
+} from "@mui/icons-material"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function DashboardVencimientosPage() {
+  // Declarar todos los hooks siempre, sin condicionales
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null)
 
+  // Obtener el contexto y los permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find((permiso) => permiso === "VIEW_FACTURACLIENTE") ||
+    context.session?.isAdmin
+
+  // Hook useEffect para cargar el dashboard
   useEffect(() => {
     cargarDashboard()
-    // Actualizar cada 5 minutos
-    const interval = setInterval(cargarDashboard, 5 * 60 * 1000)
+    const interval = setInterval(cargarDashboard, 5 * 60 * 1000) // cada 5 minutos
     return () => clearInterval(interval)
   }, [])
 
@@ -57,7 +74,7 @@ export default function DashboardVencimientosPage() {
         method: "POST",
       })
       if (respuesta.ok) {
-        cargarDashboard() // Recargar después de actualizar
+        cargarDashboard()
       }
     } catch (error) {
       console.error("Error al actualizar estados:", error)
@@ -75,25 +92,31 @@ export default function DashboardVencimientosPage() {
     return new Date(fecha).toLocaleDateString("es-PY")
   }
 
-  if (loading) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <LinearProgress />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Cargando dashboard de vencimientos...
-        </Typography>
-      </Container>
-    )
-  }
-
-  return (
+  // Al final, en lugar de retornar temprano, usamos un condicional para el contenido
+  const content = !hasPermission ? (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Container>
+  ) : loading ? (
+    <Container maxWidth="xl" sx={{ mt: 4 }}>
+      <LinearProgress />
+      <Typography variant="h6" sx={{ mt: 2 }}>
+        Cargando dashboard de vencimientos...
+      </Typography>
+    </Container>
+  ) : (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1">
           Dashboard de Vencimientos
         </Typography>
         <Box>
-          <Button variant="outlined" startIcon={<Refresh />} onClick={actualizarEstados} sx={{ mr: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={actualizarEstados}
+            sx={{ mr: 2 }}
+          >
             Actualizar Estados
           </Button>
           <Button variant="contained" startIcon={<Refresh />} onClick={cargarDashboard}>
@@ -101,13 +124,11 @@ export default function DashboardVencimientosPage() {
           </Button>
         </Box>
       </Box>
-
       {ultimaActualizacion && (
         <Alert severity="info" sx={{ mb: 3 }}>
           Última actualización: {ultimaActualizacion.toLocaleString("es-PY")}
         </Alert>
       )}
-
       {/* Resumen General */}
       {dashboardData?.resumen && (
         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -343,4 +364,6 @@ export default function DashboardVencimientosPage() {
       </Card>
     </Container>
   )
+
+  return content
 }

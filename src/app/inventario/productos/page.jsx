@@ -31,8 +31,10 @@ import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack } from "@mui/ic
 import InventarioNav from "@/src/components/inventario-nav"
 import Link from "next/link"
 
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ProductosInventarioPage() {
+  // Declaración incondicional de hooks
   const [productos, setProductos] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -51,7 +53,13 @@ export default function ProductosInventarioPage() {
   })
   const [loadingEstados, setLoadingEstados] = useState(true)
 
-  // Cargar productos
+  // Obtener contexto y permisos incondicionalmente
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find((permiso) => permiso === "VIEW_INVENTARIOPRODUCTO") || context.session?.isAdmin
+
+  // Función para cargar productos
   const fetchProductos = async () => {
     setLoading(true)
     try {
@@ -69,7 +77,6 @@ export default function ProductosInventarioPage() {
         loadAll = true
       }
 
-      // Si se seleccionó "Todos" explícitamente en el filtro de estado
       if (filtroEstado === "todos") {
         loadAll = true
       }
@@ -102,7 +109,7 @@ export default function ProductosInventarioPage() {
     }
   }
 
-  // Cargar estados de producto
+  // Función para cargar estados de producto
   const fetchEstadosProducto = async () => {
     setLoadingEstados(true)
     try {
@@ -115,7 +122,6 @@ export default function ProductosInventarioPage() {
       const data = await response.json()
       console.log("Estados de producto recibidos:", data)
 
-      // Verificar la estructura de los datos recibidos
       if (Array.isArray(data)) {
         setEstadosProducto(data)
       } else if (data && Array.isArray(data.estadosProducto)) {
@@ -132,13 +138,13 @@ export default function ProductosInventarioPage() {
     }
   }
 
-  // Cargar datos iniciales
+  // Cargar estados de producto al inicio
   useEffect(() => {
     fetchEstadosProducto()
-    // No cargar productos automáticamente al inicio
+    // No se carga productos automáticamente al inicio
   }, [])
 
-  // Actualizar productos cuando cambian los filtros
+  // Actualizar productos al aplicar filtros
   const handleSearch = () => {
     fetchProductos()
   }
@@ -171,9 +177,7 @@ export default function ProductosInventarioPage() {
     try {
       const response = await fetch("/api/productos/stock", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idProducto: selectedProducto.idProducto,
           cantidad: Number.parseFloat(cantidad),
@@ -191,7 +195,7 @@ export default function ProductosInventarioPage() {
         return
       }
 
-      const data = await response.json()
+      await response.json()
 
       setSnackbar({
         open: true,
@@ -213,10 +217,7 @@ export default function ProductosInventarioPage() {
 
   // Cerrar snackbar
   const handleCloseSnackbar = () => {
-    setSnackbar({
-      ...snackbar,
-      open: false,
-    })
+    setSnackbar({ ...snackbar, open: false })
   }
 
   // Renderizar estado de stock con color
@@ -230,28 +231,15 @@ export default function ProductosInventarioPage() {
     }
   }
 
-  // Estilos para los botones de acción
-  const actionButtonStyles = {
-    actualizar: {
-      backgroundColor: "#0099cc",
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#007399",
-      },
-    },
-    crear: {
-      backgroundColor: "#28a745",
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#218838",
-      },
-    },
-  }
-
-  return (
+  // Definir el contenido a renderizar según el permiso
+  const content = !hasPermission ? (
+    <Box sx={{ p: 3 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Box>
+  ) : (
     <Box sx={{ p: 3 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
-          Volver a Gestión
+        Volver a Gestión
       </Button>
       <Typography variant="h4" gutterBottom>
         Inventario de Productos
@@ -268,9 +256,7 @@ export default function ProductosInventarioPage() {
               variant="outlined"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                endAdornment: <SearchIcon color="action" />,
-              }}
+              InputProps={{ endAdornment: <SearchIcon color="action" /> }}
             />
           </Grid>
 
@@ -297,7 +283,7 @@ export default function ProductosInventarioPage() {
           <Grid item xs={12} sm={4} md={3}>
             <Button
               variant="contained"
-              sx={actionButtonStyles.actualizar}
+              sx={{ backgroundColor: "#0099cc", color: "white", "&:hover": { backgroundColor: "#007399" } }}
               startIcon={<RefreshIcon />}
               onClick={handleSearch}
               fullWidth
@@ -307,7 +293,12 @@ export default function ProductosInventarioPage() {
           </Grid>
 
           <Grid item xs={12} sm={4} md={3}>
-            <Button variant="contained" sx={actionButtonStyles.crear} href="/producto/formulario" fullWidth>
+            <Button
+              variant="contained"
+              sx={{ backgroundColor: "#28a745", color: "white", "&:hover": { backgroundColor: "#218838" } }}
+              href="/producto/formulario"
+              fullWidth
+            >
               CREAR
             </Button>
           </Grid>
@@ -394,7 +385,7 @@ export default function ProductosInventarioPage() {
                 Producto: {selectedProducto.nombreProducto}
               </Typography>
               <Typography variant="body2" gutterBottom>
-                Stock actual: {Number.parseFloat(selectedProducto.stockActual || 0).toFixed(2)}{" "}
+                Stock actual: {Number.parseFloat(selectedProducto.stockActual || 0).toFixed(2)}
                 {selectedProducto.unidadMedida ? selectedProducto.unidadMedida.abreviatura : ""}
               </Typography>
 
@@ -444,4 +435,6 @@ export default function ProductosInventarioPage() {
       </Snackbar>
     </Box>
   )
+
+  return content
 }

@@ -26,12 +26,15 @@ import {
   Select,
   MenuItem,
   Grid,
+  Alert
 } from "@mui/material"
 import { Add, Edit, Delete, ArrowBack } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ListaMateriaPrima() {
+  // Hooks de estado y efectos incondicionales
   const router = useRouter()
   const [materiasPrimas, setMateriasPrimas] = useState([])
   const [openDelete, setOpenDelete] = useState(false)
@@ -44,6 +47,12 @@ export default function ListaMateriaPrima() {
   const [estados, setEstados] = useState([])
   const [hasSearched, setHasSearched] = useState(false)
 
+  // Obtener contexto y permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_MATERIAPRIMA") || context.session?.isAdmin
+
   // Cargar estados para el filtro
   useEffect(() => {
     const fetchEstados = async () => {
@@ -54,7 +63,7 @@ export default function ListaMateriaPrima() {
           setEstados(data)
         }
       } catch (e) {
-        // No hacer nada
+        // No hacer nada en caso de error
       }
     }
     fetchEstados()
@@ -138,7 +147,12 @@ export default function ListaMateriaPrima() {
     }
   }
 
-  return (
+  // Definir el contenido a renderizar según el permiso
+  const content = !hasPermission ? (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Container>
+  ) : (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Botón de Volver */}
       <Box display="flex" alignItems="center" mb={3}>
@@ -214,7 +228,7 @@ export default function ListaMateriaPrima() {
           <CircularProgress />
         </Box>
       ) : (
-        hasSearched ? (
+        hasSearched && (
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -256,12 +270,6 @@ export default function ListaMateriaPrima() {
               </TableBody>
             </Table>
           </TableContainer>
-        ) : (
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-            <Typography variant="body1" color="text.secondary">
-              Favor utilizar los filtros de búsqueda para visualizar las materias primas.
-            </Typography>
-          </Box>
         )
       )}
 
@@ -270,8 +278,7 @@ export default function ListaMateriaPrima() {
         <DialogTitle>Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Está seguro de que desea eliminar la materia prima "{selectedMateriaPrima?.nombreMateriaPrima}"? Esta
-            acción no se puede deshacer.
+            ¿Está seguro de que desea eliminar la materia prima "{selectedMateriaPrima?.nombreMateriaPrima}"? Esta acción no se puede deshacer.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -285,5 +292,7 @@ export default function ListaMateriaPrima() {
       </Dialog>
     </Container>
   )
+
+  return content
 }
 
