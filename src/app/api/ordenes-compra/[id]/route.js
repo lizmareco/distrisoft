@@ -3,6 +3,35 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // Función para extraer IP del request
 function extraerIP(request) {
@@ -10,11 +39,18 @@ function extraerIP(request) {
   const realIP = request.headers.get("x-real-ip")
   const cfConnectingIP = request.headers.get("cf-connecting-ip")
 
-  if (cfConnectingIP) return cfConnectingIP
-  if (forwarded) return forwarded.split(",")[0].trim()
-  if (realIP) return realIP
+  let ip = null
+  if (cfConnectingIP) ip = cfConnectingIP
+  else if (forwarded) ip = forwarded.split(",")[0].trim()
+  else if (realIP) ip = realIP
+  else ip = "IP no disponible"
 
-  return "IP no disponible"
+  // Convertir IPv6 localhost a IPv4
+  if (ip === "::1") ip = "127.0.0.1"
+  // Convertir IPv4-mapeado en IPv6 (ejemplo ::ffff:192.168.0.1)
+  if (ip.startsWith("::ffff:")) ip = ip.replace("::ffff:", "")
+
+  return ip
 }
 
 // Función para detectar navegador del User-Agent
@@ -107,19 +143,9 @@ export async function PUT(request, { params }) {
     const { id } = params
     console.log(`API: Actualizando orden de compra con ID: ${id}`)
 
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
 
     if (!id || isNaN(Number.parseInt(id))) {
       return NextResponse.json({ message: "ID de orden de compra inválido" }, { status: HTTP_STATUS_CODES.badRequest })
@@ -368,11 +394,6 @@ export async function PUT(request, { params }) {
     const userAgent = request.headers.get("user-agent")
     const navegador = detectarNavegador(userAgent)
 
-    console.log("DEBUG - Datos para auditoría:", {
-      direccionIP: typeof direccionIP,
-      navegador: typeof navegador,
-      idOrden: typeof Number.parseInt(id),
-    })
 
     // Registrar la acción en auditoría
     await auditoriaService.registrarActualizacion(
@@ -380,7 +401,7 @@ export async function PUT(request, { params }) {
       Number.parseInt(id),
       ordenExistente,
       ordenCompraActualizada,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )
@@ -401,19 +422,9 @@ export async function DELETE(request, { params }) {
     const { id } = params
     console.log(`API: Eliminando orden de compra con ID: ${id}`)
 
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
 
     if (!id || isNaN(Number.parseInt(id))) {
       return NextResponse.json({ message: "ID de orden de compra inválido" }, { status: HTTP_STATUS_CODES.badRequest })
@@ -454,18 +465,13 @@ export async function DELETE(request, { params }) {
     const userAgent = request.headers.get("user-agent")
     const navegador = detectarNavegador(userAgent)
 
-    console.log("DEBUG - Datos para auditoría:", {
-      direccionIP: typeof direccionIP,
-      navegador: typeof navegador,
-      idOrden: typeof Number.parseInt(id),
-    })
 
     // Registrar la acción en auditoría
     await auditoriaService.registrarEliminacion(
       "OrdenCompra",
       Number.parseInt(id),
       ordenExistente,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )

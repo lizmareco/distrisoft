@@ -347,6 +347,7 @@ export default function OrdenesCompraPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(facturaData),
+        credentials: "include",
       })
 
       if (!response.ok) {
@@ -931,8 +932,7 @@ export default function OrdenesCompraPage() {
         <DialogTitle>Recepcionar Items Parcialmente</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            Esta funcionalidad permite recepcionar cantidades específicas de materias primas. La API ya maneja la
-            actualización del inventario y stock.
+            Esta funcionalidad permite recepcionar cantidades específicas de materias primas.
           </Typography>
           <Button
             component={Link}

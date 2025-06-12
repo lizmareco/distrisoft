@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
-import AuditoriaService from "@/src/backend/services/auditoria-service"
 
 export async function POST(request) {
   try {
@@ -116,23 +115,6 @@ export async function POST(request) {
         cantidadPorLote,
       })
     }
-
-    // Registrar auditoría de verificación de stock
-    const auditoriaService = new AuditoriaService()
-    await auditoriaService.registrarAuditoria({
-      entidad: "PedidoCliente",
-      idRegistro: idPedidoInt,
-      accion: "VERIFICACION_STOCK",
-      valorAnterior: null,
-      valorNuevo: {
-        stockSuficiente,
-        materialesFaltantes: materialesFaltantes.length,
-        productosVerificados: resultadosVerificacion.length,
-        descripcion: `Verificación de stock para pedido #${idPedidoInt} - ${stockSuficiente ? "Stock suficiente" : "Stock insuficiente"}`,
-      },
-      idUsuario: 1, // Por ahora usar un ID fijo, después se puede obtener del token de sesión
-      request: request,
-    })
 
     return NextResponse.json({
       idPedido: idPedidoInt,

@@ -2,8 +2,38 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
 
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 // Función para extraer IP del request
 function extraerIP(request) {
@@ -52,19 +82,8 @@ function detectarNavegador(userAgent) {
 
 export async function POST(request) {
   try {
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
-
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: 401 })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: 401 })
-    }
+    const idUsuario = await getUserIdFromRequest(request)
 
     const data = await request.json()
     const { idFacturaProveedor, montoPago, fechaPago, idMetodoPago, observacion, comprobantePago } = data
@@ -187,7 +206,7 @@ export async function POST(request) {
         nuevoSaldo: cuentaPorPagar.saldoRestante - montoPagoFloat,
         descripcion: `Pago registrado para factura ${cuentaPorPagar.facturaProveedor.nroFactura} - ${cuentaPorPagar.facturaProveedor.proveedor.empresa.razonSocial}`,
       },
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )

@@ -3,30 +3,50 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie"
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 export async function PUT(request, { params }) {
   try {
     console.log(`API: Actualizando estado de cotización de proveedor ${params.id}`)
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    // Obtener el estado anterior para la auditoría - sin incluir detalles inicialmente
+    // Obtener la cotización anterior (sólo el estado y proveedor)
     const cotizacionAnterior = await prisma.cotizacionProveedor.findUnique({
       where: {
         idCotizacionProveedor: Number.parseInt(params.id),
       },
-      include: {
+      select: {
+        estado: true,
         proveedor: {
           include: {
             empresa: true,
@@ -42,37 +62,10 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Intentar obtener los detalles por separado
-    try {
-      const detalles = await prisma.detalleCotizacionProv.findMany({
-        where: {
-          idCotizacionProveedor: Number.parseInt(params.id),
-          deletedAt: null,
-        },
-        include: {
-          materiaPrima: {
-            include: {
-              estadoMateriaPrima: true,
-            },
-          },
-        },
-      })
-
-      // Agregar los detalles manualmente
-      if (detalles && detalles.length > 0) {
-        cotizacionAnterior.detalles = detalles
-      }
-    } catch (error) {
-      console.log("Error al obtener detalles de la cotización:", error.message)
-      // Continuar sin los detalles si hay error
-    }
-
     const body = await request.json()
-
-    // Obtener el nuevo estado
     const { estado } = body
 
-    // Validar que el estado sea válido
+    // Validar el estado recibido
     const estadosValidos = ["PENDIENTE", "APROBADA", "RECHAZADA", "VENCIDA"]
     if (!estadosValidos.includes(estado)) {
       return NextResponse.json(
@@ -81,9 +74,7 @@ export async function PUT(request, { params }) {
       )
     }
 
-    console.log(`API: Actualizando estado de cotización de proveedor ${params.id} a ${estado}`)
-
-    // Actualizar la cotización
+    // Actualizar el estado de la cotización
     const cotizacion = await prisma.cotizacionProveedor.update({
       where: {
         idCotizacionProveedor: Number.parseInt(params.id),
@@ -100,39 +91,18 @@ export async function PUT(request, { params }) {
       },
     })
 
-    // Intentar obtener los detalles actualizados por separado
-    try {
-      const detallesActualizados = await prisma.detalleCotizacionProv.findMany({
-        where: {
-          idCotizacionProveedor: Number.parseInt(params.id),
-          deletedAt: null,
-        },
-        include: {
-          materiaPrima: {
-            include: {
-              estadoMateriaPrima: true,
-            },
-          },
-        },
-      })
+    // --- Auditoría solo del campo estado ---
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
 
-      // Agregar los detalles manualmente
-      if (detallesActualizados && detallesActualizados.length > 0) {
-        cotizacion.detalles = detallesActualizados
-      }
-    } catch (error) {
-      console.log("Error al obtener detalles actualizados de la cotización:", error.message)
-      // Continuar sin los detalles si hay error
-    }
-
-    // Registrar la acción en auditoría usando el método correcto
     await auditoriaService.registrarActualizacion(
       "CotizacionProveedor",
       params.id,
-      cotizacionAnterior,
-      cotizacion,
-      userData.idUsuario,
-      request,
+      { estado: cotizacionAnterior.estado },
+      { estado: cotizacion.estado },
+      idUsuario,
+      direccionIP,
+      navegador,
     )
 
     console.log(`API: Estado de cotización de proveedor ${params.id} actualizado exitosamente a ${estado}`)

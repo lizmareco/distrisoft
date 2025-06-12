@@ -2,19 +2,42 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie"
 
 const prisma = new PrismaClient()
-const authController = new AuthController()
-const auditoriaService = new AuditoriaService()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function POST(request) {
   try {
-    const token = await authController.hasAccessToken(request)
-    if (!token) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-    }
-
-    const usuario = await authController.getUserFromToken(token)
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request) 
     const datos = await request.json()
 
     const { nroFactura, motivo, detalles } = datos
@@ -112,7 +135,7 @@ export async function POST(request) {
         montoTotal: nota.montoTotal,
         detalles,
       },
-      usuario.idUsuario,
+      idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request)
     )

@@ -78,7 +78,7 @@ export default function CrearOrdenProduccionPage({ params }) {
         }
 
         // Cargar usuarios para operadores
-        const respuestaUsuarios = await fetch("/api/usuarios")
+        const respuestaUsuarios = await fetch("/api/usuarios?descripcionRol=PRODUCCION")
         if (respuestaUsuarios.ok) {
           const datosUsuarios = await respuestaUsuarios.json()
           console.log("Datos de usuarios recibidos:", datosUsuarios)

@@ -2,17 +2,41 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import { getUserData } from "src/lib/http/get-userdata"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
 
-const auditoriaService = new AuditoriaService()
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
 
-console.log("API MateriaPrima/stock: Endpoint cargado")
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function GET(request) {
   try {
     console.log("API MateriaPrima/stock - Iniciando solicitud GET")
 
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = getUserData(request)
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("query") || ""
@@ -96,6 +120,9 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     console.log("API MateriaPrima/stock - Iniciando solicitud POST")
+
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
     const data = await request.json()
     const { idMateriaPrima, cantidad, observacion } = data
@@ -201,15 +228,16 @@ export async function POST(request) {
       await auditoriaService.registrarAuditoria({
         entidad: "MateriaPrima",
         idRegistro: idMateriaPrima,
-        accion: "ACTUALIZAR_STOCK",
+        accion: "ACTUALIZAR_STOCK_MATERIA_PRIMA",
         valorAnterior: { stockActual: resultado.stockAnterior },
         valorNuevo: {
           stockActual: resultado.stockNuevo,
           ajuste: cantidad,
           observacion: observacion || "Ajuste manual",
         },
-        idUsuario: 1,
-        request,
+        idUsuario,
+        direccionIP: auditoriaService.obtenerDireccionIP(request),
+        navegador: auditoriaService.obtenerInfoNavegador(request),
       })
 
       console.log(`API MateriaPrima/stock - Stock actualizado correctamente para ID: ${idMateriaPrima}`)

@@ -3,9 +3,36 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
 
-const authController = new AuthController()
-const auditoriaService = new AuditoriaService()
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 // GET - Obtener registros de inventario de productos
 export async function GET(request) {
@@ -154,13 +181,8 @@ export async function POST(request) {
   try {
     console.log("API: Creando nuevo registro de inventario de producto")
 
-    // Verificar autenticación
-    const token = await authController.hasAccessToken(request)
-    if (!token && process.env.NODE_ENV !== "development") {
-      return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = token ? await authController.getUserFromToken(token) : { idUsuario: 1, usuario: "desarrollo" }
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener datos del cuerpo de la solicitud
     const data = await request.json()
@@ -265,7 +287,7 @@ export async function POST(request) {
           stockAnterior: resultado.stockAnterior,
           nuevoStock: resultado.stockNuevo,
         },
-        userData.idUsuario,
+        idUsuario,
         auditoriaService.obtenerDireccionIP(request),
         auditoriaService.obtenerInfoNavegador(request),
       )

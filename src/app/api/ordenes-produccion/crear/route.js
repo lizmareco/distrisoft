@@ -1,7 +1,37 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
 
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
+//CREAR ORDEN DE PRODUCCION
 export async function POST(request) {
   try {
     const { idPedido, operadorEncargado, observaciones } = await request.json()
@@ -115,6 +145,7 @@ if (ordenCancelada) {
 
     // Registrar auditoría
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
     await auditoriaService.registrarCreacion(
       "OrdenProduccion",
       resultado.idOrdenProduccion,
@@ -125,7 +156,7 @@ if (ordenCancelada) {
         observaciones: observaciones || null,
         descripcion: `Orden de producción creada para pedido #${idPedidoInt}`,
       },
-      operadorEncargadoInt,
+      idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request),
     )

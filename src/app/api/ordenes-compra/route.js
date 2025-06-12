@@ -3,6 +3,35 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // Función para extraer IP del request
 function extraerIP(request) {
@@ -10,11 +39,18 @@ function extraerIP(request) {
   const realIP = request.headers.get("x-real-ip")
   const cfConnectingIP = request.headers.get("cf-connecting-ip")
 
-  if (cfConnectingIP) return cfConnectingIP
-  if (forwarded) return forwarded.split(",")[0].trim()
-  if (realIP) return realIP
+  let ip = null
+  if (cfConnectingIP) ip = cfConnectingIP
+  else if (forwarded) ip = forwarded.split(",")[0].trim()
+  else if (realIP) ip = realIP
+  else ip = "IP no disponible"
 
-  return "IP no disponible"
+  // Convertir IPv6 localhost a IPv4
+  if (ip === "::1") ip = "127.0.0.1"
+  // Convertir IPv4-mapeado en IPv6 (ejemplo ::ffff:192.168.0.1)
+  if (ip.startsWith("::ffff:")) ip = ip.replace("::ffff:", "")
+
+  return ip
 }
 
 // Función para detectar navegador del User-Agent
@@ -174,19 +210,8 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     console.log("API: Creando nueva orden de compra...")
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
-
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener datos de la orden de compra
     const data = await request.json()
@@ -274,7 +299,7 @@ export async function POST(request) {
       "OrdenCompra",
       ordenCompra.idOrdenCompra,
       ordenCompra,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )

@@ -3,6 +3,35 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET - Obtener todos los productos (activos e inactivos)
 export async function GET(request) {
@@ -112,20 +141,9 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     console.log("API: Creando nuevo producto...")
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
-    // En desarrollo, podemos usar un usuario ficticio
-    let userData = { idUsuario: 1 }
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userFromToken = await authController.getUserFromToken(accessToken)
-      if (userFromToken) {
-        userData = userFromToken
-      }
-    }
 
     // Obtener datos del producto
     const data = await request.json()
@@ -179,7 +197,7 @@ export async function POST(request) {
   "Producto", 
   producto.idProducto, 
   producto, 
-  userData.idUsuario, 
+  idUsuario, 
   direccionIP, 
   navegador
   )

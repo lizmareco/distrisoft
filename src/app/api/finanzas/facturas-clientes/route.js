@@ -1,8 +1,39 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie"
 
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 export async function GET(request) {
   try {
@@ -128,6 +159,8 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request) 
     const data = await request.json()
     const {
       tipo, // "contado" o "credito"
@@ -339,7 +372,6 @@ export async function POST(request) {
     })
 
     // Registrar auditoría
-    const auditoriaService = new AuditoriaService()
     await auditoriaService.registrarCreacion(
       "FacturaCliente",
       resultado.nroFactura,
@@ -353,7 +385,7 @@ export async function POST(request) {
         esContado: tipo === "contado",
         descripcion: `Factura ${tipo} creada para cliente ${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido} - Pedido #${idPedidoInt}`,
       },
-      operadorInt,
+      idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request),
     )

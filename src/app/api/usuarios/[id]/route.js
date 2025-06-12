@@ -5,8 +5,39 @@ import { validatePasswordComplexity } from "../../../../utils/passwordUtils"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
+
+
 
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET /api/usuarios/[id] - Obtener un usuario por ID
 export async function GET(request, { params }) {
@@ -39,19 +70,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const auditoriaService = new AuditoriaService()
-    const authController = new AuthController()
-
-    // Obtener el usuario autenticado para la auditoría
-    let idUsuario = 1 // Valor por defecto para desarrollo
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userData = await authController.getUserFromToken(accessToken)
-      if (userData) {
-        idUsuario = userData.idUsuario
-      }
-    }
+    const idUsuario = await getUserIdFromRequest(request) 
 
     // Asegurarse de que params.id esté disponible antes de usarlo
     const id = await params.id
@@ -172,19 +191,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const auditoriaService = new AuditoriaService()
-    const authController = new AuthController()
-
-    // Obtener el usuario autenticado para la auditoría
-    let idUsuario = 1 // Valor por defecto para desarrollo
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userData = await authController.getUserFromToken(accessToken)
-      if (userData) {
-        idUsuario = userData.idUsuario
-      }
-    }
+    const idUsuario = await getUserIdFromRequest(request) 
 
     // Asegurarse de que params.id esté disponible antes de usarlo
     const id = await params.id

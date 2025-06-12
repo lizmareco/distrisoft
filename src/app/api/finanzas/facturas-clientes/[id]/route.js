@@ -1,8 +1,38 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
 
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function GET(request, { params }) {
   try {
@@ -195,6 +225,7 @@ export async function PUT(request, { params }) {
 
     // Registrar auditoría
     const auditoriaService = new AuditoriaService()
+   const idUsuario = await getUserIdFromRequest(request)
     await auditoriaService.registrarActualizacion(
       "FacturaCliente",
       idFactura,
@@ -209,7 +240,7 @@ export async function PUT(request, { params }) {
         fechaActualizacion: new Date().toISOString(),
         descripcion: `Factura actualizada - Cliente: ${facturaActualizada.cliente.persona.nombre} ${facturaActualizada.cliente.persona.apellido}`,
       },
-      operadorInt,
+      idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request),
     )
@@ -274,6 +305,8 @@ export async function DELETE(request, { params }) {
 
     // Registrar auditoría
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
+
     await auditoriaService.registrarEliminacion(
       "FacturaCliente",
       idFactura,
@@ -286,7 +319,7 @@ export async function DELETE(request, { params }) {
         observacion: facturaAnterior.observacion,
         descripcion: `Factura eliminada - Cliente: ${facturaAnterior.cliente.persona.nombre} ${facturaAnterior.cliente.persona.apellido}`,
       },
-      operadorInt,
+      idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request),
     )

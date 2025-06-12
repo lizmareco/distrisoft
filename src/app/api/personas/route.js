@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 
 const prisma = new PrismaClient()
@@ -54,9 +55,19 @@ export async function GET(request) {
 // POST /api/personas - Crear una nueva persona
 export async function POST(request) {
   try {
-    const auditoriaService = new AuditoriaService()
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    // Obtener el usuario autenticado desde el header Authorization
+const auditoriaService = new AuditoriaService()
+const authController = new AuthController()
+
+let idUsuario = 1
+const authHeader = request.headers.get("authorization")
+if (authHeader && authHeader.startsWith("Bearer ")) {
+  const token = authHeader.replace("Bearer ", "")
+  const userData = await authController.getUserFromToken(token)
+  if (userData?.idUsuario) {
+    idUsuario = userData.idUsuario
+  }
+}
 
     const data = await request.json()
     console.log("API: Creando nueva persona con datos:", data)
@@ -127,7 +138,7 @@ await auditoriaService.registrarCreacion(
   "Persona", 
   persona.idPersona, 
   persona, 
-  userData.idUsuario, 
+  idUsuario, 
   direccionIP, 
   navegador
 )

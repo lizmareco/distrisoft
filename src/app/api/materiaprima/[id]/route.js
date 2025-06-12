@@ -1,6 +1,37 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie"
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 // GET - Obtener una materia prima por ID
 export async function GET(request, { params }) {
@@ -42,7 +73,7 @@ export async function PUT(request, { params }) {
     const id = Number.parseInt(params.id)
     console.log(`API: Actualizando materia prima con ID: ${id}`)
     const auditoriaService = new AuditoriaService()
-    const userData = getUser(request)
+    const idUsuario = await getUserIdFromRequest(request)
 
     const data = await request.json()
     console.log("API: Datos recibidos:", data)
@@ -104,7 +135,7 @@ export async function PUT(request, { params }) {
       id,
       materiaPrimaAnterior,
       materiaPrimaActualizada,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )
@@ -123,9 +154,7 @@ export async function DELETE(request, { params }) {
     const id = Number.parseInt(params.id)
     console.log(`API: Eliminando materia prima con ID: ${id}`)
     const auditoriaService = new AuditoriaService()
-
-    // Usuario ficticio para auditoría en desarrollo
-    const userData = { idUsuario: 1 }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener la materia prima actual para auditoría
     const materiaPrimaAnterior = await prisma.materiaPrima.findUnique({
@@ -158,7 +187,7 @@ export async function DELETE(request, { params }) {
       "MateriaPrima",
       id,
       materiaPrimaAnterior,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )

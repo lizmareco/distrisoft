@@ -3,26 +3,43 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/prisma/client";
 import AuthController from "@/src/backend/controllers/auth-controller";
 import AuditoriaService from "@/src/backend/services/auditoria-service";
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 export async function POST(request) {
   try {
     // Verificar autenticación
-    const authController = new AuthController();
-    const token = await authController.hasAccessToken(request);
-    
-    let userData = null;
-    
-    if (!token && process.env.NODE_ENV !== "development") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    
-    if (token) {
-      userData = await authController.getUserFromToken(token);
-      if (!userData) {
-        return NextResponse.json({ error: "Token inválido" }, { status: 401 });
-      }
-    }
-
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
+  
     const { idPedido, operadorEncargado, fechaInicioProd, fechaFinProd } = await request.json();
     
     if (!idPedido || !operadorEncargado) {
@@ -108,13 +125,13 @@ export async function POST(request) {
     });
 
     // Registrar en auditoría
-    const auditoriaService = new AuditoriaService();
     await auditoriaService.registrarCreacion(
       "OrdenProduccion",
       ordenProduccion.idOrdenProduccion,
       ordenProduccion,
-      userData ? userData.idUsuario : 1,
-      request
+      idUsuario,
+      auditoriaService.obtenerDireccionIP(request),
+      auditoriaService.obtenerInfoNavegador(request)
     );
 
     return NextResponse.json({

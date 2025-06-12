@@ -3,6 +3,35 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET - Obtener un producto por ID
 export async function GET(request, { params }) {
@@ -70,20 +99,8 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "ID de producto inválido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
-
-    // En desarrollo, podemos usar un usuario ficticio
-    let userData = { idUsuario: 1 }
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userFromToken = await authController.getUserFromToken(accessToken)
-      if (userFromToken) {
-        userData = userFromToken
-      }
-    }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener datos del producto
     const data = await request.json()
@@ -170,7 +187,7 @@ export async function PUT(request, { params }) {
       id,
       productoAnterior,
       producto,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )
@@ -199,20 +216,9 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: "ID de producto inválido" }, { status: HTTP_STATUS_CODES.badRequest })
     }
 
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
-    // En desarrollo, podemos usar un usuario ficticio
-    let userData = { idUsuario: 1 }
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      const userFromToken = await authController.getUserFromToken(accessToken)
-      if (userFromToken) {
-        userData = userFromToken
-      }
-    }
 
     // Verificar si el producto existe
     const productoExistente = await prisma.producto.findFirst({
@@ -256,7 +262,7 @@ export async function DELETE(request, { params }) {
       "Producto",
       id,
       productoAnterior,
-      userData.idUsuario,
+      idUsuario,
       direccionIP,
       navegador,
     )

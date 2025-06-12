@@ -67,25 +67,41 @@ class AuthController {
     try {
       console.log("Verificando token de acceso...")
 
-      // El resto del código original para verificar tokens en producción
-      // Obtener el token de las cookies
-      const cookieToken = request.cookies.get("at")?.value
+      // 1. Intentar obtener el token de las cookies (Next.js middleware)
+      let cookieToken = null;
+      if (request.cookies && typeof request.cookies.get === "function") {
+        cookieToken = request.cookies.get("at")?.value;
+      }
+
+      // 2. Si no está, intentar obtenerlo del header 'cookie' (API routes estándar)
+      if (!cookieToken) {
+        const cookieHeader = request.headers.get("cookie");
+        if (cookieHeader) {
+          const cookies = cookieHeader.split(";").map(c => c.trim());
+          for (const cookie of cookies) {
+            if (cookie.startsWith("at=")) {
+              cookieToken = cookie.substring(3);
+              break;
+            }
+          }
+        }
+      }
 
       if (cookieToken) {
         return cookieToken;
       } else {
-        console.log("No se encontró token en cookies")
+        console.log("No se encontró token en cookies");
       }
 
-      // Si no hay token válido en las cookies, verificar en el encabezado de autorización
-      const authHeader = request.headers.get("authorization")
+      // 3. Si no hay token válido en las cookies, verificar en el encabezado de autorización
+      const authHeader = request.headers.get("authorization");
       if (authHeader && authHeader.startsWith("Bearer ")) {
-        const headerToken = authHeader.substring(7)
-        console.log("Token encontrado en encabezado de autorización")
+        const headerToken = authHeader.substring(7);
+        console.log("Token encontrado en encabezado de autorización");
 
         try {
-          const decoded = jwt.verify(headerToken, process.env.JWT_SECRET)
-          console.log("Token de encabezado verificado correctamente")
+          const decoded = jwt.verify(headerToken, process.env.JWT_SECRET);
+          console.log("Token de encabezado verificado correctamente");
 
           // Verificar si el token existe en la base de datos y es válido
           const tokenRecord = await prisma.accessToken.findFirst({
@@ -93,27 +109,27 @@ class AuthController {
               accessToken: headerToken,
               deletedAt: null,
             },
-          })
+          });
 
           if (tokenRecord) {
-            console.log("Token encontrado en base de datos")
-            return headerToken
+            console.log("Token encontrado en base de datos");
+            return headerToken;
           } else {
-            console.log("Token no encontrado en base de datos")
+            console.log("Token no encontrado en base de datos");
           }
         } catch (error) {
-          console.log("Token en encabezado inválido o expirado")
+          console.log("Token en encabezado inválido o expirado");
         }
       } else {
-        console.log("No se encontró token en encabezado de autorización")
+        console.log("No se encontró token en encabezado de autorización");
       }
 
       // Si no se encontró un token válido en cookies ni en el encabezado
-      console.log("No se encontró token válido")
-      return null
+      console.log("No se encontró token válido");
+      return null;
     } catch (error) {
-      console.error("Error al verificar el token de acceso:", error)
-      return null
+      console.error("Error al verificar el token de acceso:", error);
+      return null;
     }
   }
 
@@ -1016,7 +1032,7 @@ console.log("¿La contraseña coincide?:", match)
       // Hashear la nueva contraseña
       const hashedPassword = await bcrypt.hash(nuevaContrasena, 10)
 
-      // Actualizar la contraseña y la fecha de último cambio
+      // Actualizar la contraseña y la fecha de último cambio, ESTADO ACTIVO
       await prisma.usuario.update({
         where: {
           idUsuario: idUsuario,
@@ -1025,6 +1041,7 @@ console.log("¿La contraseña coincide?:", match)
           contrasena: hashedPassword,
           ultimoCambioContrasena: new Date(),
           updatedAt: new Date(),
+          estado: usuario.estado === "VENCIDO" ? "ACTIVO" : usuario.estado,
         },
       })
 

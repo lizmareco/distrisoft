@@ -2,10 +2,38 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie" 
 
 const prisma = new PrismaClient()
-const auditoriaService = new AuditoriaService()
-const authController = new AuthController()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 // Función para verificar si estamos en modo desarrollo
 const isDevelopment = process.env.NODE_ENV === "development"
@@ -17,18 +45,7 @@ const isDevelopment = process.env.NODE_ENV === "development"
  */
 export async function GET(request) {
   try {
-    // Verificar autenticación en producción
-    if (!isDevelopment) {
-      const token = request.headers.get("authorization")?.split(" ")[1]
-      if (!token) {
-        return NextResponse.json({ error: "Token no proporcionado" }, { status: 401 })
-      }
 
-      const tokenValido = await authController.verificarToken(token)
-      if (!tokenValido) {
-        return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 })
-      }
-    }
 
     // Obtener parámetros de consulta
     const { searchParams } = new URL(request.url)
@@ -92,18 +109,8 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    // Verificar autenticación en producción
-    if (!isDevelopment) {
-      const token = request.headers.get("authorization")?.split(" ")[1]
-      if (!token) {
-        return NextResponse.json({ error: "Token no proporcionado" }, { status: 401 })
-      }
-
-      const tokenValido = await authController.verificarToken(token)
-      if (!tokenValido) {
-        return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 })
-      }
-    }
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
     const data = await request.json()
     const { idProducto, cantidad, observacion } = data
@@ -180,8 +187,9 @@ export async function POST(request) {
           ajuste: cantidad,
           observacion: observacion || "N/A",
         },
-        idUsuario: 1, // Usuario ficticio para desarrollo
-        request: request,
+        idUsuario,
+        direccionIP: auditoriaService.obtenerDireccionIP(request),
+        navegador: auditoriaService.obtenerInfoNavegador(request),
       })
     }
 
@@ -205,18 +213,9 @@ export async function POST(request) {
  */
 export async function PUT(request) {
   try {
-    // Verificar autenticación en producción
-    if (!isDevelopment) {
-      const token = request.headers.get("authorization")?.split(" ")[1]
-      if (!token) {
-        return NextResponse.json({ error: "Token no proporcionado" }, { status: 401 })
-      }
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
 
-      const tokenValido = await authController.verificarToken(token)
-      if (!tokenValido) {
-        return NextResponse.json({ error: "Token inválido o expirado" }, { status: 401 })
-      }
-    }
 
     const data = await request.json()
     const { idProducto, cantidad, idOrdenProduccion, observacion } = data
@@ -294,8 +293,9 @@ export async function PUT(request) {
           idOrdenProduccion: idOrdenProduccion || null,
           observacion: observacion || "N/A",
         },
-        idUsuario: 1, // Usuario ficticio para desarrollo
-        request: request,
+        idUsuario,
+        direccionIP: auditoriaService.obtenerDireccionIP(request),
+        navegador: auditoriaService.obtenerInfoNavegador(request),
       })
     }
 

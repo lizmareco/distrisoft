@@ -2,8 +2,36 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import AuthController from "@/src/backend/controllers/auth-controller"
-
+import cookie from "cookie" 
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // GET /api/roles - Obtener todos los roles
 export async function GET(request) {
@@ -191,24 +219,11 @@ async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol =
 export async function POST(request) {
   try {
     console.log("API: Recibida solicitud para crear rol")
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
-
-    // Obtener el usuario autenticado para la auditoría
-    let idUsuario = 1 // Valor por defecto para desarrollo
-    let userData = null
-
-    // Verificar si hay un usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (accessToken) {
-      userData = await authController.getUserFromToken(accessToken)
-      if (userData) {
-        idUsuario = userData.idUsuario
-      }
-    }
+   const idUsuario = await getUserIdFromRequest(request)   
 
     // Verificar que el usuario tenga rol de administrador
-    if (userData && userData.rol !== "ADMINISTRADOR" && userData.rol !== "ADMINISTRADOR_SISTEMA") {
+    if (userData && userData.rol !== "ADMINISTRADOR" && userData.rol !== "ADMINISTRADORSISTEMA") {
       return NextResponse.json({ message: "No tienes permisos para crear roles" }, { status: 403 })
     }
 
@@ -269,7 +284,10 @@ export async function POST(request) {
     })
 
     // Registrar la acción en auditoría
-    await auditoriaService.registrarCreacion("Rol", rol.idRol, rolCompleto, idUsuario, request)
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+    await auditoriaService.registrarCreacion("Rol", rol.idRol, rolCompleto, idUsuario, direccionIP,
+      navegador,)
 
     console.log("API: Rol creado con ID:", rol.idRol)
     return NextResponse.json(

@@ -3,23 +3,42 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 export async function PUT(request, { params }) {
   try {
     console.log(`API: Actualizando estado de cotización ${params.id}`)
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
-
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener el estado anterior para la auditoría
     const cotizacionAnterior = await prisma.cotizacionCliente.findUnique({
@@ -123,14 +142,24 @@ export async function PUT(request, { params }) {
       },
     })
 
+    const direccionIP = auditoriaService.obtenerDireccionIP(request)
+    const navegador = auditoriaService.obtenerInfoNavegador(request)
+
     // Registrar la acción en auditoría usando el método correcto
     await auditoriaService.registrarActualizacion(
       "CotizacionCliente",
       params.id,
-      cotizacionAnterior,
-      cotizacion,
-      userData.idUsuario,
-      request,
+      {
+        idEstado: cotizacionAnterior.estadoCotizacionCliente.idEstadoCotizacionCliente,
+        estado: cotizacionAnterior.estadoCotizacionCliente.descEstadoCotizacionCliente,
+      },
+      {
+        idEstado: cotizacion.estadoCotizacionCliente.idEstadoCotizacionCliente,
+        estado: cotizacion.estadoCotizacionCliente.descEstadoCotizacionCliente,
+      },
+      idUsuario,
+      direccionIP,
+      navegador
     )
 
     console.log(

@@ -145,10 +145,14 @@ export default function PersonaFormPage({ params }) {
       const url = isEditing ? `/api/personas/${id}` : "/api/personas"
       const method = isEditing ? "PUT" : "POST"
 
+      // Obtener el accessToken de localStorage
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
+          ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify(formData),
       })

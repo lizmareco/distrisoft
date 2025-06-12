@@ -113,6 +113,16 @@ export default function ListaMateriaPrima() {
     fetchMateriasPrimas({})
   }
 
+  const handleLimpiarFiltros = () => {
+    setFiltroId("")
+    setFiltroNombre("")
+    setFiltroDescripcion("")
+    setFiltroTipo("")
+    setFiltroEstado("")
+    setProductos([])
+    setHasSearched(false)
+  }
+
   const handleEdit = (materiaPrima) => {
     router.push(`/materiaprima/formulario?id=${materiaPrima.idMateriaPrima}`)
   }
@@ -215,9 +225,10 @@ export default function ListaMateriaPrima() {
               </Button>
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
-              <Button variant="outlined" color="secondary" fullWidth onClick={handleMostrarTodos}>
-                Mostrar Todos
-              </Button>
+              <Button variant="text" onClick={handleMostrarTodos} fullWidth>Mostrar todos</Button>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <Button variant="text" onClick={handleLimpiarFiltros} fullWidth>Limpiar filtros</Button>
             </Grid>
           </Grid>
         </form>

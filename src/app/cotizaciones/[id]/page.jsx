@@ -172,7 +172,8 @@ export default function VerCotizacionPage({ params }) {
         method: "PUT",
         headers,
         body: JSON.stringify({
-          estado: estadoId, // Enviar el ID en lugar del nombre
+          estado: estadoId,
+          credentials: "include",
         }),
       })
 

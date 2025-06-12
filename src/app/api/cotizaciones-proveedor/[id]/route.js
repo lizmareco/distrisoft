@@ -3,6 +3,36 @@ import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie" 
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
+
 
 // Función para detectar el navegador desde el User-Agent
 function detectarNavegador(userAgent) {
@@ -29,18 +59,7 @@ function detectarNavegador(userAgent) {
   }
 }
 
-// Función para extraer IP del request
-function extraerIP(request) {
-  const forwarded = request.headers.get("x-forwarded-for")
-  const realIP = request.headers.get("x-real-ip")
-  const cfConnectingIP = request.headers.get("cf-connecting-ip")
 
-  if (cfConnectingIP) return cfConnectingIP
-  if (forwarded) return forwarded.split(",")[0].trim()
-  if (realIP) return realIP
-
-  return "IP no disponible"
-}
 
 // GET - Obtener una cotización específica
 export async function GET(request, { params }) {
@@ -104,25 +123,69 @@ export async function GET(request, { params }) {
   }
 }
 
+function limpiarParaAuditoria(cotizacion) {
+  // Sólo dejamos campos básicos (puedes agregar/quitar según tu modelo)
+  return {
+    idCotizacionProveedor: cotizacion.idCotizacionProveedor,
+    estado: cotizacion.estado,
+    fechaCotizacionProveedor: cotizacion.fechaCotizacionProveedor,
+    montoTotal: cotizacion.montoTotal,
+    validez: cotizacion.validez,
+    idProveedor: cotizacion.idProveedor,
+    proveedor: cotizacion.proveedor
+      ? {
+          idProveedor: cotizacion.proveedor.idProveedor,
+          empresa: cotizacion.proveedor.empresa
+            ? {
+                idEmpresa: cotizacion.proveedor.empresa.idEmpresa,
+                razonSocial: cotizacion.proveedor.empresa.razonSocial,
+              }
+            : undefined,
+        }
+      : undefined,
+    detallesCotizacionProv: cotizacion.detallesCotizacionProv?.map((det) => ({
+      idDetalleCotizacionProv: det.idDetalleCotizacionProv,
+      idMateriaPrima: det.idMateriaPrima,
+      cantidad: det.cantidad,
+      precioUnitario: det.precioUnitario,
+      subtotal: det.subtotal,
+      materiaPrima: det.materiaPrima
+        ? {
+            idMateriaPrima: det.materiaPrima.idMateriaPrima,
+            nombreMateriaPrima: det.materiaPrima.nombreMateriaPrima,
+          }
+        : undefined,
+    })),
+  }
+}
+
+function extraerIP(request) {
+  const forwarded = request.headers.get("x-forwarded-for")
+  const realIP = request.headers.get("x-real-ip")
+  const cfConnectingIP = request.headers.get("cf-connecting-ip")
+
+  let ip = null
+  if (cfConnectingIP) ip = cfConnectingIP
+  else if (forwarded) ip = forwarded.split(",")[0].trim()
+  else if (realIP) ip = realIP
+  else ip = "IP no disponible"
+
+  // Convertir IPv6 localhost a IPv4
+  if (ip === "::1") ip = "127.0.0.1"
+  // Convertir IPv4-mapeado en IPv6 (ejemplo ::ffff:192.168.0.1)
+  if (ip.startsWith("::ffff:")) ip = ip.replace("::ffff:", "")
+
+  return ip
+}
+
 // DELETE - Eliminar una cotización (soft delete)
 export async function DELETE(request, { params }) {
   try {
     const { id } = params
     console.log(`API: Eliminando cotización de proveedor con ID: ${id}`)
 
-    const authController = new AuthController()
     const auditoriaService = new AuditoriaService()
-
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
+    const idUsuario = await getUserIdFromRequest(request)
 
     // Obtener la cotización antes de eliminarla para la auditoría
     const cotizacionAnterior = await prisma.cotizacionProveedor.findUnique({
@@ -137,7 +200,6 @@ export async function DELETE(request, { params }) {
           },
         },
         detallesCotizacionProv: {
-          // Nombre correcto en plural
           include: {
             materiaPrima: true,
           },
@@ -148,20 +210,20 @@ export async function DELETE(request, { params }) {
     if (!cotizacionAnterior) {
       return NextResponse.json(
         { message: "Cotización de proveedor no encontrada" },
-        { status: HTTP_STATUS_CODES.notFound },
+        { status: HTTP_STATUS_CODES.notFound }
       )
     }
 
-    // Verificar si la cotización puede ser eliminada (por ejemplo, si está en estado PENDIENTE)
+    // Solo se puede eliminar si el estado es PENDIENTE
     if (cotizacionAnterior.estado !== "PENDIENTE") {
       return NextResponse.json(
         { message: "Solo se pueden eliminar cotizaciones en estado PENDIENTE" },
-        { status: HTTP_STATUS_CODES.forbidden },
+        { status: HTTP_STATUS_CODES.forbidden }
       )
     }
 
-    // Realizar soft delete
-    const cotizacion = await prisma.cotizacionProveedor.update({
+    // Realizar soft delete de la cotización
+    await prisma.cotizacionProveedor.update({
       where: {
         idCotizacionProveedor: Number.parseInt(id),
       },
@@ -170,7 +232,7 @@ export async function DELETE(request, { params }) {
       },
     })
 
-    // También marcar como eliminado el detalle de la cotización
+    // Soft delete de los detalles
     await prisma.detalleCotizacionProv.updateMany({
       where: {
         idCotizacionProveedor: Number.parseInt(id),
@@ -184,14 +246,14 @@ export async function DELETE(request, { params }) {
     const direccionIP = extraerIP(request)
     const navegador = detectarNavegador(request.headers.get("user-agent"))
 
-    // Registrar la acción en auditoría usando el método específico
+    // Registrar en auditoría
     await auditoriaService.registrarEliminacion(
       "CotizacionProveedor",
-      Number.parseInt(id), // Convertir a número como en CREATE
-      cotizacionAnterior,
-      userData.idUsuario,
+      Number.parseInt(id),
+      limpiarParaAuditoria(cotizacionAnterior),
+      idUsuario,
       direccionIP,
-      navegador,
+      navegador
     )
 
     console.log(`API: Cotización de proveedor con ID ${id} eliminada exitosamente`)
@@ -200,115 +262,8 @@ export async function DELETE(request, { params }) {
     console.error(`API: Error al eliminar cotización de proveedor:`, error)
     return NextResponse.json(
       { message: "Error al eliminar cotización de proveedor", error: error.message },
-      { status: HTTP_STATUS_CODES.internalServerError },
+      { status: HTTP_STATUS_CODES.internalServerError }
     )
   }
 }
 
-// PUT - Actualizar una cotización
-export async function PUT(request, { params }) {
-  try {
-    const { id } = params
-    console.log(`API: Actualizando cotización de proveedor con ID: ${id}`)
-
-    const authController = new AuthController()
-    const auditoriaService = new AuditoriaService()
-
-    // Obtener el usuario autenticado
-    const accessToken = await authController.hasAccessToken(request)
-    if (!accessToken) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    const userData = await authController.getUserFromToken(accessToken)
-    if (!userData) {
-      return NextResponse.json({ message: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
-    // Obtener datos de la actualización
-    const data = await request.json()
-    console.log("API: Datos recibidos para actualización:", data)
-
-    // Obtener la cotización antes de actualizarla para la auditoría
-    const cotizacionAnterior = await prisma.cotizacionProveedor.findUnique({
-      where: {
-        idCotizacionProveedor: Number.parseInt(id),
-        deletedAt: null,
-      },
-      include: {
-        proveedor: {
-          include: {
-            empresa: true,
-          },
-        },
-        detallesCotizacionProv: {
-          include: {
-            materiaPrima: true,
-          },
-        },
-      },
-    })
-
-    if (!cotizacionAnterior) {
-      return NextResponse.json(
-        { message: "Cotización de proveedor no encontrada" },
-        { status: HTTP_STATUS_CODES.notFound },
-      )
-    }
-
-    // Verificar si la cotización puede ser actualizada
-    if (cotizacionAnterior.estado !== "PENDIENTE") {
-      return NextResponse.json(
-        { message: "Solo se pueden actualizar cotizaciones en estado PENDIENTE" },
-        { status: HTTP_STATUS_CODES.forbidden },
-      )
-    }
-
-    // Actualizar la cotización
-    const cotizacionActualizada = await prisma.cotizacionProveedor.update({
-      where: {
-        idCotizacionProveedor: Number.parseInt(id),
-      },
-      data: {
-        ...(data.validez && { validez: Number.parseInt(data.validez) }),
-        ...(data.montoTotal && { montoTotal: Number.parseFloat(data.montoTotal) }),
-        ...(data.estado && { estado: data.estado }),
-        updatedAt: new Date(),
-      },
-      include: {
-        proveedor: {
-          include: {
-            empresa: true,
-          },
-        },
-      },
-    })
-
-    // Extraer IP y navegador del request
-    const direccionIP = extraerIP(request)
-    const navegador = detectarNavegador(request.headers.get("user-agent"))
-
-    // Registrar la acción en auditoría usando el método específico
-    await auditoriaService.registrarActualizacion(
-      "CotizacionProveedor",
-      Number.parseInt(id), // Convertir a número como en CREATE
-      cotizacionAnterior,
-      cotizacionActualizada,
-      userData.idUsuario,
-      direccionIP,
-      navegador,
-    )
-
-    console.log(`API: Cotización de proveedor con ID ${id} actualizada exitosamente`)
-    return NextResponse.json({
-      message: "Cotización de proveedor actualizada exitosamente",
-      cotizacion: cotizacionActualizada,
-    })
-  } catch (error) {
-    console.error(`API: Error al actualizar cotización de proveedor:`, error)
-    return NextResponse.json(
-      { message: "Error al actualizar cotización de proveedor", error: error.message },
-      { status: HTTP_STATUS_CODES.internalServerError },
-    )
-  }
-}

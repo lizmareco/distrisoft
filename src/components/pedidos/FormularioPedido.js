@@ -282,7 +282,7 @@ export default function FormularioPedido() {
     setCargandoProductos(true)
     try {
       console.log("Cargando productos...")
-      const respuesta = await fetch("/api/productos")
+      const respuesta = await fetch('/api/productos?estado=1');
       if (!respuesta.ok) {
         throw new Error(`Error al cargar productos: ${respuesta.status}`)
       }
