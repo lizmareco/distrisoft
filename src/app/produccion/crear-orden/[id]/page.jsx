@@ -27,10 +27,17 @@ import {
 } from "@mui/material"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import SaveIcon from "@mui/icons-material/Save"
+import { useRootContext } from "@/src/app/context/root" // Asegúrate de importar el contexto
 
 export default function CrearOrdenProduccionPage({ params }) {
   const router = useRouter()
   const { id } = use(params)
+
+  // Permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "CREATE_ORDENPRODUCCION") || context.session?.isAdmin
 
   const [pedido, setPedido] = useState(null)
   const [usuarios, setUsuarios] = useState([])
@@ -161,6 +168,20 @@ export default function CrearOrdenProduccionPage({ params }) {
     router.push(`/pedidos/${id}`)
   }
 
+  // Permiso: si no tiene permiso, mostrar alerta y no permitir acceso
+  if (!hasPermission) {
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          No tiene permisos para crear una orden de producción
+        </Alert>
+        <Button startIcon={<ArrowBackIcon />} onClick={volver}>
+          Volver al pedido
+        </Button>
+      </Box>
+    )
+  }
+
   if (cargando) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
@@ -195,7 +216,6 @@ export default function CrearOrdenProduccionPage({ params }) {
 
   return (
     <Box>
-
       <Box sx={{ p: 3 }}>
         {/* Botón volver arriba del título, alineado a la izquierda */}
         <Box sx={{ mb: 2 }}>

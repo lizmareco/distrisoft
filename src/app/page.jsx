@@ -284,6 +284,11 @@ export default function DashboardPage() {
     router.push(path)
   }
 
+  // Verificación de permisos
+  const permisos = session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_USUARIO") || session?.isAdmin
+
   if (loading) {
     return (
       <Container sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
@@ -301,6 +306,16 @@ export default function DashboardPage() {
         <Button variant="contained" onClick={() => router.push("/auth/login")}>
           Ir al inicio de sesión
         </Button>
+      </Container>
+    )
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          No tiene permisos para ver esta página
+        </Alert>
       </Container>
     )
   }
