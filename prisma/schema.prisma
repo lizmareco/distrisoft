@@ -178,6 +178,7 @@ model FacturaCliente {
   pagos                PagoFacturaCliente[]
   cuentaPorCobrar      CuentaPorCobrar?   // Solo para facturas a crédito
   notas                NotaCredito[]
+  notasDebito          NotaDebito[]
 
   @@map("FacturaCliente")
 }
@@ -367,6 +368,7 @@ model Impuestos {
   facturaCliente        FacturaCliente[]
   detalleFacturaCliente DetalleFacturaCliente[]
   notas                 DetalleNotaCredito[]
+  detallesNotaDebito    DetalleNotaDebito[]
   @@map("Impuestos")
 }
 
@@ -1026,4 +1028,52 @@ model PagoFacturaProveedor {
   usuario              Usuario          @relation(fields: [operador], references: [idUsuario], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("PagoFacturaProveedor")
+}
+
+model EstadoNotaDebito {
+  id_estado_nota Int @id @default(autoincrement())
+  desc_estado_nota String
+
+  notasDebito NotaDebito[]
+  @@map("EstadoNotaDebito")
+} 
+
+model NotaDebito {
+  id_notadb Int @id @default(autoincrement()) 
+  fecha_emision DateTime @default(now())
+  id_factura_origen Int
+  motivo String
+  monto_total Decimal @db.Decimal
+  usuario_emisor String
+  id_estado Int
+  created_at DateTime @default(now())
+  updated_at DateTime?
+  deleted_at DateTime?
+
+  // Relaciones
+  estado EstadoNotaDebito @relation(fields: [id_estado], references: [id_estado_nota])
+  factura FacturaCliente @relation(fields: [id_factura_origen], references: [nroFactura])
+  detalles DetalleNotaDebito[]
+  @@map("NotaDebito")
+}
+
+model DetalleNotaDebito {
+  id_detalle_notadb Int @id @default(autoincrement())
+  id_notadb Int
+  concepto String?
+  cantidad Decimal? @db.Decimal
+  precio_unitario Decimal? @db.Decimal
+  subtotal Float
+  id_impuesto Int
+  monto_impuesto Float
+  total_item Float
+  created_at DateTime @default(now())
+  updated_at DateTime?
+  deleted_at DateTime?
+
+  // Relaciones
+  nota NotaDebito @relation(fields: [id_notadb], references: [id_notadb])
+  impuesto Impuestos @relation(fields: [id_impuesto], references: [idImpuesto])
+  @@map("DetalleNotaDebito")
+
 }
