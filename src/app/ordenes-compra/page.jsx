@@ -52,6 +52,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ArrowBack } from "@mui/icons-material"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function OrdenesCompraPage() {
   const [ordenesCompra, setOrdenesCompra] = useState([])
@@ -83,6 +84,12 @@ export default function OrdenesCompraPage() {
     fechaVencimiento: "",
     observacion: "",
   })
+
+  // Obtener contexto y permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_ORDENCOMPRA") || context.session?.isAdmin
 
   // Estados para diálogos y acciones
   const [dialogEstado, setDialogEstado] = useState({ open: false, orden: null })
@@ -450,7 +457,12 @@ export default function OrdenesCompraPage() {
     return orden.estadoOrdenCompra?.descEstadoOrdenCompra?.toLowerCase() === "parcialmente recibido"
   }
 
-  return (
+  // Definir el contenido a renderizar según el permiso
+  const content = !hasPermission ? (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Container>
+  ) : (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión

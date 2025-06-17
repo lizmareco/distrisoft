@@ -34,6 +34,7 @@ import EditIcon from "@mui/icons-material/Edit"
 import ClearIcon from "@mui/icons-material/Clear"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ListaOrdenesProduccionPage() {
   const router = useRouter()
@@ -47,6 +48,10 @@ export default function ListaOrdenesProduccionPage() {
   const [nuevoEstado, setNuevoEstado] = useState("")
   const [guardando, setGuardando] = useState(false)
   const [datosIniciales, setDatosIniciales] = useState(false)
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_ORDENPRODUCCION") || context.session?.isAdmin
 
   // Filtros
   const [filtros, setFiltros] = useState({
@@ -245,6 +250,14 @@ export default function ListaOrdenesProduccionPage() {
     return orden.idEstadoOrdenProd !== 2 // No editar si ya está finalizada
   }
 
+  if (!hasPermission) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Box>
+    )
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
@@ -386,6 +399,8 @@ export default function ListaOrdenesProduccionPage() {
               onChange={handlePageChange}
               color="primary"
               disabled={cargando}
+              showFirstButton
+              showLastButton
             />
           )}
         </Box>

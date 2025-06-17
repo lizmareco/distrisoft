@@ -36,6 +36,7 @@ import {
 import { Add, Edit, Delete, ArrowBack } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ListaProducto() {
   const router = useRouter()
@@ -57,6 +58,10 @@ export default function ListaProducto() {
   const [tiposProducto, setTiposProducto] = useState([])
   const [estadosProducto, setEstadosProducto] = useState([])
   const [hasSearched, setHasSearched] = useState(false)
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_PRODUCTO") || context.session?.isAdmin
 
   const fetchProductos = async (params = {}) => {
     try {
@@ -179,6 +184,14 @@ export default function ListaProducto() {
     setFiltroEstado("")
     setProductos([])
     setHasSearched(false)
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

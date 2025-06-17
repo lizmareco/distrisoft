@@ -28,9 +28,14 @@ import SearchIcon from "@mui/icons-material/Search"
 import CheckCircleIcon from "@mui/icons-material/CheckCircle"
 import CommentIcon from "@mui/icons-material/Comment"
 import Link from "next/link"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function NuevoProveedorPage() {
   const router = useRouter()
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "CREATE_PROVEEDOR") || context.session?.isAdmin
 
   // Estado para el formulario
   const [formData, setFormData] = useState({
@@ -187,6 +192,14 @@ export default function NuevoProveedorPage() {
     return (
       <Container sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
         <CircularProgress />
+      </Container>
+    )
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para crear un proveedor</Alert>
       </Container>
     )
   }

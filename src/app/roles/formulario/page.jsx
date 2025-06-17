@@ -22,12 +22,13 @@ import {
   Divider,
   FormHelperText,
 } from "@mui/material"
+import { useRootContext } from "@/src/app/context/root" // <-- Agrega esta línea
 
 const RolFormulario = () => {
   const [formulario, setFormulario] = useState({
     nombreRol: "",
     permisos: [],
-    estadoRol: "ACTIVO", // Usar estadoRol en lugar de activo
+    estadoRol: "ACTIVO",
   })
   const [permisosDisponibles, setPermisosDisponibles] = useState([])
   const [loading, setLoading] = useState(false)
@@ -36,7 +37,13 @@ const RolFormulario = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get("id")
-  const isEditing = !!id // Determinar si estamos en modo edición
+  const isEditing = !!id
+
+  // Permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find((permiso) => permiso === "CREATE_ROL") || context.session?.isAdmin
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,7 +52,6 @@ const RolFormulario = () => {
         setError(null)
 
         // Cargar permisos
-        console.log("Cargando permisos...")
         const permisosResponse = await fetch("/api/permisos", {
           method: "GET",
           headers: {
@@ -59,18 +65,14 @@ const RolFormulario = () => {
         }
 
         const permisosData = await permisosResponse.json()
-        console.log("Permisos cargados:", permisosData)
-
         if (permisosData && permisosData.permisos) {
           setPermisosDisponibles(permisosData.permisos)
         } else {
-          console.warn("No se encontraron permisos disponibles")
           setPermisosDisponibles([])
         }
 
         // Si hay un ID, cargar los datos del rol
         if (id) {
-          console.log(`Cargando rol con ID: ${id}`)
           const rolResponse = await fetch(`/api/roles/${id}`, {
             method: "GET",
             headers: {
@@ -84,29 +86,22 @@ const RolFormulario = () => {
           }
 
           const rolData = await rolResponse.json()
-          console.log("Datos del rol recibidos:", rolData)
-
           if (rolData && rolData.rol) {
-            // Extraer los IDs de permisos del rol
             const permisosIds =
               rolData.rol.permisos && Array.isArray(rolData.rol.permisos)
                 ? rolData.rol.permisos.map((p) => p.idPermiso)
                 : []
 
-            console.log("IDs de permisos extraídos:", permisosIds)
-
             setFormulario({
               nombreRol: rolData.rol.nombreRol || "",
               permisos: permisosIds,
-              estadoRol: rolData.rol.estadoRol || "ACTIVO", // Usar estadoRol
+              estadoRol: rolData.rol.estadoRol || "ACTIVO",
             })
           } else {
-            console.error("Estructura de datos del rol inesperada:", rolData)
             setError("Error al cargar los datos del rol. Estructura inesperada.")
           }
         }
       } catch (error) {
-        console.error("Error al cargar datos:", error)
         setError(error.message || "Error al cargar datos necesarios para el formulario")
       } finally {
         setLoading(false)
@@ -123,20 +118,17 @@ const RolFormulario = () => {
       const permisoId = Number.parseInt(value)
 
       if (checked) {
-        // Agregar permiso
         setFormulario((prev) => ({
           ...prev,
           permisos: [...prev.permisos, permisoId],
         }))
       } else {
-        // Quitar permiso
         setFormulario((prev) => ({
           ...prev,
           permisos: prev.permisos.filter((id) => id !== permisoId),
         }))
       }
     } else {
-      // Campos de texto o select
       setFormulario((prev) => ({
         ...prev,
         [name]: value,
@@ -151,15 +143,13 @@ const RolFormulario = () => {
       setLoading(true)
       setError(null)
 
-      console.log("Enviando datos:", formulario)
-
       const url = id ? `/api/roles/${id}` : "/api/roles"
       const method = id ? "PUT" : "POST"
 
       const dataToSend = {
         nombreRol: formulario.nombreRol,
         permisos: formulario.permisos,
-        estadoRol: formulario.estadoRol, // Enviar estadoRol
+        estadoRol: formulario.estadoRol,
       }
 
       const response = await fetch(url, {
@@ -172,20 +162,16 @@ const RolFormulario = () => {
       })
 
       const responseData = await response.json()
-      console.log("Respuesta recibida:", responseData)
 
       if (!response.ok) {
         throw new Error(responseData.error || responseData.message || `Error al ${id ? "actualizar" : "crear"} el rol`)
       }
 
       setSuccess(true)
-
-      // Redirigir después de un breve retraso
       setTimeout(() => {
         router.push("/roles")
       }, 1500)
     } catch (error) {
-      console.error("Error en submit:", error)
       setError(error.message || `Error al ${id ? "actualizar" : "crear"} el rol`)
     } finally {
       setLoading(false)
@@ -194,6 +180,15 @@ const RolFormulario = () => {
 
   const handleCancel = () => {
     router.push("/roles")
+  }
+
+  // Permiso: si no tiene permiso, mostrar alerta y no permitir acceso
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para crear roles</Alert>
+      </Container>
+    )
   }
 
   return (
@@ -235,13 +230,12 @@ const RolFormulario = () => {
                 onChange={handleChange}
                 margin="normal"
                 required
-                disabled={isEditing} // Deshabilitar si estamos editando
-                InputProps={{ readOnly: isEditing }} // Hacer de solo lectura si estamos editando
+                disabled={isEditing}
+                InputProps={{ readOnly: isEditing }}
                 sx={{ mb: 1 }}
                 helperText={isEditing ? "El nombre del rol no se puede modificar" : ""}
               />
 
-              {/* Selector de estado del rol */}
               <FormControl fullWidth margin="normal">
                 <InputLabel id="estado-rol-label">Estado del Rol</InputLabel>
                 <Select

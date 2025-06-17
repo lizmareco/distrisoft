@@ -37,6 +37,7 @@ import { ArrowBack, Edit, Save, Cancel, Delete, Inventory } from "@mui/icons-mat
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { useRootContext } from "@/src/app/context/root" // <-- Agrega esta línea
 
 export default function VerOrdenCompraPage({ params }) {
   const router = useRouter()
@@ -44,6 +45,12 @@ export default function VerOrdenCompraPage({ params }) {
   // Usar React.use() para "unwrap" los parámetros
   const unwrappedParams = React.use(params)
   const { id } = unwrappedParams
+
+  // Permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_ORDENCOMPRA") || context.session?.isAdmin
 
   const [ordenCompra, setOrdenCompra] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -472,6 +479,15 @@ export default function VerOrdenCompraPage({ params }) {
 
     console.log("No se encontraron detalles")
     return []
+  }
+
+  // Si no tiene permiso, mostrar alerta y no permitir acceso
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

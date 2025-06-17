@@ -44,6 +44,10 @@ import { useRootContext } from "@/src/app/context/root"
 export default function RolesPage() {
   const router = useRouter()
   const { session } = useRootContext()
+  const permisos = session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_ROL") || session?.isAdmin
+
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -179,6 +183,14 @@ export default function RolesPage() {
     setFiltroPermiso("")
     setRoles([])
     setHasSearched(false)
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

@@ -35,6 +35,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import ConfirmDialog from "@/src/components/ConfirmDialog"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState([])
@@ -44,6 +45,10 @@ export default function PersonasPage() {
   const [tiposDocumento, setTiposDocumento] = useState([])
   const [loadingTipos, setLoadingTipos] = useState(true)
   const router = useRouter()
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_PERSONA") || context.session?.isAdmin
 
   // Estado para el formulario de búsqueda
   const [busqueda, setBusqueda] = useState({
@@ -278,7 +283,11 @@ export default function PersonasPage() {
     router.push(`/personas/${id}`)
   }
 
-  return (
+  const content = !hasPermission ? (
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Alert severity="error">No tiene permisos para ver esta página</Alert>
+    </Container>
+  ) : (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -487,4 +496,6 @@ export default function PersonasPage() {
       />
     </Container>
   )
+
+  return content
 }
