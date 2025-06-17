@@ -193,85 +193,107 @@ export default function DashboardPage() {
   const configurarPermisosSegunRol = (rol) => {
     console.log("Configurando permisos para rol:", rol)
 
-    // Por defecto, mostrar todo
+    // Por defecto, ocultar todo
     const secciones = {
-      entidades: true,
-      inventario: true,
-      usuarios: true, // Siempre visible para pruebas
-      ventas: true, // Sección para ventas/cotizaciones
-      compras: true, // Nueva sección para compras/cotizaciones de proveedores
-      finanzas: true,
-      cuentasCobrar: true,
-      cuentasPagar: true,
-      ReportesPage: true, // Nueva sección para reportes
-      produccion: true, // Nueva sección para producción
+      entidades: false,
+      inventario: false,
+      usuarios: false,
+      ventas: false,
+      compras: false,
+      finanzas: false,
+      cuentasCobrar: false,
+      cuentasPagar: false,
+      ReportesPage: false,
+      produccion: false,
     }
 
     const items = {
-      personas: true,
-      clientes: true,
-      empresas: true,
-      proveedores: true,
-      materiaprima: true,
-      productos: true,
-      inventario: true, // Nuevo
-      formulas: true,
-      administracionUsuarios: true, // Siempre visible para pruebas
-      cotizaciones: true, // Ítem para cotizaciones de clientes
-      pedidos: true, // Nuevo
-      cotizacionesProveedor: true, // Nuevo ítem para cotizaciones de proveedores
-      ordenesCompra: true, // Nuevo ítem para órdenes de compra
-      finanzas: true, // Nuevo
-      cuentasCobrar: true,
-      cuentasPagar: true,
-      reportes: true, // Nuevo ítem para reportes
+      personas: false,
+      clientes: false,
+      empresas: false,
+      proveedores: false,
+      materiaprima: false,
+      productos: false,
+      inventario: false,
+      formulas: false,
+      administracionUsuarios: false,
+      cotizaciones: false,
+      pedidos: false,
+      cotizacionesProveedor: false,
+      ordenesCompra: false,
+      finanzas: false,
+      cuentasCobrar: false,
+      cuentasPagar: false,
+      reportes: false,
+      ordenesProduccion: false,
     }
 
     // Configurar permisos específicos según el rol
-    // Comentamos temporalmente las restricciones para pruebas
     switch (rol) {
-      case "ADMINISTRADORSISTEMA":
+      case "ADMINISTRADOR":
         // El administrador ve todo
+        Object.keys(secciones).forEach(key => secciones[key] = true)
+        Object.keys(items).forEach(key => items[key] = true)
         break
 
-      case "ADMINISTRATIVO":
-        // Rol de ventas: ve clientes, empresas, productos y cotizaciones
-        items.proveedores = false
-        items.materiaprima = false
-        items.cotizacionesProveedor = false // No ve cotizaciones de proveedores
-        secciones.compras = false // No ve sección de compras
-        // Comentado para pruebas: items.administracionUsuarios = false;
-        // Comentado para pruebas: secciones.usuarios = false;
+      case "ADMINISTRADORSISTEMA":
+        // Solo ve la sección de usuarios y sus items
+        secciones.usuarios = true
+        items.administracionUsuarios = true
         break
 
       case "PRODUCCION":
-        // El rol produccion no ve cotizaciones a clientes, pero sí las órdenes de producción (o pedidos)
-        items.cotizaciones = false         // Oculta cotizaciones de clientes
-        items.ordenesProduccion = true       // Permite ver la opción de producción
-        items.materiaprima = false
-        items.formulas = false 
-        items.productos = false
-        secciones.compras = false            
-        secciones.ReportesPage = false
-        secciones.finanzas = false
-        secciones.entidades = false
-        secciones.usuarios = false
+        // Ve producción e inventario
+        secciones.produccion = true
+        secciones.inventario = true
+        items.ordenesProduccion = true
+        items.materiaprima = true
+        items.productos = true
+        items.inventario = true
+        items.formulas = true
         break
 
-      case "COMPRAS":
-        // Rol de compras: ve proveedores, materias primas y cotizaciones de proveedores
-        items.clientes = false
-        items.productos = false
-        items.cotizaciones = false // No ve cotizaciones de clientes
-        secciones.ventas = false // No ve sección de ventas
-        // Comentado para pruebas: items.administracionUsuarios = false;
-        // Comentado para pruebas: secciones.usuarios = false;
+      case "ADMINISTRATIVO":
+        // Ve ventas, compras, finanzas, entidades, inventario y reportes
+        secciones.ventas = true
+        secciones.compras = true
+        secciones.finanzas = true
+        secciones.entidades = true
+        secciones.inventario = true
+        secciones.ReportesPage = true
+        
+        // Items de ventas
+        items.cotizaciones = true
+        items.pedidos = true
+        
+        // Items de compras
+        items.cotizacionesProveedor = true
+        items.ordenesCompra = true
+        
+        // Items de finanzas
+        items.finanzas = true
+        items.cuentasCobrar = true
+        items.cuentasPagar = true
+        
+        // Items de entidades
+        items.personas = true
+        items.clientes = true
+        items.empresas = true
+        items.proveedores = true
+        
+        // Items de inventario
+        items.materiaprima = true
+        items.productos = true
+        items.inventario = true
+        items.formulas = true
+        
+        // Items de reportes
+        items.reportes = true
         break
 
       default:
-      // Rol desconocido o básico: acceso limitado
-      // Comentado para pruebas: items.administracionUsuarios = false;
-      // Comentado para pruebas: secciones.usuarios = false;
+        // Rol desconocido: acceso limitado
+        console.warn("Rol desconocido:", rol)
     }
 
     // Actualizar los estados de visibilidad

@@ -62,24 +62,33 @@ export default function VerCotizacionPage({ params }) {
     const fetchCotizacion = async () => {
       try {
         setLoading(true)
+        console.log(`Frontend: Intentando cargar cotización con ID: ${id}`)
         const response = await fetch(`/api/cotizaciones/${id}`)
+        console.log(`Frontend: Respuesta recibida para cotización con ID ${id}. OK: ${response.ok}`)
 
         if (!response.ok) {
-          throw new Error("Error al cargar la cotización")
+          const errorText = await response.text()
+          console.error(`Frontend: Error en la respuesta de la API para cotización ${id}: ${response.status} - ${errorText}`)
+          throw new Error("Error al cargar la cotización: " + errorText)
         }
 
         const data = await response.json()
+        console.log(`Frontend: Datos de cotización recibidos para ID ${id}:`, data)
         setCotizacion(data)
       } catch (error) {
-        console.error("Error:", error)
+        console.error("Frontend: Error al cargar la cotización en useEffect:", error)
         setError(error.message)
       } finally {
         setLoading(false)
+        console.log(`Frontend: Finalizado el proceso de carga para cotización con ID: ${id}`)
       }
     }
 
     if (id) {
+      console.log(`Frontend: useEffect detectó ID y va a intentar cargar cotización: ${id}`)
       fetchCotizacion()
+    } else {
+      console.log("Frontend: useEffect no detectó ID.")
     }
   }, [id])
 
@@ -90,13 +99,17 @@ export default function VerCotizacionPage({ params }) {
       setSnackbarSeverity("info")
       setOpenSnackbar(true)
 
-      // Intentar descargar el PDF directamente
       const response = await fetch(`/api/cotizaciones/${id}/pdf`)
 
       if (!response.ok) {
-        // Si hay un error, intentar obtener el mensaje de error
         const errorData = await response.json()
         throw new Error(errorData.message || "Error al generar el PDF")
+      }
+
+      // Verificar que la respuesta sea un PDF
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/pdf")) {
+        throw new Error("La respuesta no es un PDF válido")
       }
 
       // Obtener el blob del PDF
@@ -123,8 +136,6 @@ export default function VerCotizacionPage({ params }) {
       setOpenSnackbar(true)
     } catch (error) {
       console.error("Error:", error)
-
-      // Mostrar mensaje de error
       setSnackbarMessage("Error al generar el PDF: " + error.message)
       setSnackbarSeverity("error")
       setOpenSnackbar(true)

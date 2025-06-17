@@ -188,10 +188,7 @@ export async function POST(request) {
       }
     })
 
-    // Extraer IP y navegador del request
-    const direccionIP = extraerIP(request)
-    const userAgent = request.headers.get("user-agent")
-    const navegador = detectarNavegador(userAgent)
+
 
     // Registrar auditoría del pago
     await auditoriaService.registrarCreacion(
@@ -207,8 +204,8 @@ export async function POST(request) {
         descripcion: `Pago registrado para factura ${cuentaPorPagar.facturaProveedor.nroFactura} - ${cuentaPorPagar.facturaProveedor.proveedor.empresa.razonSocial}`,
       },
       idUsuario,
-      direccionIP,
-      navegador,
+      auditoriaService.obtenerDireccionIP(request),
+      auditoriaService.obtenerInfoNavegador(request)
     )
 
     // Si la cuenta se pagó completamente, registrar auditoría de la actualización de estado
@@ -219,8 +216,8 @@ export async function POST(request) {
         cuentaPorPagar.facturaProveedor,
         resultado.facturaActualizada,
         idUsuario,
-        direccionIP,
-        navegador,
+        auditoriaService.obtenerDireccionIP(request),
+        auditoriaService.obtenerInfoNavegador(request)
       )
     }
 

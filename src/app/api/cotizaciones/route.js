@@ -82,7 +82,15 @@ export async function GET(request) {
 
       // Filtro por cliente específico
       const cliente = searchParams.get("cliente")
-      if (cliente) {
+      const idCliente = searchParams.get("idCliente")
+      
+      if (idCliente) {
+        // Si tenemos un ID de cliente, buscar por ese ID específico
+        conditions.push({
+          idCliente: Number.parseInt(idCliente)
+        })
+      } else if (cliente) {
+        // Si no hay ID pero hay texto de búsqueda, buscar por nombre/apellido/documento
         conditions.push({
           OR: [
             // Búsqueda por nombre y apellido del cliente
@@ -109,56 +117,6 @@ export async function GET(request) {
         })
       }
 
-      // Búsqueda por término general (mantener la búsqueda original si existe)
-      if (searchTerm && !cliente) {
-        const searchId = !isNaN(Number.parseInt(searchTerm)) ? Number.parseInt(searchTerm) : undefined
-
-        conditions.push({
-          OR: [
-            // Búsqueda por ID de cotización
-            searchId ? { idCotizacionCliente: searchId } : {},
-            // Búsqueda por nombre o apellido del cliente
-            {
-              cliente: {
-                persona: {
-                  OR: [
-                    { nombre: { contains: searchTerm, mode: "insensitive" } },
-                    { apellido: { contains: searchTerm, mode: "insensitive" } },
-                  ],
-                },
-              },
-            },
-            // Búsqueda por razón social de empresa
-            {
-              cliente: {
-                empresa: {
-                  razonSocial: { contains: searchTerm, mode: "insensitive" },
-                },
-              },
-            },
-            // Búsqueda por número de documento del cliente
-            {
-              cliente: {
-                persona: {
-                  nroDocumento: { contains: searchTerm, mode: "insensitive" },
-                },
-              },
-            },
-            // Búsqueda por vendedor
-            {
-              usuario: {
-                persona: {
-                  OR: [
-                    { nombre: { contains: searchTerm, mode: "insensitive" } },
-                    { apellido: { contains: searchTerm, mode: "insensitive" } },
-                  ],
-                },
-              },
-            },
-          ],
-        })
-      }
-
       // Si hay condiciones específicas, usar AND
       if (conditions.length > 0) {
         whereCondition.AND = conditions
@@ -167,6 +125,8 @@ export async function GET(request) {
         return NextResponse.json([], { status: HTTP_STATUS_CODES.ok })
       }
     }
+
+    console.log("API: Condición de búsqueda:", JSON.stringify(whereCondition, null, 2))
 
     // Obtener cotizaciones con sus relaciones
     const cotizaciones = await prisma.cotizacionCliente.findMany({

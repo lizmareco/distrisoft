@@ -4,6 +4,8 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import cookie from "cookie" 
+import { ajustarStockProducto } from "@/src/lib/api/ajustarStockProducto";
+
 
 async function getUserIdFromRequest(request) {
   const authController = new AuthController()
@@ -68,7 +70,9 @@ export async function PUT(request, { params }) {
           include: {
             pedidoDetalle: {
               include: {
-                producto: true,
+                producto: {
+                  include: { unidadMedida: true },
+                },
               },
             },
           },
@@ -88,15 +92,20 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Verificar si el cambio es a COMPLETADA o PARCIALMENTE COMPLETADA
-    const cambioACompletada = data.idEstadoOrdenProd === 3 // Asumiendo que 3 es el ID para COMPLETADA
-    const cambioAParcialmenteCompletada = data.idEstadoOrdenProd === 4 // Asumiendo que 4 es el ID para PARCIALMENTE COMPLETADA
+    // Definir los IDs de estado correctos
+    const ESTADO_FINALIZADO = 2; // ID para FINALIZADO
+    const ESTADO_CANCELADO = 3; // ID para CANCELADO
+
+    // Determinar si el cambio es a FINALIZADO
+    const cambioAFinalizado = data.idEstadoOrdenProd === ESTADO_FINALIZADO
+    const cambioACancelado = data.idEstadoOrdenProd === ESTADO_CANCELADO
 
     // Actualizar la orden de producción
     const ordenActualizada = await prisma.ordenProduccion.update({
       where: { idOrdenProduccion: Number.parseInt(id) },
       data: {
         idEstadoOrdenProd: data.idEstadoOrdenProd,
+        fechaFinProd: cambioAFinalizado ? new Date() : ordenExistente.fechaFinProd, // Establecer fechaFinProd si se finaliza
         updatedAt: new Date(),
       },
       include: {
@@ -105,7 +114,9 @@ export async function PUT(request, { params }) {
           include: {
             pedidoDetalle: {
               include: {
-                producto: true,
+                producto: {
+                  include: { unidadMedida: true },
+                },
               },
             },
           },
@@ -113,76 +124,24 @@ export async function PUT(request, { params }) {
       },
     })
 
-    // Si se cambió a COMPLETADA, actualizar el inventario con todos los productos
-    if (cambioACompletada) {
-      console.log("API: Actualizando inventario con todos los productos completados")
+    const detalles = ordenExistente.pedidoCliente.pedidoDetalle || [];
 
-      // Obtener los detalles del pedido
-      const detalles = ordenExistente.pedidoCliente.pedidoDetalle || []
-
-      // Crear registros de inventario y actualizar stock para cada producto
+    // Si se cambió a FINALIZADO, actualizar el inventario con todos los productos
+    if (cambioAFinalizado) {
       for (const detalle of detalles) {
-        // Crear registro en inventario de productos
-        await prisma.inventarioProducto.create({
-          data: {
-            idProducto: detalle.idProducto,
-            cantidad: detalle.cantidad,
-            unidadMedida: detalle.producto.unidadMedida?.abreviatura || "Unidad",
-            tipoMovimiento: "ENTRADA",
-            fechaMovimiento: new Date(),
-            idOrdenProduccion: Number.parseInt(id),
-            motivo: `Producción completa de orden #${id}`,
-            observacion: data.observacion || `Producción finalizada según pedido #${ordenExistente.idPedido}`,
-          },
-        })
-
-        // Actualizar el stock del producto
-        await prisma.producto.update({
-          where: { idProducto: detalle.idProducto },
-          data: {
-            stockActual: {
-              increment: detalle.cantidad,
-            },
-            updatedAt: new Date(),
-          },
-        })
-
-        console.log(`API: Stock actualizado para producto ID ${detalle.idProducto}, +${detalle.cantidad}`)
+        await ajustarStockProducto({
+          idProducto: detalle.idProducto,
+          cantidad: detalle.cantidad,
+          motivo: `Producción finalizada de orden #${id}`,
+          observacion: data.observacion || `Producción finalizada según pedido #${ordenExistente.idPedido}`,
+          idOrdenProduccion: Number.parseInt(id),
+        });
       }
-    }
-    // Si se cambió a PARCIALMENTE COMPLETADA y se proporcionaron items, actualizar el inventario con esos items
-    else if (cambioAParcialmenteCompletada && data.produccionItems && data.produccionItems.length > 0) {
-      console.log("API: Actualizando inventario con productos parcialmente completados")
-
-      // Crear registros de inventario y actualizar stock para cada producto producido
-      for (const item of data.produccionItems) {
-        // Crear registro en inventario de productos
-        await prisma.inventarioProducto.create({
-          data: {
-            idProducto: item.idProducto,
-            cantidad: item.cantidad,
-            unidadMedida: item.unidadMedida || "Unidad",
-            tipoMovimiento: "ENTRADA",
-            fechaMovimiento: new Date(),
-            idOrdenProduccion: Number.parseInt(id),
-            motivo: `Producción parcial de orden #${id}`,
-            observacion: data.observacion || `Producción parcial según pedido #${ordenExistente.idPedido}`,
-          },
-        })
-
-        // Actualizar el stock del producto
-        await prisma.producto.update({
-          where: { idProducto: item.idProducto },
-          data: {
-            stockActual: {
-              increment: item.cantidad,
-            },
-            updatedAt: new Date(),
-          },
-        })
-
-        console.log(`API: Stock actualizado para producto ID ${item.idProducto}, +${item.cantidad}`)
-      }
+    } else if (cambioACancelado) {
+      // Lógica para manejar la cancelación (si es necesario revertir stock, etc.)
+      console.log(`API: Orden de producción ${id} cancelada. No se modifica inventario de productos terminados.`)
+      // Podrías añadir lógica para reponer stock de materias primas si se habían descontado al crear la orden
+      // O para notificar que la producción fue cancelada
     }
 
     // Registrar la acción en auditoría

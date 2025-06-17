@@ -92,12 +92,23 @@ export async function GET(request) {
 
     // Obtener parámetros de búsqueda de la URL
     const { searchParams } = new URL(request.url)
-    const searchTerm = searchParams.get("search") || ""
+    const page = parseInt(searchParams.get("page") || "0")
+    const limit = parseInt(searchParams.get("limit") || "10")
     const idCotizacion = searchParams.get("idCotizacion") || ""
     const estado = searchParams.get("estado") || ""
     const idProveedor = searchParams.get("idProveedor") || ""
     const idOrdenCompra = searchParams.get("idOrdenCompra") || ""
     const mostrarTodas = searchParams.get("mostrarTodas") === "true"
+
+    console.log("API: Parámetros recibidos:", {
+      page,
+      limit,
+      idCotizacion,
+      estado,
+      idProveedor,
+      idOrdenCompra,
+      mostrarTodas
+    })
 
     // Construir condiciones de búsqueda
     let whereCondition = {
@@ -128,40 +139,10 @@ export async function GET(request) {
       }
     }
 
-    // Si hay término de búsqueda, aplicar filtros adicionales
-    if (searchTerm) {
-      // Intentar convertir el término de búsqueda a número para buscar por ID
-      const searchId = !isNaN(Number.parseInt(searchTerm)) ? Number.parseInt(searchTerm) : undefined
-
-      // Construir condiciones de búsqueda
+    // Solo aplicar el filtro de fecha si no se solicita mostrar todas
+    if (!mostrarTodas) {
       whereCondition = {
         ...whereCondition,
-        OR: [
-          // Búsqueda por ID de orden de compra
-          ...(searchId ? [{ idOrdenCompra: searchId }] : []),
-          // Búsqueda por proveedor (a través de la cotización)
-          {
-            cotizacionProveedor: {
-              proveedor: {
-                empresa: {
-                  razonSocial: { contains: searchTerm, mode: "insensitive" },
-                },
-              },
-            },
-          },
-          // Búsqueda por observación
-          {
-            observacion: { contains: searchTerm, mode: "insensitive" },
-          },
-        ],
-      }
-    }
-
-    // Si no se solicita mostrar todas y no hay filtros específicos, limitar a las más recientes
-    if (!mostrarTodas && !searchTerm && !idCotizacion && !estado && !idProveedor && !idOrdenCompra) {
-      whereCondition = {
-        ...whereCondition,
-        // Limitar a órdenes creadas en los últimos 30 días
         createdAt: {
           gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         },
@@ -170,7 +151,12 @@ export async function GET(request) {
 
     console.log("API: Condición de búsqueda:", JSON.stringify(whereCondition, null, 2))
 
-    // Obtener órdenes de compra con sus relaciones y aplicar filtro de búsqueda
+    // Obtener el total de registros que coinciden con los filtros
+    const total = await prisma.ordenCompra.count({
+      where: whereCondition,
+    })
+
+    // Obtener órdenes de compra con paginación
     const ordenesCompra = await prisma.ordenCompra.findMany({
       where: whereCondition,
       include: {
@@ -193,15 +179,22 @@ export async function GET(request) {
       orderBy: {
         fechaOrden: "desc",
       },
+      skip: page * limit,
+      take: limit,
     })
 
-    console.log(`API: Se encontraron ${ordenesCompra.length} órdenes de compra`)
-    return NextResponse.json(ordenesCompra, { status: HTTP_STATUS_CODES.ok })
+    console.log(`API: Se encontraron ${total} órdenes de compra (mostrando ${ordenesCompra.length})`)
+    return NextResponse.json({
+      ordenes: ordenesCompra,
+      total: total,
+      page: page,
+      limit: limit
+    }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
-    console.error("API: Error al obtener órdenes de compra:", error)
+    console.error("Error al obtener órdenes de compra:", error)
     return NextResponse.json(
-      { message: "Error al obtener órdenes de compra", error: error.message },
-      { status: HTTP_STATUS_CODES.internalServerError },
+      { error: "Error al obtener órdenes de compra" },
+      { status: HTTP_STATUS_CODES.internal_server_error }
     )
   }
 }

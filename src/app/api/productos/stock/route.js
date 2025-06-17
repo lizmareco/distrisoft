@@ -122,7 +122,7 @@ export async function POST(request) {
     // Verificar que el producto existe y está activo ANTES de la transacción
     const producto = await prisma.producto.findUnique({
       where: { idProducto, deletedAt: null },
-      include: { estadoProducto: true },
+      include: { estadoProducto: true, unidadMedida: true },
     })
 
     if (!producto) {
@@ -161,12 +161,31 @@ export async function POST(request) {
         return { productoActualizado: producto, cambioRealizado: false }
       }
 
+      // Determinar el tipo de movimiento
+      const tipoMovimiento = cantidad > 0 ? "ENTRADA" : "SALIDA"
+      const cantidadMovimiento = Math.abs(cantidad)
+
       // Actualizar stock del producto
       const productoActualizado = await tx.producto.update({
         where: { idProducto },
         data: {
           stockActual: nuevoStock,
           updatedAt: new Date(),
+        },
+      })
+
+      // Registrar movimiento de inventario en InventarioProducto
+      await tx.inventarioProducto.create({
+        data: {
+          idProducto: idProducto,
+          cantidad: cantidadMovimiento,
+          tipoMovimiento: tipoMovimiento,
+          fechaMovimiento: new Date(),
+          motivo: "Ajuste de stock", 
+          observacion: observacion || "Ajuste de stock desde Inventario de Productos",
+          stockAntes: stockAnterior,
+          stockDespues: nuevoStock,
+          unidadMedida: producto.unidadMedida.descUnidadMedida,
         },
       })
 

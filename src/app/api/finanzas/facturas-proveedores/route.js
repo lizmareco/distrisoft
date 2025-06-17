@@ -323,10 +323,6 @@ export async function POST(request) {
       }
     })
 
-    // Extraer IP y navegador del request
-    const direccionIP = extraerIP(request)
-    const userAgent = request.headers.get("user-agent")
-    const navegador = detectarNavegador(userAgent)
 
     // Registrar auditoría
     await auditoriaService.registrarCreacion(
@@ -344,8 +340,8 @@ export async function POST(request) {
         } - Nro: ${nroFactura} - Estado: ${esContado ? "Pagada" : "Registrada"}`,
       },
       idUsuario,
-      direccionIP,
-      navegador,
+      auditoriaService.obtenerDireccionIP(request),
+      auditoriaService.obtenerInfoNavegador(request),
     )
 
     return NextResponse.json({

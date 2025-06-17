@@ -211,6 +211,8 @@ export async function POST(request) {
           tipoMovimiento: cantidadAjuste > 0 ? "ENTRADA" : "SALIDA",
           motivo: "Ajuste manual de stock",
           observacion: observacion || `Ajuste manual de stock: ${cantidadAjuste > 0 ? "Entrada" : "Salida"}`,
+          stockAntes: stockActual,
+          stockDespues: nuevoStock,
         },
       })
 

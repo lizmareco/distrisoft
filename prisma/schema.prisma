@@ -823,6 +823,8 @@ model Inventario {
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime?     @default(now()) @map("updated_at")
   deletedAt          DateTime?     @map("deleted_at")
+  stockAntes             Float?       @map("stock_antes")
+  stockDespues           Float?       @map("stock_despues")
   
   // Relaciones
   materiaPrima       MateriaPrima  @relation(fields: [idMateriaPrima], references: [idMateriaPrima], onDelete: NoAction, onUpdate: NoAction, map: "inventario_materia_prima_fk")
@@ -842,6 +844,8 @@ model InventarioProducto {
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime?     @default(now()) @map("updated_at")
   deletedAt             DateTime?     @map("deleted_at")
+  stockAntes             Float?       @map("stock_antes")
+  stockDespues           Float?       @map("stock_despues")
   producto              Producto      @relation(fields: [idProducto], references: [idProducto], onDelete: NoAction, onUpdate: NoAction, map: "inventario_producto_producto_fk")
   ordenProduccion       OrdenProduccion? @relation(fields: [idOrdenProduccion], references: [idOrdenProduccion], onDelete: NoAction, onUpdate: NoAction, map: "inventario_producto_orden_produccion_fk")
 }

@@ -275,48 +275,36 @@ export async function PUT(request, { params }) {
         // Para cada detalle, calcular la cantidad pendiente
         for (const detalle of detalles) {
           try {
-            if (!detalle.idMateriaPrima) {
-              console.log(`API: ADVERTENCIA - Detalle sin ID de materia prima: ${JSON.stringify(detalle)}`)
-              continue
-            }
-
-            console.log(
-              `API: Procesando materia prima ID ${detalle.idMateriaPrima}, cantidad total: ${detalle.cantidad}`,
-            )
-
-            // Calcular cuánto ya se ha recibido de este item
+            if (!detalle.idMateriaPrima) continue
+        
             const cantidadRecibida = inventarioPrevio
               .filter((item) => item.idMateriaPrima === detalle.idMateriaPrima)
               .reduce((total, item) => total + Number(item.cantidad || 0), 0)
-
-            // Calcular la cantidad pendiente
+        
             const cantidadPendiente = Number(detalle.cantidad || 0) - cantidadRecibida
-
-            console.log(
-              `API: Materia prima ID ${detalle.idMateriaPrima}: cantidad total ${detalle.cantidad}, recibida ${cantidadRecibida}, pendiente ${cantidadPendiente}`,
-            )
-
-            // Solo crear registro si hay cantidad pendiente
+        
             if (cantidadPendiente > 0) {
-              // Crear registro en inventario
+              const materiaPrima = await prisma.materiaPrima.findUnique({
+                where: { idMateriaPrima: detalle.idMateriaPrima },
+              })
+              const stockAntes = Number(materiaPrima?.stockActual || 0)
+              const stockDespues = stockAntes + cantidadPendiente
+        
               const nuevoInventario = await prisma.inventario.create({
                 data: {
                   idMateriaPrima: detalle.idMateriaPrima,
                   cantidad: cantidadPendiente,
                   unidadMedida: detalle.unidadMedida || "Unidad",
                   fechaMovimiento: new Date(),
-                  idOrdenCompra: Number.parseInt(id),
+                  idOrdenCompra: Number(id),
                   observacion: `Recepción final de orden de compra #${id} (pendiente: ${cantidadPendiente})`,
                   tipoMovimiento: "ENTRADA",
+                  stockAntes,
+                  stockDespues,
                 },
               })
-
-              console.log(
-                `API: Registro de inventario creado para materia prima ID ${detalle.idMateriaPrima}, ID inventario: ${nuevoInventario.idInventario}`,
-              )
-
-              // Actualizar el stock de la materia prima
-              const materiaPrimaActualizada = await prisma.materiaPrima.update({
+        
+              await prisma.materiaPrima.update({
                 where: { idMateriaPrima: detalle.idMateriaPrima },
                 data: {
                   stockActual: {
@@ -325,15 +313,9 @@ export async function PUT(request, { params }) {
                   updatedAt: new Date(),
                 },
               })
-
-              console.log(
-                `API: Stock actualizado para materia prima ID ${detalle.idMateriaPrima}, nuevo stock: ${materiaPrimaActualizada.stockActual}`,
-              )
-            } else {
-              console.log(`API: No hay cantidad pendiente para materia prima ID ${detalle.idMateriaPrima}`)
             }
           } catch (error) {
-            console.error(`API: Error al procesar materia prima ID ${detalle.idMateriaPrima}:`, error)
+            console.error(`Error al procesar materia prima ID ${detalle.idMateriaPrima}:`, error)
           }
         }
       } catch (error) {
@@ -346,47 +328,43 @@ export async function PUT(request, { params }) {
       console.log("API: Actualizando inventario con items parcialmente recibidos")
 
       // Crear registros de inventario y actualizar stock para cada item recibido
-      for (const item of data.recepcionItems) {
-        try {
-          console.log(
-            `API: Procesando recepción parcial de materia prima ID ${item.idMateriaPrima}, cantidad: ${item.cantidad}`,
-          )
+for (const item of data.recepcionItems) {
+  try {
+    const materiaPrima = await prisma.materiaPrima.findUnique({
+      where: { idMateriaPrima: item.idMateriaPrima },
+    })
+    const stockAntes = Number(materiaPrima?.stockActual || 0)
+    const stockDespues = stockAntes + item.cantidad
 
-          // Crear registro en inventario
-          const nuevoInventario = await prisma.inventario.create({
-            data: {
-              idMateriaPrima: item.idMateriaPrima,
-              cantidad: item.cantidad,
-              unidadMedida: item.unidadMedida || "Unidad",
-              fechaMovimiento: new Date(),
-              idOrdenCompra: Number.parseInt(id),
-              observacion: `Recepción parcial de orden de compra #${id}`,
-              tipoMovimiento: "ENTRADA",
-            },
-          })
+    // Crear registro en inventario con stockAntes y stockDespues
+    const nuevoInventario = await prisma.inventario.create({
+      data: {
+        idMateriaPrima: item.idMateriaPrima,
+        cantidad: item.cantidad,
+        unidadMedida: item.unidadMedida || "Unidad",
+        fechaMovimiento: new Date(),
+        idOrdenCompra: Number(id),
+        observacion: `Recepción parcial de orden de compra #${id}`,
+        tipoMovimiento: "ENTRADA",
+        stockAntes,
+        stockDespues,
+      },
+    })
 
-          console.log(
-            `API: Registro de inventario creado para materia prima ID ${item.idMateriaPrima}, ID inventario: ${nuevoInventario.idInventario}`,
-          )
-
-          // Actualizar el stock de la materia prima
-          const materiaPrimaActualizada = await prisma.materiaPrima.update({
-            where: { idMateriaPrima: item.idMateriaPrima },
-            data: {
-              stockActual: {
-                increment: item.cantidad,
-              },
-              updatedAt: new Date(),
-            },
-          })
-
-          console.log(
-            `API: Stock actualizado para materia prima ID ${item.idMateriaPrima}, nuevo stock: ${materiaPrimaActualizada.stockActual}`,
-          )
-        } catch (error) {
-          console.error(`API: Error al procesar recepción parcial de materia prima ID ${item.idMateriaPrima}:`, error)
-        }
-      }
+    // Actualizar el stock de la materia prima
+    await prisma.materiaPrima.update({
+      where: { idMateriaPrima: item.idMateriaPrima },
+      data: {
+        stockActual: {
+          increment: item.cantidad,
+        },
+        updatedAt: new Date(),
+      },
+    })
+  } catch (error) {
+    console.error(`Error al procesar recepción parcial de materia prima ID ${item.idMateriaPrima}:`, error)
+  }
+}
     }
 
     // Extraer IP y navegador del request

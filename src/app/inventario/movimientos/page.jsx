@@ -206,11 +206,12 @@ export default function MovimientosPage() {
       valorTab === "materiasprimas"
         ? movimiento.materiaPrima?.nombreMateriaPrima || "N/A"
         : movimiento.producto?.nombreProducto || "N/A",
-    Cantidad: Math.abs(Number(movimiento.cantidad)).toFixed(2),
+    Cantidad: Number.parseFloat(movimiento.cantidad).toFixed(2),
+    "Stock Antes": Number.parseFloat(movimiento.stockAntes || 0).toFixed(2),
+    "Stock Después": Number.parseFloat(movimiento.stockDespues || 0).toFixed(2),
     "Unidad Medida": movimiento.unidadMedida || "N/A",
     Motivo: movimiento.motivo || "N/A",
     Observación: movimiento.observacion || "N/A",
-    Usuario: movimiento.usuario ? `${movimiento.usuario.nombre || ""} ${movimiento.usuario.apellido || ""}` : "Sistema",
   }))
 
   const handleMovimientoRegistrado = () => {
@@ -254,6 +255,7 @@ export default function MovimientosPage() {
         <Typography variant="h4" component="h1" gutterBottom>
           Movimientos de Inventario
           {movimientos.length > 0 && (
+            console.log("Movimientos cargados:", movimientos),
             <ExportarExcel
               datos={datosParaExcel}
               nombreArchivo={`movimientos-${valorTab === "materiasprimas" ? "materiasprimas" : "productos"}`}
@@ -498,16 +500,36 @@ export default function MovimientosPage() {
                           Cantidad:
                         </Typography>
                         <Typography variant="body2">
-                          {Math.abs(Number(movimiento.cantidad)).toFixed(2)} {movimiento.unidadMedida}
+                          {Number.parseFloat(movimiento.cantidad).toFixed(2)} {movimiento.unidadMedida || "N/A"}
                         </Typography>
                       </Grid>
 
-                      <Grid item xs={12}>
+                      <Grid item xs={6}>
                         <Typography variant="body2" color="textSecondary">
-                          Motivo:
+                          Stock Antes:
                         </Typography>
-                        <Typography variant="body2">{movimiento.motivo || "-"}</Typography>
+                        <Typography variant="body2">
+                          {Number.parseFloat(movimiento.stockAntes || 0).toFixed(2)}
+                        </Typography>
                       </Grid>
+
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="textSecondary">
+                          Stock Después:
+                        </Typography>
+                        <Typography variant="body2">
+                          {Number.parseFloat(movimiento.stockDespues || 0).toFixed(2)}
+                        </Typography>
+                      </Grid>
+
+                      {movimiento.motivo && (
+                        <Grid item xs={12}>
+                          <Typography variant="body2" color="textSecondary">
+                            Motivo:
+                          </Typography>
+                          <Typography variant="body2">{movimiento.motivo}</Typography>
+                        </Grid>
+                      )}
 
                       {movimiento.observacion && (
                         <Grid item xs={12}>
@@ -517,17 +539,6 @@ export default function MovimientosPage() {
                           <Typography variant="body2">{movimiento.observacion}</Typography>
                         </Grid>
                       )}
-
-                      <Grid item xs={12}>
-                        <Typography variant="body2" color="textSecondary">
-                          Usuario:
-                        </Typography>
-                        <Typography variant="body2">
-                          {movimiento.usuario
-                            ? `${movimiento.usuario.nombre || ""} ${movimiento.usuario.apellido || ""}`
-                            : "Sistema"}
-                        </Typography>
-                      </Grid>
                     </Grid>
                   </CardContent>
                 </Card>
@@ -545,9 +556,10 @@ export default function MovimientosPage() {
                     <TableCell>{valorTab === "materiasprimas" ? "Materia Prima" : "Producto"}</TableCell>
                     <TableCell align="center">Tipo</TableCell>
                     <TableCell align="right">Cantidad</TableCell>
+                    <TableCell align="right">Stock Antes</TableCell>
+                    <TableCell align="right">Stock Después</TableCell>
                     <TableCell>Motivo</TableCell>
                     <TableCell>Observación</TableCell>
-                    <TableCell>Usuario</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -561,15 +573,16 @@ export default function MovimientosPage() {
                       </TableCell>
                       <TableCell align="center">{renderizarTipoMovimiento(movimiento.tipoMovimiento)}</TableCell>
                       <TableCell align="right">
-                        {Math.abs(Number(movimiento.cantidad)).toFixed(2)} {movimiento.unidadMedida}
+                        {Number.parseFloat(movimiento.cantidad).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {Number.parseFloat(movimiento.stockAntes ?? 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {Number.parseFloat(movimiento.stockDespues || 0).toFixed(2)}
                       </TableCell>
                       <TableCell>{movimiento.motivo || "-"}</TableCell>
                       <TableCell>{movimiento.observacion || "-"}</TableCell>
-                      <TableCell>
-                        {movimiento.usuario
-                          ? `${movimiento.usuario.nombre || ""} ${movimiento.usuario.apellido || ""}`
-                          : "Sistema"}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

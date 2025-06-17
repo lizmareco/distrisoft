@@ -165,9 +165,14 @@ export default function DetallePedido({ id }) {
   const formatearCantidadFaltante = (material) => {
     const nombreMaterial = material.materiaPrima.toLowerCase()
     const faltanteGramos = Math.ceil(material.faltante)
-    const faltanteKg = (material.faltante / 1000).toFixed(3)
-    const stockActualKg = (material.stockActual / 1000).toFixed(3)
-    const necesarioKg = (material.cantidadNecesaria / 1000).toFixed(3)
+
+    const formatKg = (value) => {
+      return new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 1000)
+    }
+
+    const faltanteKg = formatKg(material.faltante)
+    const stockActualKg = formatKg(material.stockActual)
+    const necesarioKg = formatKg(material.cantidadNecesaria)
 
     // Formatear para edulcorante (mostrar en gramos y paquetes)
     if (

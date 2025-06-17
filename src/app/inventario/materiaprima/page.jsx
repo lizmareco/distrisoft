@@ -263,7 +263,7 @@ export default function MateriaPrimaPage() {
             <Grid item xs={12} sm={4} md={3}>
               <TextField
                 fullWidth
-                label="Buscar por nombre o descripción"
+                label="  nombre o descripción"
                 variant="outlined"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

@@ -126,7 +126,15 @@ export default function CotizacionesPage() {
         params.append("mostrarTodas", "true")
       } else {
         if (filtros.cliente.trim()) {
-          params.append("cliente", filtros.cliente.trim())
+          // Buscar el cliente seleccionado en el array de clientes
+          const clienteSeleccionado = clientes.find(c => formatearCliente(c) === filtros.cliente)
+          if (clienteSeleccionado) {
+            // Si encontramos el cliente, usar su ID
+            params.append("idCliente", clienteSeleccionado.idCliente)
+          } else {
+            // Si no encontramos el cliente por el formato completo, usar el texto como búsqueda
+            params.append("cliente", filtros.cliente.trim())
+          }
         }
         if (filtros.idCotizacion.trim()) {
           params.append("idCotizacion", filtros.idCotizacion.trim())
@@ -150,11 +158,13 @@ export default function CotizacionesPage() {
 
       // Mostrar mensaje según resultados
       if (data.length === 0) {
-        setSnackbarMessage(
-          mostrarTodas
-            ? "No hay cotizaciones registradas"
-            : "No se encontraron cotizaciones que coincidan con los filtros",
-        )
+        if (filtros.cliente.trim() && clientes.some(c => formatearCliente(c) === filtros.cliente)) {
+          setSnackbarMessage("El cliente existe pero no tiene cotizaciones registradas")
+        } else if (mostrarTodas) {
+          setSnackbarMessage("No hay cotizaciones registradas")
+        } else {
+          setSnackbarMessage("No se encontraron cotizaciones que coincidan con los filtros")
+        }
         setSnackbarSeverity("info")
         setOpenSnackbar(true)
       } else {
@@ -503,7 +513,11 @@ export default function CotizacionesPage() {
             </Table>
           </TableContainer>
         ) : (
-          <Alert severity="info">No se encontraron cotizaciones que coincidan con los filtros aplicados</Alert>
+          <Alert severity="info">
+            {filtros.cliente.trim() && clientes.some(c => formatearCliente(c) === filtros.cliente)
+              ? "El cliente existe pero no tiene cotizaciones registradas"
+              : "No se encontraron cotizaciones que coincidan con los filtros aplicados"}
+          </Alert>
         )
       ) : (
         <Alert severity="info" sx={{ mb: 3 }}>

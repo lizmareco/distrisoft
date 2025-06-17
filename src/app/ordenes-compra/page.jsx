@@ -57,10 +57,11 @@ import { useRootContext } from "@/src/app/context/root"
 export default function OrdenesCompraPage() {
   console.log("Renderizando OrdenesCompraPage");
   const [ordenesCompra, setOrdenesCompra] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [totalOrdenes, setTotalOrdenes] = useState(0)
   const [mostrarTodas, setMostrarTodas] = useState(false)
   const [idCotizacion, setIdCotizacion] = useState("")
   const [idOrdenCompra, setIdOrdenCompra] = useState("")
@@ -117,18 +118,20 @@ export default function OrdenesCompraPage() {
   useEffect(() => {
     if (hasPermission) {
       fetchMetodosPago()
-      fetchOrdenesCompra()
     }
   }, [hasPermission])
 
   // Cargar órdenes de compra
-  const fetchOrdenesCompra = async () => {
+  const fetchOrdenesCompra = async (overrideMostrarTodas = null) => {
     try {
       setLoading(true)
       setError(null)
       setMostrarOrdenes(true)
 
       let url = "/api/ordenes-compra?"
+
+      // Agregar parámetros de paginación
+      url += `page=${page}&limit=${rowsPerPage}&`
 
       if (idCotizacion) {
         url += `idCotizacion=${encodeURIComponent(idCotizacion)}&`
@@ -146,9 +149,9 @@ export default function OrdenesCompraPage() {
         url += `estado=${encodeURIComponent(estado)}&`
       }
 
-      if (mostrarTodas) {
-        url += "mostrarTodas=true&"
-      }
+      // Usar overrideMostrarTodas si está presente, de lo contrario, usar el estado actual
+      const actualMostrarTodas = overrideMostrarTodas !== null ? overrideMostrarTodas : mostrarTodas;
+      url += `mostrarTodas=${actualMostrarTodas}&`
 
       console.log("Fetching URL:", url)
       const response = await fetch(url)
@@ -158,13 +161,23 @@ export default function OrdenesCompraPage() {
       }
 
       const data = await response.json()
-      setOrdenesCompra(data)
-      setPage(0)
-      // En la función fetchOrdenesCompra, después de setOrdenesCompra(data), agregar:
-      await verificarFacturasExistentes(data)
+      console.log("Respuesta del servidor:", data)
+      
+      // Si el backend envía un mensaje de error explícito (ej. por falta de permisos/filtros necesarios)
+      if (data.error || data.mensaje) { // Se incluye data.error por si el backend envía el error así
+        setError(data.error || data.mensaje)
+        setOrdenesCompra([])
+        setTotalOrdenes(0)
+      } else {
+        setOrdenesCompra(data.ordenes || [])
+        setTotalOrdenes(data.total || 0)
+        await verificarFacturasExistentes(data.ordenes || [])
+      }
     } catch (error) {
       console.error("Error:", error)
-      setError(error.message)
+      setError("Error de red o servidor: " + error.message)
+      setOrdenesCompra([])
+      setTotalOrdenes(0)
     } finally {
       setLoading(false)
     }
@@ -213,37 +226,52 @@ export default function OrdenesCompraPage() {
     }
   }
 
-  useEffect(() => {
-    setLoading(false)
-    fetchMetodosPago()
-  }, [])
-
   // Manejar cambio de página
   const handleChangePage = (event, newPage) => {
     setPage(newPage)
+    fetchOrdenesCompra()
   }
 
   // Manejar cambio de filas por página
   const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(Number.parseInt(event.target.value, 10))
+    setRowsPerPage(parseInt(event.target.value, 10))
     setPage(0)
-  }
-
-  // Manejar búsqueda
-  const handleSearch = (event) => {
-    event.preventDefault()
     fetchOrdenesCompra()
   }
 
-  // Limpiar filtros
+  // Manejar búsqueda (aplicar filtros)
+  const handleSearch = (event) => {
+    event.preventDefault()
+    setMostrarTodas(false) // Asegurarse de que 'mostrarTodas' sea falso al aplicar filtros
+    setPage(0)
+    setMostrarOrdenes(true)
+    fetchOrdenesCompra(false) // Pasar false para overrideMostrarTodas
+  }
+
+  // Manejar limpieza de filtros
   const handleClearFilters = () => {
     setIdCotizacion("")
     setIdOrdenCompra("")
     setIdProveedor("")
     setEstado("")
-    setMostrarTodas(false)
+    setMostrarTodas(false) // Asegurarse de que 'mostrarTodas' sea falso al limpiar filtros
+    setPage(0)
     setMostrarOrdenes(false)
     setOrdenesCompra([])
+    setTotalOrdenes(0)
+    setError(null)
+  }
+
+  // Manejar el clic en el botón "Listar todas las órdenes"
+  const handleListarTodas = () => {
+    setIdCotizacion("")
+    setIdOrdenCompra("")
+    setIdProveedor("")
+    setEstado("")
+    setMostrarTodas(true) // Actualiza el estado
+    setPage(0)
+    setMostrarOrdenes(true)
+    fetchOrdenesCompra(true) // Pasar true para overrideMostrarTodas
   }
 
   // Obtener color del chip según el estado
@@ -547,8 +575,8 @@ export default function OrdenesCompraPage() {
                 <Button type="submit" variant="contained" color="primary">
                   Aplicar Filtros
                 </Button>
-                <Button variant="contained" color="primary" startIcon={<SearchIcon />} onClick={fetchOrdenesCompra}>
-                  Listar Todas las Órdenes
+                <Button variant="contained" color="primary" startIcon={<SearchIcon />} onClick={handleListarTodas}>
+                  Listar Todas Las Órdenes
                 </Button>
                 <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchOrdenesCompra}>
                   Actualizar
@@ -558,18 +586,6 @@ export default function OrdenesCompraPage() {
                     Limpiar Filtros
                   </Button>
                 )}
-                <FormControl component="fieldset">
-                  <Box display="flex" alignItems="center">
-                    <input
-                      type="checkbox"
-                      id="mostrarTodas"
-                      checked={mostrarTodas}
-                      onChange={(e) => setMostrarTodas(e.target.checked)}
-                      style={{ marginRight: "8px" }}
-                    />
-                    <label htmlFor="mostrarTodas">Mostrar todas (incluye órdenes antiguas)</label>
-                  </Box>
-                </FormControl>
               </Box>
             </Grid>
           </Grid>
@@ -584,71 +600,114 @@ export default function OrdenesCompraPage() {
         ) : mostrarOrdenes ? (
           ordenesCompra.length > 0 ? (
             <>
-              <TableContainer sx={{ maxHeight: 440 }}>
-                <Table stickyHeader aria-label="sticky table">
+              <TableContainer component={Paper}>
+                <Table>
                   <TableHead>
                     <TableRow>
                       <TableCell>ID</TableCell>
                       <TableCell>Fecha</TableCell>
                       <TableCell>Proveedor</TableCell>
-                      <TableCell>Cotización</TableCell>
                       <TableCell>Estado</TableCell>
-                      <TableCell>Monto Total</TableCell>
-                      <TableCell align="center">Acciones</TableCell>
+                      <TableCell>Total</TableCell>
+                      <TableCell>Acciones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {ordenesCompra.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((orden) => (
-                      <TableRow hover key={orden.idOrdenCompra}>
-                        <TableCell>{orden.idOrdenCompra}</TableCell>
-                        <TableCell>{format(new Date(orden.fechaOrden), "dd/MM/yyyy", { locale: es })}</TableCell>
-                        <TableCell>{orden.cotizacionProveedor?.proveedor?.empresa?.razonSocial || "N/A"}</TableCell>
-                        <TableCell>#{orden.idCotizacionProveedor}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={orden.estadoOrdenCompra?.descEstadoOrdenCompra || "Pendiente"}
-                            color={getEstadoChipColor(orden.estadoOrdenCompra?.descEstadoOrdenCompra)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                            orden.cotizacionProveedor?.montoTotal || 0,
-                          )}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title="Ver detalles">
-                            <IconButton
-                              component={Link}
-                              href={`/ordenes-compra/${orden.idOrdenCompra}`}
-                              color="primary"
-                              size="small"
-                            >
-                              <VisibilityIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Más acciones">
-                            <IconButton size="small" onClick={(e) => handleMenuClick(e, orden)}>
-                              <MoreVertIcon />
-                            </IconButton>
-                          </Tooltip>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center">
+                          <CircularProgress />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : error ? (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center">
+                          <Alert severity="error">{error}</Alert>
+                        </TableCell>
+                      </TableRow>
+                    ) : ordenesCompra.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} align="center">
+                          <Box sx={{ py: 2 }}>
+                            <Typography variant="h6" color="text.secondary" gutterBottom>
+                              No se encontraron órdenes de compra
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {mostrarTodas === true ? (
+                                 "No hay órdenes de compra en el sistema. Puedes crear una nueva orden."
+                              ) : (!idCotizacion && !idOrdenCompra && !idProveedor && !estado) ? (
+                                "Utiliza los filtros de búsqueda para encontrar órdenes específicas."
+                              ) : (
+                                "No hay órdenes que coincidan con los filtros seleccionados. Intenta con otros criterios de búsqueda."
+                              )}
+                            </Typography>
+                            {mostrarTodas && (
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                startIcon={<AddIcon />}
+                                component={Link}
+                                href="/ordenes-compra/nueva"
+                                sx={{ mt: 2 }}
+                              >
+                                Crear Nueva Orden de Compra
+                              </Button>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      ordenesCompra.map((orden) => (
+                        <TableRow hover key={orden.idOrdenCompra}>
+                          <TableCell>{orden.idOrdenCompra}</TableCell>
+                          <TableCell>{format(new Date(orden.fechaOrden), "dd/MM/yyyy", { locale: es })}</TableCell>
+                          <TableCell>{orden.cotizacionProveedor?.proveedor?.empresa?.razonSocial || "N/A"}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={orden.estadoOrdenCompra?.descEstadoOrdenCompra || "Pendiente"}
+                              color={getEstadoChipColor(orden.estadoOrdenCompra?.descEstadoOrdenCompra)}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                              orden.cotizacionProveedor?.montoTotal || 0,
+                            )}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Tooltip title="Ver detalles">
+                              <IconButton
+                                component={Link}
+                                href={`/ordenes-compra/${orden.idOrdenCompra}`}
+                                color="primary"
+                                size="small"
+                              >
+                                <VisibilityIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Más acciones">
+                              <IconButton size="small" onClick={(e) => handleMenuClick(e, orden)}>
+                                <MoreVertIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  rowsPerPageOptions={[5, 10, 25, 50]}
+                  component="div"
+                  count={totalOrdenes}
+                  rowsPerPage={rowsPerPage}
+                  page={page}
+                  onPageChange={handleChangePage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                  labelRowsPerPage="Filas por página"
+                  labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+                />
               </TableContainer>
-              <TablePagination
-                rowsPerPageOptions={[5, 10, 25, 50]}
-                component="div"
-                count={ordenesCompra.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-                labelRowsPerPage="Filas por página:"
-                labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-              />
             </>
           ) : (
             <Box p={3} textAlign="center">

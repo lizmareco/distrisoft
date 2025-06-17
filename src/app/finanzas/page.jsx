@@ -88,6 +88,24 @@ export default function FinanzasPage() {
         <Typography variant="h4" component="h1">
           Gestión Financiera
         </Typography>
+        {tabValue === 0 && (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => router.push("/finanzas/cuentas-cobrar")}
+          >
+            IR A CUENTAS A COBRAR
+          </Button>
+        )}
+        {tabValue === 1 && (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => router.push("/finanzas/cuentas-pagar")}
+          >
+            IR A CUENTAS POR PAGAR
+          </Button>
+        )}
       </Box>
       {/* Navegación por pestañas */}
       <Paper sx={{ width: "100%", mb: 3 }}>
