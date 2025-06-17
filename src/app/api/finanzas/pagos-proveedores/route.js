@@ -146,7 +146,7 @@ export async function POST(request) {
           idMetodoPago: Number.parseInt(idMetodoPago),
           comprobantePago: comprobantePago || "",
           observaciones: observacion || "",
-          operador: userData.idUsuario,
+          operador: idUsuario,
         },
       })
 
@@ -218,7 +218,7 @@ export async function POST(request) {
         cuentaPorPagar.idFacturaProveedor,
         cuentaPorPagar.facturaProveedor,
         resultado.facturaActualizada,
-        userData.idUsuario,
+        idUsuario,
         direccionIP,
         navegador,
       )

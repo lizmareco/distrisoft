@@ -55,6 +55,7 @@ import { ArrowBack } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 
 export default function OrdenesCompraPage() {
+  console.log("Renderizando OrdenesCompraPage");
   const [ordenesCompra, setOrdenesCompra] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -87,9 +88,12 @@ export default function OrdenesCompraPage() {
 
   // Obtener contexto y permisos
   const context = useRootContext()
+  console.log("Context:", context);
   const permisos = context.session?.permisos || []
+  console.log("Permisos:", permisos);
   const hasPermission =
     permisos.find(permiso => permiso === "VIEW_ORDENCOMPRA") || context.session?.isAdmin
+  console.log("Has Permission:", hasPermission);
 
   // Estados para diálogos y acciones
   const [dialogEstado, setDialogEstado] = useState({ open: false, orden: null })
@@ -108,6 +112,14 @@ export default function OrdenesCompraPage() {
 
   // Después de la línea donde defines otros estados, agregar:
   const [facturasExistentes, setFacturasExistentes] = useState(new Set())
+
+  // Efecto para cargar datos iniciales
+  useEffect(() => {
+    if (hasPermission) {
+      fetchMetodosPago()
+      fetchOrdenesCompra()
+    }
+  }, [hasPermission])
 
   // Cargar órdenes de compra
   const fetchOrdenesCompra = async () => {
@@ -419,17 +431,19 @@ export default function OrdenesCompraPage() {
   const getEstadosDisponibles = (estadoActual) => {
     if (!estadoActual) return []
 
+    const todosLosEstados = estados;
+
     switch (estadoActual?.toLowerCase()) {
       case "pendiente":
-        return ["ENVIADO", "ANULADO"]
+        return todosLosEstados.filter(e => ["ENVIADO", "ANULADO"].includes(e.id));
       case "enviado":
-        return ["RECIBIDO", "PARCIALMENTE RECIBIDO", "ANULADO"]
+        return todosLosEstados.filter(e => ["RECIBIDO", "PARCIALMENTE RECIBIDO", "ANULADO"].includes(e.id));
       case "parcialmente recibido":
-        return ["RECIBIDO", "ANULADO"]
+        return todosLosEstados.filter(e => ["RECIBIDO", "ANULADO"].includes(e.id));
       default:
-        return []
+        return [];
     }
-  }
+  };
 
   // Reemplazar la función puedeGuardarFactura existente con:
   const puedeGuardarFactura = (orden) => {
@@ -652,99 +666,98 @@ export default function OrdenesCompraPage() {
       </Paper>
 
       {/* Menú de acciones */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem
-          onClick={() => {
-            setDialogEstado({ open: true, orden: selectedOrden })
-            handleMenuClose()
-          }}
-          disabled={getEstadosDisponibles(selectedOrden?.estadoOrdenCompra?.descEstadoOrdenCompra).length === 0}
-        >
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Cambiar Estado</ListItemText>
-        </MenuItem>
-
-        {puedeEliminar(selectedOrden) && (
-          <MenuItem
-            onClick={() => {
-              setDialogEliminar({ open: true, orden: selectedOrden })
-              handleMenuClose()
-            }}
-          >
-            <ListItemIcon>
-              <DeleteIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Eliminar Orden</ListItemText>
-          </MenuItem>
-        )}
-
-        {puedeGuardarFactura(selectedOrden) && (
-          <MenuItem
-            onClick={() => {
-              setDialogFactura({ open: true, orden: selectedOrden })
-              handleMenuClose()
-            }}
-          >
-            <ListItemIcon>
-              <ReceiptIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Guardar Factura Proveedor</ListItemText>
-          </MenuItem>
-        )}
-        {tieneFacturaGuardada(selectedOrden) && (
-          <MenuItem disabled>
-            <ListItemIcon>
-              <ReceiptIcon fontSize="small" color="success" />
-            </ListItemIcon>
-            <ListItemText>
-              <Typography variant="body2" color="success.main">
-                ✅ Factura ya guardada
-              </Typography>
-            </ListItemText>
-          </MenuItem>
-        )}
-
-        {puedeRecepcionar(selectedOrden) && (
-          <MenuItem
-            onClick={() => {
-              setDialogRecepcion({ open: true, orden: selectedOrden })
-              handleMenuClose()
-            }}
-          >
-            <ListItemIcon>
-              <InventoryIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Recepcionar Items</ListItemText>
-          </MenuItem>
-        )}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        {selectedOrden && [
+            <MenuItem key="verDetalles" onClick={() => handleMenuClose()}>
+              <ListItemIcon>
+                <VisibilityIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Ver detalles</ListItemText>
+            </MenuItem>,
+            <MenuItem
+              key="cambiarEstado"
+              onClick={() => {
+                setDialogEstado({ open: true, orden: selectedOrden });
+                handleMenuClose();
+              }}
+              disabled={getEstadosDisponibles(selectedOrden?.estadoOrdenCompra?.descEstadoOrdenCompra).length === 0}
+            >
+              <ListItemIcon>
+                <EditIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Cambiar Estado</ListItemText>
+            </MenuItem>,
+            puedeGuardarFactura(selectedOrden) && (
+              <MenuItem key="registrarFactura" onClick={() => {
+                setDialogFactura({ open: true, orden: selectedOrden });
+                handleMenuClose();
+              }}>
+                <ListItemIcon>
+                  <ReceiptIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Registrar factura</ListItemText>
+              </MenuItem>
+            ),
+            puedeRecepcionar(selectedOrden) && (
+              <MenuItem
+                key="recepcionar"
+                component={Link}
+                href={`/ordenes-compra/${selectedOrden.idOrdenCompra}`}
+                onClick={handleMenuClose}
+              >
+                <ListItemIcon>
+                  <InventoryIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Recepcionar</ListItemText>
+              </MenuItem>
+            ),
+            puedeEliminar(selectedOrden) && (
+              <MenuItem key="eliminar" onClick={() => {
+                setDialogEliminar({ open: true, orden: selectedOrden });
+                handleMenuClose();
+              }}>
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Eliminar</ListItemText>
+              </MenuItem>
+            ),
+        ].filter(Boolean)}
       </Menu>
 
-      {/* Diálogo cambiar estado */}
+      {/* Diálogo de cambio de estado */}
       <Dialog open={dialogEstado.open} onClose={() => setDialogEstado({ open: false, orden: null })}>
-        <DialogTitle>Cambiar Estado de Orden</DialogTitle>
+        <DialogTitle>Cambiar Estado</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mt: 2 }}>
             <InputLabel>Nuevo Estado</InputLabel>
-            <Select value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value)} label="Nuevo Estado">
-              {getEstadosDisponibles(dialogEstado.orden?.estadoOrdenCompra?.descEstadoOrdenCompra).map((estado) => (
-                <MenuItem key={estado} value={estado}>
-                  {estado}
-                </MenuItem>
-              ))}
+            <Select
+              value={nuevoEstado}
+              onChange={(e) => setNuevoEstado(e.target.value)}
+              label="Nuevo Estado"
+            >
+              {dialogEstado.orden &&
+                getEstadosDisponibles(dialogEstado.orden.estadoOrdenCompra?.descEstadoOrdenCompra).map((estado) => (
+                  <MenuItem key={estado.id} value={estado.id}>
+                    {estado.nombre}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogEstado({ open: false, orden: null })}>Cancelar</Button>
-          <Button onClick={handleCambiarEstado} variant="contained" disabled={!nuevoEstado}>
-            Cambiar Estado
+          <Button onClick={handleCambiarEstado} variant="contained" color="primary">
+            Guardar
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo eliminar orden */}
+      {/* Diálogo de eliminación */}
       <Dialog open={dialogEliminar.open} onClose={() => setDialogEliminar({ open: false, orden: null })}>
         <DialogTitle>Confirmar Eliminación</DialogTitle>
         <DialogContent>
@@ -760,208 +773,107 @@ export default function OrdenesCompraPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo guardar factura */}
-      <Dialog
-        open={dialogFactura.open}
-        onClose={() => {
-          setDialogFactura({ open: false, orden: null })
-          resetFormularioFactura()
-        }}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Registrar Factura de Proveedor</DialogTitle>
+      {/* Diálogo de factura */}
+      <Dialog open={dialogFactura.open} onClose={() => setDialogFactura({ open: false, orden: null })}>
+        <DialogTitle>Registrar Factura</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 3, p: 2, bgcolor: "grey.100", borderRadius: 1 }}>
-            <strong>Orden:</strong> #{dialogFactura.orden?.idOrdenCompra}
-            <br />
-            <strong>Proveedor:</strong> {dialogFactura.orden?.cotizacionProveedor?.proveedor?.empresa?.razonSocial}
-            <br />
-            <strong>Monto:</strong>{" "}
-            {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-              dialogFactura.orden?.cotizacionProveedor?.montoTotal || 0,
-            )}
-          </Typography>
-
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Número de Factura *"
-                value={datosFactura.nroFactura}
-                onChange={(e) => setDatosFactura((prev) => ({ ...prev, nroFactura: e.target.value }))}
-                placeholder="Ej: 001-001-0000123"
-                required
-              />
+          <Box component="form" sx={{ mt: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Número de Factura"
+                  value={datosFactura.nroFactura}
+                  onChange={(e) => setDatosFactura({ ...datosFactura, nroFactura: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Fecha de Emisión"
+                  value={datosFactura.fechaEmision}
+                  onChange={(e) => setDatosFactura({ ...datosFactura, fechaEmision: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Método de Pago</InputLabel>
+                  <Select
+                    value={datosFactura.idMetodoPago}
+                    onChange={(e) => setDatosFactura({ ...datosFactura, idMetodoPago: e.target.value })}
+                    label="Método de Pago"
+                  >
+                    {metodosPago.map((metodo) => (
+                      <MenuItem key={metodo.idMetodoPago} value={metodo.idMetodoPago}>
+                        {metodo.descMetodoPago}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={datosFactura.esContado}
+                      onChange={(e) => setDatosFactura({ ...datosFactura, esContado: e.target.checked })}
+                    />
+                  }
+                  label="Es Contado"
+                />
+              </Grid>
+              {!datosFactura.esContado && (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Plazo de Pago (días)"
+                      value={datosFactura.plazoPago}
+                      onChange={(e) => setDatosFactura({ ...datosFactura, plazoPago: parseInt(e.target.value) })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      label="Fecha de Vencimiento"
+                      value={datosFactura.fechaVencimiento}
+                      onChange={(e) => setDatosFactura({ ...datosFactura, fechaVencimiento: e.target.value })}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                </>
+              )}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Observación"
+                  value={datosFactura.observacion}
+                  onChange={(e) => setDatosFactura({ ...datosFactura, observacion: e.target.value })}
+                />
+              </Grid>
             </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Fecha de Emisión *"
-                type="date"
-                value={datosFactura.fechaEmision}
-                onChange={(e) => setDatosFactura((prev) => ({ ...prev, fechaEmision: e.target.value }))}
-                InputLabelProps={{ shrink: true }}
-                required
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={datosFactura.esContado}
-                    onChange={(e) => {
-                      const esContado = e.target.checked
-                      setDatosFactura((prev) => ({
-                        ...prev,
-                        esContado,
-                        // Calcular fecha de vencimiento si cambia a crédito
-                        fechaVencimiento: !esContado
-                          ? new Date(Date.now() + prev.plazoPago * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-                          : "",
-                      }))
-                    }}
-                  />
-                }
-                label={datosFactura.esContado ? "Factura al Contado" : "Factura a Crédito"}
-              />
-            </Grid>
-
-            {datosFactura.esContado ? (
-              <>
-                <Grid item xs={12}>
-                  <FormControl fullWidth required>
-                    <InputLabel>Método de Pago *</InputLabel>
-                    <Select
-                      value={datosFactura.idMetodoPago}
-                      onChange={(e) => setDatosFactura((prev) => ({ ...prev, idMetodoPago: e.target.value }))}
-                      label="Método de Pago *"
-                    >
-                      {metodosPago.map((metodo) => (
-                        <MenuItem key={metodo.idMetodoPago} value={metodo.idMetodoPago}>
-                          {metodo.descMetodoPago}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Comprobante de Pago"
-                    value={datosFactura.comprobantePago}
-                    onChange={(e) => setDatosFactura((prev) => ({ ...prev, comprobantePago: e.target.value }))}
-                    placeholder="Número de cheque, transferencia, etc."
-                  />
-                </Grid>
-              </>
-            ) : (
-              <>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="Plazo de Pago (días) *"
-                    type="number"
-                    value={datosFactura.plazoPago}
-                    onChange={(e) => {
-                      const plazo = Number.parseInt(e.target.value) || 30
-                      const fechaVenc = new Date(Date.now() + plazo * 24 * 60 * 60 * 1000)
-                      setDatosFactura((prev) => ({
-                        ...prev,
-                        plazoPago: plazo,
-                        fechaVencimiento: fechaVenc.toISOString().split("T")[0],
-                      }))
-                    }}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    fullWidth
-                    label="Fecha de Vencimiento *"
-                    type="date"
-                    value={datosFactura.fechaVencimiento}
-                    onChange={(e) => setDatosFactura((prev) => ({ ...prev, fechaVencimiento: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    required
-                  />
-                </Grid>
-              </>
-            )}
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Observaciones"
-                multiline
-                rows={3}
-                value={datosFactura.observacion}
-                onChange={(e) => setDatosFactura((prev) => ({ ...prev, observacion: e.target.value }))}
-                placeholder="Observaciones adicionales sobre la factura..."
-              />
-            </Grid>
-          </Grid>
-
-          <Alert severity="info" sx={{ mt: 2 }}>
-            {datosFactura.esContado
-              ? "✅ La factura se registrará como pagada inmediatamente."
-              : "📋 Se creará una cuenta por pagar que podrá gestionar en Finanzas > Cuentas por Pagar."}
-          </Alert>
+          </Box>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => {
-              setDialogFactura({ open: false, orden: null })
-              resetFormularioFactura()
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleGuardarFactura}
-            variant="contained"
-            disabled={
-              !datosFactura.nroFactura ||
-              !datosFactura.fechaEmision ||
-              (datosFactura.esContado && !datosFactura.idMetodoPago) ||
-              (!datosFactura.esContado && (!datosFactura.fechaVencimiento || !datosFactura.plazoPago))
-            }
-          >
-            Registrar Factura
+          <Button onClick={() => setDialogFactura({ open: false, orden: null })}>Cancelar</Button>
+          <Button onClick={handleGuardarFactura} variant="contained" color="primary">
+            Guardar
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Diálogo recepción de items */}
-      <Dialog
-        open={dialogRecepcion.open}
-        onClose={() => setDialogRecepcion({ open: false, orden: null })}
-        maxWidth="md"
-        fullWidth
+      {/* Snackbar para mensajes */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <DialogTitle>Recepcionar Items Parcialmente</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Esta funcionalidad permite recepcionar cantidades específicas de materias primas.
-          </Typography>
-          <Button
-            component={Link}
-            href={`/ordenes-compra/${dialogRecepcion.orden?.idOrdenCompra}`}
-            variant="contained"
-            fullWidth
-          >
-            Ir a Detalles de la Orden para Recepcionar
-          </Button>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogRecepcion({ open: false, orden: null })}>Cerrar</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar para notificaciones */}
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
@@ -972,4 +884,7 @@ export default function OrdenesCompraPage() {
       </Snackbar>
     </Container>
   )
+
+  return content;
 }
+

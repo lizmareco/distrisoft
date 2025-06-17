@@ -77,7 +77,7 @@ export default function MateriaPrimaPage() {
   console.log("Is Admin:", context.session?.isAdmin) // Debug
 
   const hasPermission =
-    permisos.find((permiso) => permiso === "VIEW_MATERIAPRIMAaaa") || context.session?.isAdmin
+    permisos.find((permiso) => permiso === "VIEW_MATERIAPRIMA") || context.session?.isAdmin
 
   // Cargar estados de materia prima al inicio
   useEffect(() => {

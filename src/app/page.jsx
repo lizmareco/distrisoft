@@ -230,11 +230,11 @@ export default function DashboardPage() {
     // Configurar permisos específicos según el rol
     // Comentamos temporalmente las restricciones para pruebas
     switch (rol) {
-      case "ADMINISTRADOR_SISTEMA":
+      case "ADMINISTRADORSISTEMA":
         // El administrador ve todo
         break
 
-      case "VENTAS":
+      case "ADMINISTRATIVO":
         // Rol de ventas: ve clientes, empresas, productos y cotizaciones
         items.proveedores = false
         items.materiaprima = false
@@ -284,10 +284,10 @@ export default function DashboardPage() {
     router.push(path)
   }
 
-  // Verificación de permisos
+  //Verificación de permisos
   const permisos = session?.permisos || []
-  const hasPermission =
-    permisos.find(permiso => permiso === "VIEW_USUARIO") || session?.isAdmin
+  /*const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_USUARIO") || session?.isAdmin*/
 
   if (loading) {
     return (
@@ -310,7 +310,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (!hasPermission) {
+  /*if (!hasPermission) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -318,7 +318,7 @@ export default function DashboardPage() {
         </Alert>
       </Container>
     )
-  }
+  }*/
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>

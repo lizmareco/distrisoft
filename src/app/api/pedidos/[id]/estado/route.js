@@ -339,7 +339,7 @@ export async function PUT(request, { params }) {
 
     // Registrar auditoría específica para facturas actualizadas
     for (const facturaInfo of resultado.facturasActualizadas) {
-      if (facturaInfo.cantidad > 0 && userData) {
+      if (facturaInfo.cantidad > 0 && idUsuario) {
         await auditoriaService.registrarActualizacion({
           entidad: facturaInfo.tipo === "contado" ? "FacturaClienteContado" : "FacturaClienteCredito",
           idRegistro: `pedido-${idPedido}`,

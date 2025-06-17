@@ -587,7 +587,7 @@ export default function NuevaCotizacionPage() {
                           </span>
                         </Tooltip>
                       </TableCell>
-                      <TableCell>{producto.pesoUnidad} kg</TableCell>
+                      <TableCell>{producto.pesoUnidad} </TableCell>
                       <TableCell>
                         {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
                           producto.precioUnitario,

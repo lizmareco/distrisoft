@@ -279,7 +279,7 @@ export async function POST(request) {
           idMetodoPago: idMetodoPago ? Number.parseInt(idMetodoPago) : null,
           comprobantePago,
           observacion,
-          operador: userData.idUsuario,
+          operador: idUsuario,
         },
       })
 

@@ -38,43 +38,6 @@ async function getUserIdFromRequest(request) {
 export async function GET(request) {
   try {
     console.log("API: Consultando registros de inventario de productos")
-
-    // BYPASS DE AUTENTICACIÓN PARA DESARROLLO
-    let token = null
-    let userData = null
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("Modo desarrollo: Bypass de autenticación activado")
-      token = await authController.hasAccessToken(request)
-
-      if (!token) {
-        console.log("Usando token especial de desarrollo")
-        token = "dev-mode-bypass-token"
-        userData = {
-          idUsuario: 1,
-          nombre: "Usuario",
-          apellido: "Desarrollo",
-          correo: "desarrollo@example.com",
-          rol: "ADMINISTRADOR",
-          usuario: "desarrollo",
-          permisos: ["*"],
-        }
-      } else {
-        console.log("Token real encontrado en modo desarrollo")
-        userData = await authController.getUserFromToken(token)
-      }
-    } else {
-      token = await authController.hasAccessToken(request)
-      if (token) {
-        userData = await authController.getUserFromToken(token)
-      }
-    }
-
-    if (!token) {
-      console.log("API: No autorizado: Token no encontrado")
-      return NextResponse.json({ error: "No autorizado" }, { status: HTTP_STATUS_CODES.unauthorized })
-    }
-
     // Extraer parámetros de búsqueda
     const { searchParams } = new URL(request.url)
     const productoId = searchParams.get("productoId")
@@ -153,18 +116,6 @@ export async function GET(request) {
 
     console.log(`API: Se encontraron ${movimientos.length} registros de inventario de productos`)
 
-    // Registrar auditoría solo si se encontraron resultados (evitar registros innecesarios)
-    if (movimientos.length > 0 && userData) {
-      await auditoriaService.registrarAuditoria({
-        entidad: "InventarioProducto",
-        idRegistro: 0,
-        accion: "CONSULTA",
-        valorAnterior: null,
-        valorNuevo: { filtros: Object.fromEntries(searchParams) },
-        idUsuario: userData.idUsuario,
-        request,
-      })
-    }
 
     return NextResponse.json({ movimientos }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {

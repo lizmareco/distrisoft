@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
 import cookie from "cookie" 
 
 async function getUserIdFromRequest(request) {
