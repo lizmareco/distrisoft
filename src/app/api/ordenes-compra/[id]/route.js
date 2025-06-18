@@ -286,11 +286,25 @@ export async function PUT(request, { params }) {
             if (cantidadPendiente > 0) {
               const materiaPrima = await prisma.materiaPrima.findUnique({
                 where: { idMateriaPrima: detalle.idMateriaPrima },
+                include: { estadoMateriaPrima: true },
               })
-              const stockAntes = Number(materiaPrima?.stockActual || 0)
-              const stockDespues = stockAntes + cantidadPendiente
+
+              if (!materiaPrima) {
+                console.warn(`Materia prima con ID ${detalle.idMateriaPrima} no encontrada. Saltando.`);
+                continue
+              }
         
-              const nuevoInventario = await prisma.inventario.create({
+              if (materiaPrima.estadoMateriaPrima?.descEstadoMateriaPrima !== "ACTIVO") {
+                console.warn(`Materia prima ID ${detalle.idMateriaPrima} no está activa. Saltando.`);
+                continue
+              }
+
+              const stockAntes = Number.parseFloat(materiaPrima.stockActual ?? 0)
+              const stockDespues = stockAntes + cantidadPendiente
+              
+              console.log(`Recepción OC #${id} - MP ${materiaPrima.nombreMateriaPrima}: stock ${stockAntes} -> ${stockDespues}`)
+
+              await prisma.inventario.create({
                 data: {
                   idMateriaPrima: detalle.idMateriaPrima,
                   cantidad: cantidadPendiente,
@@ -307,9 +321,7 @@ export async function PUT(request, { params }) {
               await prisma.materiaPrima.update({
                 where: { idMateriaPrima: detalle.idMateriaPrima },
                 data: {
-                  stockActual: {
-                    increment: cantidadPendiente,
-                  },
+                  stockActual: stockDespues,
                   updatedAt: new Date(),
                 },
               })
@@ -332,12 +344,25 @@ for (const item of data.recepcionItems) {
   try {
     const materiaPrima = await prisma.materiaPrima.findUnique({
       where: { idMateriaPrima: item.idMateriaPrima },
+      include: { estadoMateriaPrima: true },
     })
-    const stockAntes = Number(materiaPrima?.stockActual || 0)
-    const stockDespues = stockAntes + item.cantidad
 
+    if (!materiaPrima) {
+      console.warn(`Materia prima con ID ${item.idMateriaPrima} no encontrada. Saltando.`);
+      continue
+    }
+
+    if (materiaPrima.estadoMateriaPrima?.descEstadoMateriaPrima !== "ACTIVO") {
+      console.warn(`Materia prima ID ${item.idMateriaPrima} no está activa. Saltando.`);
+      continue
+    }
+
+    const stockAntes = Number.parseFloat(materiaPrima.stockActual ?? 0)
+    const stockDespues = stockAntes + Number(item.cantidad)
+
+    console.log(`Recepción parcial OC #${id} - MP ${materiaPrima.nombreMateriaPrima}: stock ${stockAntes} -> ${stockDespues}`)
     // Crear registro en inventario con stockAntes y stockDespues
-    const nuevoInventario = await prisma.inventario.create({
+    await prisma.inventario.create({
       data: {
         idMateriaPrima: item.idMateriaPrima,
         cantidad: item.cantidad,
@@ -355,9 +380,7 @@ for (const item of data.recepcionItems) {
     await prisma.materiaPrima.update({
       where: { idMateriaPrima: item.idMateriaPrima },
       data: {
-        stockActual: {
-          increment: item.cantidad,
-        },
+        stockActual: stockDespues,
         updatedAt: new Date(),
       },
     })

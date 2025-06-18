@@ -4,7 +4,6 @@ import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
 import AuthController from "@/src/backend/controllers/auth-controller"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
 import cookie from "cookie" 
-import { ajustarStockProducto } from "@/src/lib/api/ajustarStockProducto";
 
 
 async function getUserIdFromRequest(request) {
@@ -128,15 +127,52 @@ export async function PUT(request, { params }) {
 
     // Si se cambió a FINALIZADO, actualizar el inventario con todos los productos
     if (cambioAFinalizado) {
+      console.log(`API: Finalizando orden de producción ${id} y actualizando inventario de productos`)
+      
+      // Procesar cada producto del pedido FUERA de transacción
       for (const detalle of detalles) {
-        await ajustarStockProducto({
-          idProducto: detalle.idProducto,
-          cantidad: detalle.cantidad,
-          motivo: `Producción finalizada de orden #${id}`,
-          observacion: data.observacion || `Producción finalizada según pedido #${ordenExistente.idPedido}`,
-          idOrdenProduccion: Number.parseInt(id),
+        const producto = detalle.producto;
+        const cantidadProduccion = detalle.cantidad;
+
+        // 1. Obtener el stock actual antes de la actualización
+        const productoAntes = await prisma.producto.findUnique({
+          where: { idProducto: producto.idProducto },
+          include: { unidadMedida: true }
+        });
+        const stockAntes = Number.parseFloat(productoAntes.stockActual || 0);
+
+        // 2. Actualizar el stock
+        await prisma.producto.update({
+          where: { idProducto: producto.idProducto },
+          data: {
+            stockActual: stockAntes + Number.parseFloat(cantidadProduccion),
+            updatedAt: new Date(),
+          },
+        });
+
+        // 3. Obtener el stock después de la actualización
+        const productoDespues = await prisma.producto.findUnique({
+          where: { idProducto: producto.idProducto }
+        });
+        const stockDespues = Number.parseFloat(productoDespues.stockActual || 0);
+
+        // 4. Registrar el movimiento
+        await prisma.inventarioProducto.create({
+          data: {
+            idProducto: producto.idProducto,
+            cantidad: cantidadProduccion,
+            tipoMovimiento: "ENTRADA",
+            fechaMovimiento: new Date(),
+            motivo: "Entrada por producción finalizada",
+            observacion: `Entrada por finalización de producción - Pedido #${ordenExistente.pedidoCliente.idPedido} - Orden #${id}`,
+            stockAntes: stockAntes,
+            stockDespues: stockDespues,
+            unidadMedida: productoAntes.unidadMedida.descUnidadMedida,
+            idOrdenProduccion: Number.parseInt(id),
+          },
         });
       }
+      console.log(`API: Inventario actualizado para ${detalles.length} productos de la orden de producción ${id}`)
     } else if (cambioACancelado) {
       // Lógica para manejar la cancelación (si es necesario revertir stock, etc.)
       console.log(`API: Orden de producción ${id} cancelada. No se modifica inventario de productos terminados.`)

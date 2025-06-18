@@ -182,7 +182,7 @@ export async function POST(request) {
           tipoMovimiento: tipoMovimiento,
           fechaMovimiento: new Date(),
           motivo: "Ajuste de stock", 
-          observacion: observacion || "Ajuste de stock desde Inventario de Productos",
+          observacion: observacion || "Ajuste manual de stock desde Inventario de Productos",
           stockAntes: stockAnterior,
           stockDespues: nuevoStock,
           unidadMedida: producto.unidadMedida.descUnidadMedida,

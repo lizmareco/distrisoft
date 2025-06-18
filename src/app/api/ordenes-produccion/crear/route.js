@@ -119,34 +119,32 @@ if (ordenCancelada) {
       return NextResponse.json({ error: stockVerificado.error }, { status: 400 })
     }
 
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
     // Crear la orden de producción en una transacción
-    const resultado = await prisma.$transaction(async (prisma) => {
-      // 1. Crear la orden de producción con fecha de inicio automática
-      const nuevaOrden = await prisma.ordenProduccion.create({
+    const resultado = await prisma.$transaction(async (prismaTx) => {
+      const nuevaOrden = await prismaTx.ordenProduccion.create({
         data: {
           idPedido: idPedidoInt,
-          fechaInicioProd: new Date(), // Fecha actual automática
-          fechaFinProd: new Date("1900-01-01"), // Fecha temporal, se actualizará al finalizar
+          fechaInicioProd: new Date(),
+          fechaFinProd: new Date("1900-01-01"),
           operadorEncargado: operadorEncargadoInt,
-          idEstadoOrdenProd: 1, // Estado "EN PROCESO"
+          idEstadoOrdenProd: 1,
         },
       })
-
-      // 2. Actualizar el estado del pedido a "En proceso" (ID: 2)
-      await prisma.pedidoCliente.update({
+    
+      await prismaTx.pedidoCliente.update({
         where: { idPedido: idPedidoInt },
         data: { idEstadoPedido: 2 },
       })
-
-      // 3. Descontar stock de materias primas y registrar movimientos
-      await descontarStockMateriasPrimas(prisma, idPedidoInt, operadorEncargadoInt)
-
+    
       return nuevaOrden
     })
 
+    await descontarStockMateriasPrimas(prisma, idPedidoInt, idUsuario, auditoriaService, request)
+
     // Registrar auditoría
-    const auditoriaService = new AuditoriaService()
-    const idUsuario = await getUserIdFromRequest(request)
+
     await auditoriaService.registrarCreacion(
       "OrdenProduccion",
       resultado.idOrdenProduccion,
@@ -263,8 +261,9 @@ async function verificarYDescontarStock(idPedido) {
 }
 
 // Función para descontar stock de materias primas
-async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario) {
-  // Obtener detalles del pedido
+async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario, auditoriaService, request) {
+
+
   const pedido = await prisma.pedidoCliente.findUnique({
     where: { idPedido },
     include: {
@@ -277,7 +276,6 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario) {
   })
 
   for (const detalle of pedido.pedidoDetalle) {
-    // Buscar fórmulas para el producto
     const formulas = await prisma.formula.findMany({
       where: { idProducto: detalle.idProducto },
       include: {
@@ -291,14 +289,8 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario) {
 
     if (formulas.length > 0) {
       const formula = formulas[0]
-
-      // Usar el peso por unidad del producto desde la base de datos
       const pesoPorUnidad = detalle.producto.pesoUnidad
-
-      // Calcular gramos totales necesarios
       const gramosNecesarios = detalle.cantidad * pesoPorUnidad
-
-      // Calcular cuántos lotes de producción se necesitan
       const cantidadPorLote = formula.rendimiento
       const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
 
@@ -309,38 +301,62 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario) {
       console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
       console.log(`Lotes necesarios: ${lotesNecesarios}`)
 
-      // Descontar stock de cada materia prima
       for (const detalleFormula of formula.FormulaDetalle) {
         const cantidadMateriaPrimaPorLote = detalleFormula.cantidad
         const cantidadTotalMateriaPrima = cantidadMateriaPrimaPorLote * lotesNecesarios
 
-        console.log(`--- Descuento ---`)
-        console.log(`Materia prima: ${detalleFormula.materiaPrima.nombreMateriaPrima}`)
-        console.log(`Descontando: ${cantidadTotalMateriaPrima}g`)
+        const materiaPrima = await prisma.materiaPrima.findUnique({
+          where: { idMateriaPrima: detalleFormula.idMateriaPrima },
+        })
 
-        // Actualizar stock de materia prima (todo en gramos)
+        if (!materiaPrima) {
+          console.warn(`Materia prima ID ${detalleFormula.idMateriaPrima} no encontrada. Saltando.`)
+          continue
+        }
+
+        const stockAntes = Number.parseFloat(materiaPrima.stockActual ?? 0)
+        const stockDespues = stockAntes - cantidadTotalMateriaPrima
+
+        console.log(`--- Descuento ---`)
+        console.log(`Materia prima: ${materiaPrima.nombreMateriaPrima}`)
+        console.log(`Descontando: ${cantidadTotalMateriaPrima}g`)
+        console.log(`Stock: ${stockAntes}g -> ${stockDespues}g`)
+
+        // Actualizar stock
         await prisma.materiaPrima.update({
           where: { idMateriaPrima: detalleFormula.idMateriaPrima },
           data: {
-            stockActual: {
-              decrement: cantidadTotalMateriaPrima,
-            },
+            stockActual: stockDespues,
             updatedAt: new Date(),
           },
         })
 
-        // Registrar movimiento de inventario (cantidad en gramos, pero con observación en kg)
+        // Crear movimiento de inventario con stockAntes y stockDespues
         const cantidadKg = (cantidadTotalMateriaPrima / 1000).toFixed(3)
         await prisma.inventario.create({
           data: {
             idMateriaPrima: detalleFormula.idMateriaPrima,
-            cantidad: cantidadTotalMateriaPrima, // Cantidad en gramos
-            unidadMedida: "g", // Unidad en gramos
+            cantidad: cantidadTotalMateriaPrima,
+            unidadMedida: "g",
             fechaMovimiento: new Date(),
-            tipoMovimiento: "SALIDA", // String directo
+            tipoMovimiento: "SALIDA",
             motivo: `Salida para orden de producción - Pedido #${idPedido}`,
             observacion: `Salida para producción de ${detalle.producto.nombreProducto}. Pedido: ${detalle.cantidad} unidades x ${pesoPorUnidad}g = ${gramosNecesarios}g. Materia prima utilizada: ${cantidadTotalMateriaPrima}g (${cantidadKg}kg)`,
+            stockAntes,
+            stockDespues,
           },
+        })
+
+        // Auditoría de salida de stock
+        await auditoriaService.registrarAuditoria({
+          entidad: "MateriaPrima",
+          idRegistro: detalleFormula.idMateriaPrima,
+          accion: "ACTUALIZAR_STOCK_MATERIA_PRIMA",
+          valorAnterior: { stockActual: stockAntes },
+          valorNuevo: { stockActual: stockDespues },
+          idUsuario,
+          direccionIP: auditoriaService.obtenerDireccionIP(request),
+          navegador: auditoriaService.obtenerInfoNavegador(request),
         })
       }
     }
