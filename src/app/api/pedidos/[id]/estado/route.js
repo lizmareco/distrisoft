@@ -252,13 +252,12 @@ export async function PUT(request, { params }) {
         // Validar stock disponible antes de procesar
         for (const detalle of pedidoExistente.pedidoDetalle) {
           const producto = detalle.producto
-          const cantidadRequerida = Number.parseFloat(detalle.cantidad || 0)
-          const stockActual = Number.parseFloat(producto.stockActual || 0)
+          const cantidadSalida = Number.parseFloat(detalle.cantidad || 0)
+          const stockAntes = Number.parseFloat(producto.stockActual || 0)
+          const stockDespues = stockAntes - cantidadSalida
 
-          if (stockActual < cantidadRequerida) {
-            throw new Error(
-              `Stock insuficiente para el producto "${producto.nombreProducto}". Stock actual: ${stockActual}, Requerido: ${cantidadRequerida}`,
-            )
+          if (stockAntes < cantidadSalida) {
+            throw new Error(`Stock insuficiente para el producto "${producto.nombreProducto}". Stock actual: ${stockAntes}, Requerido: ${cantidadSalida}`)
           }
         }
 
@@ -266,23 +265,21 @@ export async function PUT(request, { params }) {
         for (const detalle of pedidoExistente.pedidoDetalle) {
           const producto = detalle.producto
           const cantidadSalida = Number.parseFloat(detalle.cantidad || 0)
-          const stockActual = Number.parseFloat(producto.stockActual || 0)
-          const nuevoStock = stockActual - cantidadSalida
-
-          console.log(
-            `API: Procesando producto ${producto.idProducto}: Stock actual ${stockActual}, Salida ${cantidadSalida}, Nuevo stock ${nuevoStock}`,
-          )
-
-          // Actualizar stock del producto
+          const stockAntes = Number.parseFloat(producto.stockActual || 0)
+          const stockDespues = stockAntes - cantidadSalida
+        
+          if (stockAntes < cantidadSalida) {
+            throw new Error(`Stock insuficiente para el producto "${producto.nombreProducto}"...`)
+          }
+        
           await tx.producto.update({
             where: { idProducto: producto.idProducto },
             data: {
-              stockActual: nuevoStock,
+              stockActual: stockDespues,
               updatedAt: new Date(),
             },
           })
-
-          // Crear registro de movimiento de inventario
+        
           const movimiento = await tx.inventarioProducto.create({
             data: {
               idProducto: producto.idProducto,
@@ -292,21 +289,19 @@ export async function PUT(request, { params }) {
               fechaMovimiento: new Date(),
               motivo: `Entrega de pedido #${idPedido}`,
               observacion: `Entrega automática - Cliente: ${pedidoExistente.cliente?.persona?.nombre || "N/A"} ${pedidoExistente.cliente?.persona?.apellido || ""}`,
+              stockAntes,
+              stockDespues,
             },
-            include: {
-              producto: true,
-            },
+            include: { producto: true },
           })
-
+        
           movimientosInventario.push({
             producto: producto.nombreProducto,
             cantidad: cantidadSalida,
-            stockAnterior: stockActual,
-            stockNuevo: nuevoStock,
+            stockAntes,
+            stockDespues,
             movimientoId: movimiento.idInventarioProducto,
           })
-
-          console.log(`API: Movimiento de inventario creado con ID: ${movimiento.idInventarioProducto}`)
         }
 
         console.log(`API: Se procesaron ${movimientosInventario.length} movimientos de inventario`)
@@ -324,18 +319,15 @@ export async function PUT(request, { params }) {
 
     // Registrar auditoría del pedido
     
-      await auditoriaService.registrarActualizacion(
-        "PedidoCliente",
-        idPedido,
-        valorAnterior,
-        {
-          pedido: resultado.pedido,
-          detalles: resultado.detalles,
-        },
-        idUsuario,
-        direccionIP,
-        navegador
-      )
+    await auditoriaService.registrarActualizacion(
+      "PedidoCliente",
+      idPedido,
+      valorAnterior,
+      resultado.pedidoActualizado,
+      idUsuario,
+      direccionIP,
+      navegador
+    )
 
     // Registrar auditoría específica para facturas actualizadas
     for (const facturaInfo of resultado.facturasActualizadas) {

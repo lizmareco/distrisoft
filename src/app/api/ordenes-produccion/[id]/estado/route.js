@@ -1,6 +1,36 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import AuditoriaService from "@/src/backend/services/auditoria-service"
+import AuthController from "@/src/backend/controllers/auth-controller"
+import cookie from "cookie"
+
+async function getUserIdFromRequest(request) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = request.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = request.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 export async function PUT(request, { params }) {
   try {
@@ -49,6 +79,8 @@ export async function PUT(request, { params }) {
       )
     }
 
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(request)
     // Usar transacción para asegurar consistencia
     const resultado = await prisma.$transaction(async (tx) => {
       const fechaActual = new Date()
@@ -83,16 +115,22 @@ export async function PUT(request, { params }) {
           console.log(`--- Procesando producto: ${detalle.producto.nombreProducto} ---`)
           console.log(`Cantidad a agregar al stock: ${detalle.cantidad}`)
 
-          // Actualizar stock del producto
-          const productoActualizado = await tx.producto.update({
-            where: { idProducto: detalle.idProducto },
-            data: {
-              stockActual: {
-                increment: detalle.cantidad,
-              },
-              updatedAt: fechaActual,
-            },
-          })
+          // Obtener stock actual antes de la entrada
+const producto = await tx.producto.findUnique({
+  where: { idProducto: detalle.idProducto },
+})
+
+const stockAntes = Number(producto?.stockActual ?? 0)
+const stockDespues = stockAntes + detalle.cantidad
+
+// Actualizar stock del producto
+const productoActualizado = await tx.producto.update({
+  where: { idProducto: detalle.idProducto },
+  data: {
+    stockActual: stockDespues,
+    updatedAt: fechaActual,
+  },
+})
           console.log(`✓ Stock actualizado: ${productoActualizado.stockActual}`)
 
           // Registrar movimiento de ENTRADA en inventario de productos
@@ -106,8 +144,22 @@ export async function PUT(request, { params }) {
               idOrdenProduccion: idOrdenInt,
               motivo: `Entrada por producción finalizada`,
               observacion: `Entrada por finalización de producción - Pedido #${ordenActual.idPedido} - Orden #${idOrdenInt}`,
+              stockAntes,
+              stockDespues,
             },
           })
+
+          await auditoriaService.registrarAuditoria({
+            entidad: "Producto",
+            idRegistro: detalle.idProducto,
+            accion: "ACTUALIZAR_STOCK_PRODUCTO",
+            valorAnterior: { stockActual: stockAntes },
+            valorNuevo: { stockActual: stockDespues },
+            idUsuario,
+            direccionIP: auditoriaService.obtenerDireccionIP(request),
+            navegador: auditoriaService.obtenerInfoNavegador(request),
+          })
+
           console.log(`✓ Movimiento de inventario registrado: ID ${movimiento.idInventarioProducto}`)
         }
       }
@@ -130,7 +182,6 @@ export async function PUT(request, { params }) {
     })
 
     // Registrar auditoría
-    const auditoriaService = new AuditoriaService()
     const valorAnterior = {
       idEstadoOrdenProd: ordenActual.idEstadoOrdenProd,
       fechaFinProd: ordenActual.fechaFinProd,
@@ -141,15 +192,17 @@ export async function PUT(request, { params }) {
       pedidoActualizado: idEstadoInt === 2 ? "Estado cambiado a LISTO PARA ENTREGA" : null,
     }
 
+
     await auditoriaService.registrarActualizacion(
       "OrdenProduccion",
       idOrdenInt,
       valorAnterior,
       valorNuevo,
-      1, // TODO: Obtener usuario actual
+      idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request),
     )
+
 
     console.log("=== ORDEN FINALIZADA EXITOSAMENTE ===")
 
