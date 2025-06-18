@@ -83,24 +83,14 @@ export async function PUT(request, { params }) {
     const idUsuario = await getUserIdFromRequest(request)
     // Usar transacción para asegurar consistencia
     const resultado = await prisma.$transaction(async (tx) => {
+      const detallesFinales = []
       const fechaActual = new Date()
-
-      // Preparar datos de actualización de la orden
       const datosActualizacion = {
         idEstadoOrdenProd: idEstadoInt,
         updatedAt: fechaActual,
       }
 
-      // Si cambia a FINALIZADO (estado 2)
       if (idEstadoInt === 2) {
-        console.log("=== FINALIZANDO ORDEN DE PRODUCCIÓN ===")
-        console.log(`Orden ID: ${idOrdenInt}`)
-        console.log(`Pedido ID: ${ordenActual.idPedido}`)
-
-        // Establecer fecha de finalización
-        datosActualizacion.fechaFinProd = fechaActual
-
-        // 1. Actualizar estado del pedido a "LISTO PARA ENTREGA" (ID 3)
         await tx.pedidoCliente.update({
           where: { idPedido: ordenActual.idPedido },
           data: {
@@ -108,111 +98,162 @@ export async function PUT(request, { params }) {
             updatedAt: fechaActual,
           },
         })
-        console.log("✓ Pedido actualizado a 'LISTO PARA ENTREGA'")
 
-        // 2. Sumar stock de productos finalizados y registrar movimientos
         for (const detalle of ordenActual.pedidoCliente.pedidoDetalle) {
-          console.log(`--- Procesando producto: ${detalle.producto.nombreProducto} ---`)
-          console.log(`Cantidad a agregar al stock: ${detalle.cantidad}`)
+          const producto = await tx.producto.findUnique({
+            where: { idProducto: detalle.idProducto },
+          })
 
-          // Obtener stock actual antes de la entrada
-const producto = await tx.producto.findUnique({
-  where: { idProducto: detalle.idProducto },
-})
+          const stockAntes = Number(producto?.stockActual ?? 0)
+          const stockDespues = stockAntes + detalle.cantidad
 
-const stockAntes = Number(producto?.stockActual ?? 0)
-const stockDespues = stockAntes + detalle.cantidad
-
-// Actualizar stock del producto
-const productoActualizado = await tx.producto.update({
-  where: { idProducto: detalle.idProducto },
-  data: {
-    stockActual: stockDespues,
-    updatedAt: fechaActual,
-  },
-})
-          console.log(`✓ Stock actualizado: ${productoActualizado.stockActual}`)
-
-          // Registrar movimiento de ENTRADA en inventario de productos
-          const movimiento = await tx.inventarioProducto.create({
+          await tx.producto.update({
+            where: { idProducto: detalle.idProducto },
             data: {
-              idProducto: detalle.idProducto,
-              cantidad: detalle.cantidad,
-              unidadMedida: detalle.producto.unidadMedida?.nombre || "unidades",
-              fechaMovimiento: fechaActual,
-              tipoMovimiento: "ENTRADA",
-              idOrdenProduccion: idOrdenInt,
-              motivo: `Entrada por producción finalizada`,
-              observacion: `Entrada por finalización de producción - Pedido #${ordenActual.idPedido} - Orden #${idOrdenInt}`,
-              stockAntes,
-              stockDespues,
+              stockActual: stockDespues,
+              updatedAt: fechaActual,
             },
           })
 
-          await auditoriaService.registrarAuditoria({
-            entidad: "Producto",
-            idRegistro: detalle.idProducto,
-            accion: "ACTUALIZAR_STOCK_PRODUCTO",
-            valorAnterior: { stockActual: stockAntes },
-            valorNuevo: { stockActual: stockDespues },
-            idUsuario,
-            direccionIP: auditoriaService.obtenerDireccionIP(request),
-            navegador: auditoriaService.obtenerInfoNavegador(request),
+          detallesFinales.push({
+            tipo: "PRODUCTO",
+            idProducto: detalle.idProducto,
+            cantidad: detalle.cantidad,
+            unidadMedida: detalle.producto.unidadMedida?.nombre || "unidades",
+            stockAntes,
+            stockDespues,
+          })
+        }
+      } else if (idEstadoInt === 3) {
+        const lotes = ordenActual.cantidadLotes || 1
+
+        for (const detalle of ordenActual.pedidoCliente.pedidoDetalle) {
+          const producto = detalle.producto
+          const formula = await tx.formula.findFirst({
+            where: { idProducto: producto.idProducto, deletedAt: null },
+            orderBy: { idFormula: "desc" },
           })
 
-          console.log(`✓ Movimiento de inventario registrado: ID ${movimiento.idInventarioProducto}`)
+          if (!formula) throw new Error(`No se encontró fórmula para el producto ${producto.nombreProducto}`)
+
+          const detallesFormula = await tx.formulaDetalle.findMany({
+            where: { idFormula: formula.idFormula, deletedAt: null },
+          })
+
+          for (const item of detallesFormula) {
+            const cantidadTotal = item.cantidad * detalle.cantidad * lotes
+            const materia = await tx.materiaPrima.findUnique({ where: { idMateriaPrima: item.idMateriaPrima } })
+            const stockAntes = Number(materia?.stockActual ?? 0)
+            const stockDespues = stockAntes + cantidadTotal
+
+            await tx.materiaPrima.update({
+              where: { idMateriaPrima: item.idMateriaPrima },
+              data: { stockActual: stockDespues, updatedAt: fechaActual },
+            })
+
+            detallesFinales.push({
+              tipo: "MATERIA_PRIMA",
+              idMateriaPrima: item.idMateriaPrima,
+              cantidad: cantidadTotal,
+              unidadMedida: item.unidadMedida,
+              productoNombre: producto.nombreProducto,
+              stockAntes,
+              stockDespues,
+            })
+          }
         }
       }
 
-      // Actualizar la orden de producción
       const ordenActualizada = await tx.ordenProduccion.update({
         where: { idOrdenProduccion: idOrdenInt },
         data: datosActualizacion,
         include: {
           pedidoCliente: true,
-          usuario: {
-            include: {
-              persona: true,
-            },
-          },
+          usuario: { include: { persona: true } },
         },
       })
 
-      return ordenActualizada
+      return { ordenActualizada, fechaActual, movimientos: detallesFinales }
     })
+    
+    
+    for (const detalle of resultado.movimientos) {
+      if (detalle.tipo === "PRODUCTO") {
+        await prisma.inventarioProducto.create({
+          data: {
+            idProducto: detalle.idProducto,
+            cantidad: detalle.cantidad,
+            unidadMedida: detalle.unidadMedida,
+            fechaMovimiento: resultado.fechaActual,
+            tipoMovimiento: "ENTRADA",
+            motivo: "Entrada por producción finalizada",
+            observacion: `Entrada por finalización de producción - Orden #${idOrdenInt}`,
+            stockAntes: detalle.stockAntes,
+            stockDespues: detalle.stockDespues,
+          },
+        })
 
-    // Registrar auditoría
-    const valorAnterior = {
-      idEstadoOrdenProd: ordenActual.idEstadoOrdenProd,
-      fechaFinProd: ordenActual.fechaFinProd,
-    }
-    const valorNuevo = {
-      idEstadoOrdenProd: idEstadoInt,
-      fechaFinProd: resultado.fechaFinProd,
-      pedidoActualizado: idEstadoInt === 2 ? "Estado cambiado a LISTO PARA ENTREGA" : null,
-    }
+        await auditoriaService.registrarAuditoria({
+          entidad: "Producto",
+          idRegistro: detalle.idProducto,
+          accion: "ACTUALIZAR_STOCK_PRODUCTO",
+          valorAnterior: { stockActual: detalle.stockAntes },
+          valorNuevo: { stockActual: detalle.stockDespues },
+          idUsuario,
+          direccionIP: auditoriaService.obtenerDireccionIP(request),
+          navegador: auditoriaService.obtenerInfoNavegador(request),
+        })
+      } else if (detalle.tipo === "MATERIA_PRIMA") {
+        await prisma.inventario.create({
+          data: {
+            idMateriaPrima: detalle.idMateriaPrima,
+            cantidad: detalle.cantidad,
+            unidadMedida: detalle.unidadMedida,
+            fechaMovimiento: resultado.fechaActual,
+            tipoMovimiento: "ENTRADA",
+            motivo: "Cancelación de orden de producción",
+            observacion: `Orden cancelada #${idOrdenInt} - Producto: ${detalle.productoNombre}`,
+            stockAntes: detalle.stockAntes,
+            stockDespues: detalle.stockDespues,
+          },
+        })
 
+        await auditoriaService.registrarAuditoria({
+          entidad: "MateriaPrima",
+          idRegistro: detalle.idMateriaPrima,
+          accion: "DEVOLVER_STOCK_MATERIA_PRIMA",
+          valorAnterior: { stockActual: detalle.stockAntes },
+          valorNuevo: { stockActual: detalle.stockDespues },
+          idUsuario,
+          direccionIP: auditoriaService.obtenerDireccionIP(request),
+          navegador: auditoriaService.obtenerInfoNavegador(request),
+        })
+      }
+    }
 
     await auditoriaService.registrarActualizacion(
       "OrdenProduccion",
       idOrdenInt,
-      valorAnterior,
-      valorNuevo,
+      {
+        idEstadoOrdenProd: ordenActual.idEstadoOrdenProd,
+        fechaFinProd: ordenActual.fechaFinProd,
+      },
+      {
+        idEstadoOrdenProd: idEstadoInt,
+        pedidoActualizado: idEstadoInt === 2 ? "Estado cambiado a LISTO PARA ENTREGA" : null,
+      },
       idUsuario,
       auditoriaService.obtenerDireccionIP(request),
       auditoriaService.obtenerInfoNavegador(request),
     )
 
-
-    console.log("=== ORDEN FINALIZADA EXITOSAMENTE ===")
-
     return NextResponse.json({
       success: true,
-      ordenProduccion: resultado,
+      ordenProduccion: resultado.ordenActualizada,
       message:
         idEstadoInt === 2
           ? "Orden finalizada exitosamente. El pedido está listo para entrega y el stock ha sido actualizado."
-          : "Estado actualizado exitosamente",
+          : "Orden cancelada exitosamente. Materias primas devueltas.",
     })
   } catch (error) {
     console.error("Error al actualizar estado:", error)

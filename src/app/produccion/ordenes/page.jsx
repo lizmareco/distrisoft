@@ -35,6 +35,7 @@ import ClearIcon from "@mui/icons-material/Clear"
 import Link from "next/link"
 import { ArrowBack } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
+import { Snackbar } from "@mui/material"
 
 export default function ListaOrdenesProduccionPage() {
   const router = useRouter()
@@ -50,6 +51,7 @@ export default function ListaOrdenesProduccionPage() {
   const [datosIniciales, setDatosIniciales] = useState(false)
   const context = useRootContext()
   const permisos = context.session?.permisos || []
+  const [mensajeExito, setMensajeExito] = useState(null)
   const hasPermission =
     permisos.find(permiso => permiso === "VIEW_ORDENPRODUCCION") || context.session?.isAdmin
 
@@ -210,12 +212,14 @@ export default function ListaOrdenesProduccionPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nuevoEstado: 1 }), // 1 = PENDIENTE
         })
+
+        setMensajeExito("Orden cancelada. Materias primas devueltas al inventario.");
       }
 
       // Mostrar mensaje de éxito específico
       if (Number.parseInt(nuevoEstado) === 2) {
         setError(null)
-        // Podrías agregar un snackbar de éxito aquí
+        setMensajeExito("Orden Finalizada Exitosamente");
         console.log("Orden finalizada exitosamente")
       }
 
@@ -247,7 +251,7 @@ export default function ListaOrdenesProduccionPage() {
 
   // Verificar si una orden puede ser editada
   const puedeEditarEstado = (orden) => {
-    return orden.idEstadoOrdenProd !== 2 // No editar si ya está finalizada
+    return orden.idEstadoOrdenProd !== 2 && orden.idEstadoOrdenProd !== 3
   }
 
   if (!hasPermission) {
@@ -526,6 +530,18 @@ export default function ListaOrdenesProduccionPage() {
               </Typography>
             </Alert>
           )}
+          {nuevoEstado === 3 && (
+  <Alert severity="info" sx={{ mt: 2 }}>
+    <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+      Al cancelar la orden:
+    </Typography>
+    <Typography variant="body2" component="div">
+      • El pedido volverá a estado "PENDIENTE"
+      <br />• Las materias primas consumidas serán devueltas al inventario
+      <br />• Se registrarán los movimientos de entrada
+    </Typography>
+  </Alert>
+)}
         </DialogContent>
         <DialogActions>
           <Button onClick={cerrarDialogo}>Cancelar</Button>
@@ -539,6 +555,17 @@ export default function ListaOrdenesProduccionPage() {
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+  open={!!mensajeExito}
+  autoHideDuration={6000}
+  onClose={() => setMensajeExito(null)}
+  anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+>
+  <Alert onClose={() => setMensajeExito(null)} severity="success" sx={{ width: "100%" }}>
+    {mensajeExito}
+  </Alert>
+</Snackbar>
     </Box>
   )
+  
 }

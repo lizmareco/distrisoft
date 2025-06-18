@@ -50,68 +50,99 @@ export async function POST(request) {
     }
 
     // Verificar que el pedido existe y está en estado "Pendiente"
-    const pedido = await prisma.pedidoCliente.findUnique({
-      where: { idPedido: idPedidoInt },
+const pedido = await prisma.pedidoCliente.findUnique({
+  where: { idPedido: idPedidoInt },
+  include: {
+    pedidoDetalle: {
       include: {
-        pedidoDetalle: {
-          include: {
-            producto: true,
-          },
-        },
+        producto: true,
       },
-    })
+    },
+  },
+})
 
-    if (!pedido) {
-      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 })
-    }
+if (!pedido) {
+  return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 })
+}
 
-    if (pedido.idEstadoPedido !== 1) {
-      return NextResponse.json({ error: "El pedido no está en estado pendiente" }, { status: 400 })
-    }
+if (pedido.idEstadoPedido !== 1) {
+  return NextResponse.json({ error: "El pedido no está en estado pendiente" }, { status: 400 })
+}
 
-// Buscar si ya existe una orden de producción CANCELADA para este pedido
+// Buscar orden CANCELADA para reactivarla
 const ordenCancelada = await prisma.ordenProduccion.findFirst({
   where: {
     idPedido: idPedidoInt,
     idEstadoOrdenProd: 3, // CANCELADO
     deletedAt: null,
   },
-});
+})
 
 if (ordenCancelada) {
-  // Reactivar la orden cancelada
-  const ordenReactivada = await prisma.ordenProduccion.update({
-    where: { idOrdenProduccion: ordenCancelada.idOrdenProduccion },
-    data: {
-      idEstadoOrdenProd: 1, // EN PROCESO
-      fechaInicioProd: new Date(),
-    },
-  });
+  // Verificar stock antes de reactivar
+  const stockVerificado = await verificarYDescontarStock(idPedidoInt)
+  if (!stockVerificado.success) {
+    return NextResponse.json({ error: stockVerificado.error }, { status: 400 })
+  }
 
-  // Cambiar el estado del pedido a EN PROCESO
-  await prisma.pedidoCliente.update({
-    where: { idPedido: idPedidoInt },
-    data: { idEstadoPedido: 2 },
-  });
+  const auditoriaService = new AuditoriaService()
+  const idUsuario = await getUserIdFromRequest(request)
+
+  const ordenReactivada = await prisma.$transaction(async (tx) => {
+    const reactivada = await tx.ordenProduccion.update({
+      where: { idOrdenProduccion: ordenCancelada.idOrdenProduccion },
+      data: {
+        idEstadoOrdenProd: 1, // EN PROCESO
+        fechaInicioProd: new Date(),
+        updatedAt: new Date(),
+      },
+    })
+
+    await tx.pedidoCliente.update({
+      where: { idPedido: idPedidoInt },
+      data: { idEstadoPedido: 2 },
+    })
+
+    return reactivada
+  })
+
+  await descontarStockMateriasPrimas(prisma, idPedidoInt, idUsuario, auditoriaService, request)
+
+  // Auditoría
+  await auditoriaService.registrarAuditoria({
+    entidad: "OrdenProduccion",
+    idRegistro: ordenCancelada.idOrdenProduccion,
+    accion: "REACTIVAR_ORDEN_PRODUCCION",
+    valorAnterior: { estado: "CANCELADO" },
+    valorNuevo: { estado: "EN PROCESO" },
+    idUsuario,
+    direccionIP: auditoriaService.obtenerDireccionIP(request),
+    navegador: auditoriaService.obtenerInfoNavegador(request),
+  })
 
   return NextResponse.json({
     success: true,
     ordenProduccion: ordenReactivada,
     message: "Orden de producción reactivada exitosamente",
-  });
+  })
 }
 
-    // Verificar que no existe ya una orden de producción para este pedido
-    const ordenExistente = await prisma.ordenProduccion.findFirst({
-      where: {
-        idPedido: idPedidoInt,
-        deletedAt: null,
-      },
-    })
 
-    if (ordenExistente) {
-      return NextResponse.json({ error: "Ya existe una orden de producción para este pedido" }, { status: 400 })
-    }
+// Verificar que NO exista otra orden (EN PROCESO o FINALIZADA)
+const ordenActiva = await prisma.ordenProduccion.findFirst({
+  where: {
+    idPedido: idPedidoInt,
+    deletedAt: null,
+    NOT: {
+      idEstadoOrdenProd: 3, // Excluir CANCELADA
+    },
+  },
+})
+
+if (ordenActiva) {
+  return NextResponse.json({ error: "Ya existe una orden de producción activa o finalizada para este pedido" }, { status: 400 })
+}
+
 
     // Verificar stock una vez más antes de crear la orden
     const stockVerificado = await verificarYDescontarStock(idPedidoInt)
@@ -123,7 +154,7 @@ if (ordenCancelada) {
     const idUsuario = await getUserIdFromRequest(request)
     // Crear la orden de producción en una transacción
     const resultado = await prisma.$transaction(async (prismaTx) => {
-      const nuevaOrden = await prismaTx.ordenProduccion.create({
+      const nuevaOrden = await prisma.ordenProduccion.create({
         data: {
           idPedido: idPedidoInt,
           fechaInicioProd: new Date(),
@@ -261,10 +292,10 @@ async function verificarYDescontarStock(idPedido) {
 }
 
 // Función para descontar stock de materias primas
-async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario, auditoriaService, request) {
+async function descontarStockMateriasPrimas(tx, idPedido, idUsuario, auditoriaService, request) {
 
 
-  const pedido = await prisma.pedidoCliente.findUnique({
+  const pedido = await tx.pedidoCliente.findUnique({
     where: { idPedido },
     include: {
       pedidoDetalle: {
@@ -276,7 +307,7 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario, auditor
   })
 
   for (const detalle of pedido.pedidoDetalle) {
-    const formulas = await prisma.formula.findMany({
+    const formulas = await tx.formula.findMany({
       where: { idProducto: detalle.idProducto },
       include: {
         FormulaDetalle: {
@@ -305,7 +336,7 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario, auditor
         const cantidadMateriaPrimaPorLote = detalleFormula.cantidad
         const cantidadTotalMateriaPrima = cantidadMateriaPrimaPorLote * lotesNecesarios
 
-        const materiaPrima = await prisma.materiaPrima.findUnique({
+        const materiaPrima = await tx.materiaPrima.findUnique({
           where: { idMateriaPrima: detalleFormula.idMateriaPrima },
         })
 
@@ -323,7 +354,7 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario, auditor
         console.log(`Stock: ${stockAntes}g -> ${stockDespues}g`)
 
         // Actualizar stock
-        await prisma.materiaPrima.update({
+        await tx.materiaPrima.update({
           where: { idMateriaPrima: detalleFormula.idMateriaPrima },
           data: {
             stockActual: stockDespues,
@@ -333,7 +364,7 @@ async function descontarStockMateriasPrimas(prisma, idPedido, idUsuario, auditor
 
         // Crear movimiento de inventario con stockAntes y stockDespues
         const cantidadKg = (cantidadTotalMateriaPrima / 1000).toFixed(3)
-        await prisma.inventario.create({
+        await tx.inventario.create({
           data: {
             idMateriaPrima: detalleFormula.idMateriaPrima,
             cantidad: cantidadTotalMateriaPrima,
