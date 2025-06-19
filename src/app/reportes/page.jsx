@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Box, Typography, Paper, Grid, Card, CardContent, CardActions, Button, Tabs, Tab } from "@mui/material"
+import { Box, Typography, Paper, Grid, Card, CardContent, CardActions, Button, Tabs, Tab, Alert, Container } from "@mui/material"
 import {
   BarChart as BarChartIcon,
   PieChart as PieChartIcon,
@@ -28,10 +28,17 @@ import { ArrowBack } from "@mui/icons-material"
 import ReporteComprasProveedor from "@/src/components/reportes/ReporteComprasProveedor"
 import ReporteComprasProducto from "@/src/components/reportes/ReporteComprasProducto"
 import ReporteComprasOrden from "@/src/components/reportes/ReporteComprasOrden"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
   const [selectedReport, setSelectedReport] = useState(null)
+
+  // Permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_EMPRESA") || context.session?.isAdmin
 
   // Cambiar pestaña activa
   const handleTabChange = (event, newValue) => {
@@ -130,7 +137,6 @@ export default function ReportesPage() {
         return <ReporteComprasProducto />
       case "ordenes":
         return <ReporteComprasOrden onVolver={handleVolver} />
-      
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>
@@ -140,6 +146,15 @@ export default function ReportesPage() {
           </Paper>
         )
     }
+  }
+
+  // Permiso: si no tiene permiso, mostrar alerta y no permitir acceso
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (

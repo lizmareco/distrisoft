@@ -37,7 +37,7 @@ import { ArrowBack, Edit, Save, Cancel, Delete, Inventory } from "@mui/icons-mat
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { useRootContext } from "@/src/app/context/root" // <-- Agrega esta línea
+import { useRootContext } from "@/src/app/context/root" 
 
 export default function VerOrdenCompraPage({ params }) {
   const router = useRouter()

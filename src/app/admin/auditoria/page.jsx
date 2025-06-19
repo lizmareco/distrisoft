@@ -63,8 +63,9 @@ export default function AuditoriaPage() {
   const [exportLoading, setExportLoading] = useState(false)
   const context = useRootContext()
   const permisos = context.session?.permisos || []
-  const hasPermission = permisos.find((permiso) => permiso === "VIEW_AUDITORIA")
-  const { isLoading } = context;
+  const hasPermission =
+    permisos.find((permiso) => permiso === "VIEW_AUDITORIA") || context.session?.isAdmin
+  const { isLoading } = context
 
   // Lista de acciones para el filtro
   const acciones = [

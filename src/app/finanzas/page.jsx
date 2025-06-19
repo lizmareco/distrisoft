@@ -68,18 +68,30 @@ export default function FinanzasPage() {
 
   // Obtener contexto para permisos
   const context = useRootContext()
-
-  // Después de declarar todos los hooks, realizamos la verificación de permisos
   const permisos = context.session?.permisos || []
   const hasPermission =
-    permisos.find((permiso) => permiso === "VIEW_NOTACREDITO") || context.session?.isAdmin
+    permisos.find((permiso) => permiso === "VIEW_FACTURACLIENTE") || context.session?.isAdmin
+
+  // Mostrar loading mientras el contexto se está cargando o session aún no está disponible
+  if (context.isLoading || !context.session) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <CircularProgress />
+      </Container>
+    )
+  }
+
+  // Ahora sí, mostrar el mensaje de error solo si realmente no tiene permisos
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
+  }
 
   // Definimos el contenido a renderizar según permisos
-  const content = !hasPermission ? (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Alert severity="error">No tiene permisos para ver esta página</Alert>
-    </Container>
-  ) : (
+  const content = (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
         Volver a Gestión

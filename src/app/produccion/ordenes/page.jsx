@@ -38,11 +38,12 @@ import { useRootContext } from "@/src/app/context/root"
 import { Snackbar } from "@mui/material"
 
 export default function ListaOrdenesProduccionPage() {
-  const router = useRouter()
-  const [ordenes, setOrdenes] = useState([])
-  const [usuarios, setUsuarios] = useState([])
-  const [cargando, setCargando] = useState(false)
-  const [cargandoUsuarios, setCargandoUsuarios] = useState(true)
+  const router = useRouter();
+  const [ordenes, setOrdenes] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [cargando, setCargando] = useState(false);
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(true);
+  const [mensajeExito, setMensajeExito] = useState(""); // <-- AGREGA ESTA LÍNEA
   const [error, setError] = useState(null)
   const [dialogoAbierto, setDialogoAbierto] = useState(false)
   const [ordenSeleccionada, setOrdenSeleccionada] = useState(null)
@@ -51,9 +52,10 @@ export default function ListaOrdenesProduccionPage() {
   const [datosIniciales, setDatosIniciales] = useState(false)
   const context = useRootContext()
   const permisos = context.session?.permisos || []
-  const [mensajeExito, setMensajeExito] = useState(null)
   const hasPermission =
     permisos.find(permiso => permiso === "VIEW_ORDENPRODUCCION") || context.session?.isAdmin
+  const canUpdateEstado =
+    permisos.find(permiso => permiso === "UPDATE_ORDENPRODUCCIOnN") || context.session?.isAdmin
 
   // Filtros
   const [filtros, setFiltros] = useState({
@@ -459,13 +461,13 @@ export default function ListaOrdenesProduccionPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    {puedeEditarEstado(orden) ? (
+                    {puedeEditarEstado(orden) && canUpdateEstado ? (
                       <Button size="small" startIcon={<EditIcon />} onClick={() => abrirDialogoEstado(orden)}>
                         Cambiar Estado
                       </Button>
                     ) : (
                       <Typography variant="caption" color="text.secondary">
-                        Finalizada
+                        {getEstadoNombre(orden.idEstadoOrdenProd)}
                       </Typography>
                     )}
                   </TableCell>
