@@ -35,6 +35,7 @@ import {
   ListItemText,
   FormControlLabel,
   Switch,
+  Checkbox,
 } from "@mui/material"
 import {
   Add as AddIcon,
@@ -108,6 +109,8 @@ export default function OrdenesCompraPage() {
   // Estados para formularios
   const [nuevoEstado, setNuevoEstado] = useState("")
   const [itemsRecepcion, setItemsRecepcion] = useState([])
+  const [openRecepcionDialog, setOpenRecepcionDialog] = useState(false)
+  const [ordenParaRecepcion, setOrdenParaRecepcion] = useState(null)
 
   const [mostrarOrdenes, setMostrarOrdenes] = useState(false)
 
@@ -306,6 +309,30 @@ export default function OrdenesCompraPage() {
   // Cambiar estado de orden
   const handleCambiarEstado = async () => {
     try {
+      // Detectar si el estado anterior es ENVIADO y el nuevo es PARCIALMENTE RECIBIDO
+      const estadoAnterior = dialogEstado.orden?.estadoOrdenCompra?.descEstadoOrdenCompra
+      const esCambioAParcialmenteRecibido =
+        estadoAnterior?.toLowerCase() === "enviado" && nuevoEstado === "PARCIALMENTE RECIBIDO"
+
+      if (esCambioAParcialmenteRecibido) {
+        // Inicializar items para recepción parcial
+        const detalles = dialogEstado.orden?.cotizacionProveedor?.detallesCotizacionProv || []
+        const items = detalles.map((detalle) => ({
+          idMateriaPrima: detalle.idMateriaPrima,
+          nombreMateriaPrima: detalle.materiaPrima?.nombreMateriaPrima || "N/A",
+          cantidadTotal: detalle.cantidad,
+          cantidad: 0,
+          seleccionado: false,
+          unidadMedida: detalle.unidadMedida || "Unidad",
+        }))
+        setItemsRecepcion(items)
+        setOrdenParaRecepcion(dialogEstado.orden)
+        setDialogEstado({ open: false, orden: null })
+        setOpenRecepcionDialog(true)
+        return
+      }
+
+      // Si no es cambio a parcialmente recibido, proceder normalmente
       const response = await fetch(`/api/ordenes-compra/${dialogEstado.orden.idOrdenCompra}`, {
         method: "PUT",
         headers: {
@@ -328,6 +355,82 @@ export default function OrdenesCompraPage() {
 
       setDialogEstado({ open: false, orden: null })
       setNuevoEstado("")
+      fetchOrdenesCompra()
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error.message,
+        severity: "error",
+      })
+    }
+  }
+
+  // Manejar cambio en checkbox de item de recepción parcial
+  const handleItemCheckChange = (index, checked) => {
+    const newItems = [...itemsRecepcion]
+    newItems[index].seleccionado = checked
+    if (!checked) {
+      newItems[index].cantidad = 0
+    }
+    setItemsRecepcion(newItems)
+  }
+
+  // Manejar cambio en cantidad de item de recepción parcial
+  const handleItemCantidadChange = (index, cantidad) => {
+    const newItems = [...itemsRecepcion]
+    const cantidadNum = Number(cantidad)
+    if (cantidadNum > newItems[index].cantidadTotal) {
+      newItems[index].cantidad = newItems[index].cantidadTotal
+    } else {
+      newItems[index].cantidad = cantidadNum
+    }
+    setItemsRecepcion(newItems)
+  }
+
+  // Confirmar recepción parcial
+  const handleConfirmRecepcion = async () => {
+    try {
+      // Filtrar solo los items seleccionados con cantidad > 0
+      const itemsSeleccionados = itemsRecepcion
+        .filter((item) => item.seleccionado && item.cantidad > 0)
+        .map((item) => ({
+          idMateriaPrima: item.idMateriaPrima,
+          cantidad: item.cantidad,
+          unidadMedida: item.unidadMedida,
+        }))
+
+      if (itemsSeleccionados.length === 0) {
+        setSnackbar({
+          open: true,
+          message: "Debe seleccionar al menos un ítem con cantidad mayor a cero",
+          severity: "error",
+        })
+        return
+      }
+
+      const response = await fetch(`/api/ordenes-compra/${ordenParaRecepcion.idOrdenCompra}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idEstadoOrdenCompra: getEstadoId("PARCIALMENTE RECIBIDO"),
+          recepcionItems: itemsSeleccionados,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al registrar recepción parcial")
+      }
+
+      setSnackbar({
+        open: true,
+        message: "Recepción parcial registrada exitosamente",
+        severity: "success",
+      })
+      setOpenRecepcionDialog(false)
+      setOrdenParaRecepcion(null)
+      setItemsRecepcion([])
       fetchOrdenesCompra()
     } catch (error) {
       setSnackbar({
@@ -796,12 +899,33 @@ export default function OrdenesCompraPage() {
             <InputLabel>Nuevo Estado</InputLabel>
             <Select
               value={nuevoEstado}
-              onChange={(e) => setNuevoEstado(e.target.value)}
+              onChange={(e) => {
+                const valor = e.target.value;
+                setNuevoEstado(valor);
+                // Detectar si es PARCIALMENTE RECIBIDO y el estado anterior es ENVIADO
+                const estadoAnterior = dialogEstado.orden?.estadoOrdenCompra?.descEstadoOrdenCompra;
+                if (estadoAnterior?.toLowerCase() === "enviado" && valor === "PARCIALMENTE RECIBIDO") {
+                  // Inicializar items para recepción parcial
+                  const detalles = dialogEstado.orden?.cotizacionProveedor?.detallesCotizacionProv || [];
+                  const items = detalles.map((detalle) => ({
+                    idMateriaPrima: detalle.idMateriaPrima,
+                    nombreMateriaPrima: detalle.materiaPrima?.nombreMateriaPrima || "N/A",
+                    cantidadTotal: detalle.cantidad,
+                    cantidad: 0,
+                    seleccionado: false,
+                    unidadMedida: detalle.unidadMedida || "Unidad",
+                  }));
+                  setItemsRecepcion(items);
+                  setOrdenParaRecepcion(dialogEstado.orden);
+                  setDialogEstado({ open: false, orden: null });
+                  setTimeout(() => setOpenRecepcionDialog(true), 200); // Pequeño delay para evitar conflicto visual
+                }
+              }}
               label="Nuevo Estado"
             >
               {dialogEstado.orden &&
                 getEstadosDisponibles(dialogEstado.orden.estadoOrdenCompra?.descEstadoOrdenCompra).map((estado) => (
-                  <MenuItem key={estado.id} value={estado.id}>
+                  <MenuItem key={estado.id} value={estado.nombre}>
                     {estado.nombre}
                   </MenuItem>
                 ))}
@@ -810,7 +934,7 @@ export default function OrdenesCompraPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogEstado({ open: false, orden: null })}>Cancelar</Button>
-          <Button onClick={handleCambiarEstado} variant="contained" color="primary">
+          <Button onClick={handleCambiarEstado} variant="contained" color="primary" disabled={nuevoEstado === "PARCIALMENTE RECIBIDO"}>
             Guardar
           </Button>
         </DialogActions>
@@ -923,6 +1047,70 @@ export default function OrdenesCompraPage() {
           <Button onClick={() => setDialogFactura({ open: false, orden: null })}>Cancelar</Button>
           <Button onClick={handleGuardarFactura} variant="contained" color="primary">
             Guardar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo para recepción parcial al cambiar a PARCIALMENTE RECIBIDO */}
+      <Dialog open={openRecepcionDialog} onClose={() => setOpenRecepcionDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Recepción Parcial de Materias Primas</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2 }}>
+            Seleccione las materias primas recibidas e indique la cantidad para cada una.
+          </Box>
+          <TableContainer component={Paper} sx={{ mb: 2 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox">Seleccionar</TableCell>
+                  <TableCell>Materia Prima</TableCell>
+                  <TableCell align="right">Cantidad Total</TableCell>
+                  <TableCell align="right">Cantidad Recibida</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {itemsRecepcion.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={item.seleccionado}
+                        onChange={(e) => handleItemCheckChange(index, e.target.checked)}
+                      />
+                    </TableCell>
+                    <TableCell>{item.nombreMateriaPrima}</TableCell>
+                    <TableCell align="right">{item.cantidadTotal}</TableCell>
+                    <TableCell align="right">
+                      <TextField
+                        type="number"
+                        size="small"
+                        value={item.cantidad}
+                        onChange={(e) => handleItemCantidadChange(index, e.target.value)}
+                        disabled={!item.seleccionado}
+                        inputProps={{ min: 0, max: item.cantidadTotal, step: "any" }}
+                        sx={{ width: 100 }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Alert severity="info">
+            Al confirmar, se actualizará el estado de la orden a "PARCIALMENTE RECIBIDO" y se registrarán las cantidades
+            recibidas en el inventario.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenRecepcionDialog(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmRecepcion}
+            color="primary"
+            variant="contained"
+            disabled={!itemsRecepcion.some((item) => item.seleccionado && item.cantidad > 0)}
+          >
+            Confirmar Recepción
           </Button>
         </DialogActions>
       </Dialog>

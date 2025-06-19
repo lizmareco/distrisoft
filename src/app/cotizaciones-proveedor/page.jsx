@@ -253,6 +253,11 @@ export default function CotizacionesProveedorPage() {
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
         Volver a Gestión
       </Button>
+      <Box display="flex" justifyContent="flex-end" alignItems="center" mb={1}>
+        <Button component={Link} href="/ordenes-compra" variant="contained" color="secondary">
+          Ir a Órdenes de Compra
+        </Button>
+      </Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
         <Typography variant="h4" component="h1">
           Cotizaciones de Proveedores

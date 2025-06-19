@@ -70,7 +70,14 @@ export default function NuevaOrdenCompraPage() {
       if (!responseOrdenes.ok) {
         throw new Error("Error al cargar órdenes de compra existentes")
       }
-      const ordenes = await responseOrdenes.json()
+      const ordenesResponse = await responseOrdenes.json()
+      console.log("Respuesta de ordenes:", ordenesResponse)
+      const ordenes = Array.isArray(ordenesResponse)
+        ? ordenesResponse
+        : (ordenesResponse.data || ordenesResponse.ordenes || [])
+      if (!Array.isArray(ordenes)) {
+        throw new Error("La respuesta de órdenes de compra no es un array")
+      }
       console.log(`Se encontraron ${ordenes.length} órdenes de compra existentes`)
 
       // Paso 3: Crear un conjunto con los IDs de cotizaciones que ya tienen órdenes
@@ -126,7 +133,14 @@ export default function NuevaOrdenCompraPage() {
       if (!responseOrdenes.ok) {
         throw new Error("Error al cargar órdenes de compra existentes")
       }
-      const ordenes = await responseOrdenes.json()
+      const ordenesResponse = await responseOrdenes.json()
+      console.log("Respuesta de ordenes:", ordenesResponse)
+      const ordenes = Array.isArray(ordenesResponse)
+        ? ordenesResponse
+        : (ordenesResponse.data || ordenesResponse.ordenes || [])
+      if (!Array.isArray(ordenes)) {
+        throw new Error("La respuesta de órdenes de compra no es un array")
+      }
 
       // Paso 3: Crear un conjunto con los IDs de cotizaciones que ya tienen órdenes
       const cotizacionesConOrdenes = new Set(ordenes.map((orden) => orden.idCotizacionProveedor))
@@ -176,7 +190,14 @@ export default function NuevaOrdenCompraPage() {
       if (!responseOrdenes.ok) {
         throw new Error("Error al cargar órdenes de compra existentes")
       }
-      const ordenes = await responseOrdenes.json()
+      const ordenesResponse = await responseOrdenes.json()
+      console.log("Respuesta de ordenes:", ordenesResponse)
+      const ordenes = Array.isArray(ordenesResponse)
+        ? ordenesResponse
+        : (ordenesResponse.data || ordenesResponse.ordenes || [])
+      if (!Array.isArray(ordenes)) {
+        throw new Error("La respuesta de órdenes de compra no es un array")
+      }
 
       // Paso 3: Crear un conjunto con los IDs de cotizaciones que ya tienen órdenes
       const cotizacionesConOrdenes = new Set(ordenes.map((orden) => orden.idCotizacionProveedor))
