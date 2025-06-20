@@ -59,11 +59,19 @@ export default function VisorFactura({ open, onClose, nroFactura }) {
     }
   }
 
+  // Función para formatear el número de factura
+  const formatearNroFactura = (nroFactura) => {
+    if (typeof nroFactura !== "string" && typeof nroFactura !== "number") return nroFactura;
+    const nro = nroFactura.toString().replace(/[^0-9]/g, "");
+    if (nro.length > 7) return nroFactura;
+    return `001-001-${nro.padStart(7, "0")}`;
+  }
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Factura #{nroFactura}</Typography>
+          <Typography variant="h6">Factura #{formatearNroFactura(nroFactura)}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -79,7 +87,7 @@ export default function VisorFactura({ open, onClose, nroFactura }) {
 
         <Box sx={{ textAlign: "center", py: 3 }}>
           <Typography variant="body1" gutterBottom>
-            ¿Qué deseas hacer con la factura #{nroFactura}?
+            ¿Qué deseas hacer con la factura #{formatearNroFactura(nroFactura)}?
           </Typography>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 3 }}>
