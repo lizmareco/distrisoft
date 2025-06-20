@@ -55,7 +55,7 @@ export default function ListaOrdenesProduccionPage() {
   const hasPermission =
     permisos.find(permiso => permiso === "VIEW_ORDENPRODUCCION") || context.session?.isAdmin
   const canUpdateEstado =
-    permisos.find(permiso => permiso === "UPDATE_ORDENPRODUCCIOnN") || context.session?.isAdmin
+    permisos.find(permiso => permiso === "UPDATE_ORDENPRODUCCION") || context.session?.isAdmin
 
   // Filtros
   const [filtros, setFiltros] = useState({

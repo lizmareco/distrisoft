@@ -132,9 +132,9 @@ export default function ReportesPage() {
       case "facturas_emtidas":
         return <ReporteFacturasEmitidas onVolver={handleVolver} />
       case "compras-proveedor":
-        return <ReporteComprasProveedor />
+        return <ReporteComprasProveedor onVolver={handleVolver} />
       case "compras-producto":
-        return <ReporteComprasProducto />
+        return <ReporteComprasProducto onVolver={handleVolver}/>
       case "ordenes":
         return <ReporteComprasOrden onVolver={handleVolver} />
       default:

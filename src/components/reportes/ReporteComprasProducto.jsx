@@ -43,6 +43,11 @@ const Line = dynamic(() => import("react-chartjs-2").then((mod) => mod.Line), {
 // Importación dinámica de los componentes de Chart.js
 const ChartJS = dynamic(() => import("chart.js").then((mod) => mod.Chart), { ssr: false })
 
+/**
+ * ReporteComprasProducto - Reporte de compras por producto
+ * @param {Object} props
+ * @param {function} props.onVolver - Handler para volver a la pantalla de reportes
+ */
 export default function ReporteComprasProducto({ onVolver }) {
   // Ahora se ingresa el id de la materia prima directamente
   const [idMateriaPrima, setIdMateriaPrima] = useState("")
@@ -161,7 +166,6 @@ export default function ReporteComprasProducto({ onVolver }) {
                   <th>Compras Totales</th>
                   <th>Cantidad Total</th>
                   <th>Monto Total</th>
-                  <th>Precio Promedio</th>
                 </tr>
               </thead>
               <tbody>
@@ -272,7 +276,17 @@ export default function ReporteComprasProducto({ onVolver }) {
     <Box sx={{ p: 3 }}>
       {/* Botón de volver */}
       <Box sx={{ mb: 2 }}>
-        <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={onVolver} sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => {
+            if (typeof onVolver === "function") {
+              onVolver();
+            } else {
+              console.warn("No se pasó el prop onVolver al componente ReporteComprasProducto");
+            }
+          }}
+        >
           Volver a Reportes
         </Button>
       </Box>
@@ -469,7 +483,6 @@ export default function ReporteComprasProducto({ onVolver }) {
                   <TableCell align="center"><strong>Compras Totales</strong></TableCell>
                   <TableCell align="center"><strong>Cantidad Total</strong></TableCell>
                   <TableCell align="right"><strong>Monto Total</strong></TableCell>
-                  <TableCell align="right"><strong>Precio Promedio</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -482,9 +495,6 @@ export default function ReporteComprasProducto({ onVolver }) {
                     <TableCell align="center">{item.estadisticas.cantidadTotal}</TableCell>
                     <TableCell align="right">
                       {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", minimumFractionDigits: 0 }).format(item.estadisticas.montoTotal)}
-                    </TableCell>
-                    <TableCell align="right">
-                      {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", minimumFractionDigits: 0 }).format(item.estadisticas.precioPromedio)}
                     </TableCell>
                   </TableRow>
                 ))}
