@@ -1,5 +1,36 @@
 import { PrismaClient } from '@prisma/client'
+import AuthController from "@/src/backend/controllers/auth-controller"
+import AuditoriaService from "@/src/backend/services/auditoria-service"
+import cookie from "cookie"
 const prisma = new PrismaClient()
+
+async function getUserIdFromRequest(req) {
+  const authController = new AuthController()
+  let token = null
+
+  // Leer la cookie "at" del header (para Next.js App Router y API routes modernas)
+  const cookieHeader = req.headers.get("cookie")
+  if (cookieHeader) {
+    const cookies = cookie.parse(cookieHeader)
+    token = cookies.at
+  }
+
+  // Fallback: Authorization header (Bearer)
+  if (!token) {
+    const authHeader = req.headers.get("authorization")
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "")
+    }
+  }
+
+  if (!token) {
+    console.warn("NO TOKEN FOUND, defaulting to 1")
+    return 1
+  }
+
+  const userData = await authController.getUserFromToken(token)
+  return userData?.idUsuario || 1
+}
 
 // Buscar todas las notas de débito (con filtros básicos)
 export async function GET(req) {
@@ -35,6 +66,8 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
+    const auditoriaService = new AuditoriaService()
+    const idUsuario = await getUserIdFromRequest(req) 
     const data = await req.json()
     console.log("Datos recibidos:", data)
 
@@ -64,6 +97,22 @@ export async function POST(req) {
       },
       include: { detalles: true }
     })
+
+    // Auditoría y respuesta fuera de la transacción
+    await auditoriaService.registrarCreacion(
+      "NotaDebito",
+      nota.id_notadb,
+      {
+        numero: nota.nro_nota,
+        motivo: data.motivo,
+        montoTotal: nota.monto_total,
+        detalles: data.detalles,
+      },
+      idUsuario,
+      auditoriaService.obtenerDireccionIP(req),
+      auditoriaService.obtenerInfoNavegador(req)
+    )
+
     return Response.json(nota)
   } catch (error) {
     console.error(error)
