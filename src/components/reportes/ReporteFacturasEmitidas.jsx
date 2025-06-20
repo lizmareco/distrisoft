@@ -21,8 +21,9 @@ function formatFecha(fechaStr) {
 }
 
 const ESTADOS = [
+    { label: "Todos", value: 0 },
     { label: "Emitida", value: 1 },
-    { label: "Parcial", value: 5 },
+    { label: "Parcial", value: 2 },
     { label: "Cobrada", value: 3 },
     { label: "Anulada", value: 4 },
 ]
@@ -41,7 +42,7 @@ async function fetchFacturas({ fechaDesde, fechaHasta, estado }) {
 export default function ReporteFacturasEmitidas({ onVolver }) {
     const [fechaDesde, setFechaDesde] = useState(dayjs().startOf("month"))
     const [fechaHasta, setFechaHasta] = useState(dayjs())
-    const [estado, setEstado] = useState(1)
+    const [estado, setEstado] = useState(0)
     const [data, setData] = useState([])
     const [loading, setLoading] = useState(false)
 

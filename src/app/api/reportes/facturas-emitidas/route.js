@@ -5,15 +5,20 @@ export async function POST(req) {
     try {
         const { fechaDesde, fechaHasta, estado } = await req.json()
 
+        const whereClause = {
+            fechaEmision: {
+                gte: new Date(fechaDesde),
+                lte: new Date(fechaHasta),
+            },
+        };
+
+        if (estado) {
+            whereClause.idEstadoFactuCliente = estado;
+        }
+
         // Consulta Prisma adaptada a tu esquema
         const facturas = await prisma.facturaCliente.findMany({
-            where: {
-                fechaEmision: {
-                    gte: new Date(fechaDesde),
-                    lte: new Date(fechaHasta),
-                },
-                idEstadoFactuCliente: estado,
-            },
+            where: whereClause,
             select: {
                 nroFactura: true,
                 fechaEmision: true,
