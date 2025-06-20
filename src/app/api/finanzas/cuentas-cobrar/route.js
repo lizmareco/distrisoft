@@ -76,7 +76,9 @@ export async function GET(request) {
         },
       },
       orderBy: {
-        fechaVencimiento: "asc",
+        facturaCliente: {
+          fechaEmision: "desc",
+        },
       },
       skip,
       take: limite,

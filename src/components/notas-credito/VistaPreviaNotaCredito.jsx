@@ -255,7 +255,7 @@ export default function VistaPreviaNotaCredito({ open, onClose, notaId }) {
       </DialogContent>
       <DialogActions>
         <Button onClick={handleImprimir} variant="contained" color="primary" startIcon={<PrintIcon />}>
-          Imprimir / PDF
+          Imprimir PDF
         </Button>
         <Button onClick={onClose} variant="outlined">Cerrar</Button>
       </DialogActions>
