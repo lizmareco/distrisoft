@@ -49,7 +49,8 @@ export default function ClientesPage() {
   const context = useRootContext()
   // Verificación de permisos
   const permisos = context.session?.permisos || []
-  const hasPermission = permisos.find((permiso) => permiso === "VIEW_CLIENTE")
+  const hasPermission =
+    permisos.find((permiso) => permiso === "VIEW_CLIENTE") || context.session?.isAdmin
 
   // Estado para el formulario de búsqueda
   const [busqueda, setBusqueda] = useState({
@@ -66,6 +67,26 @@ export default function ClientesPage() {
     clienteId: null,
     clienteNombre: "",
   })
+
+  // Mostrar loader mientras el contexto está cargando o no hay sesión
+  if (context.isLoading || !context.session) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 200 }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    )
+  }
+
+  // Mostrar error solo si realmente no tiene permisos
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
+  }
 
   // Cargar tipos de documento al iniciar
   useEffect(() => {
@@ -200,14 +221,6 @@ export default function ClientesPage() {
   const handleEdit = (id) => {
     console.log(`Navegando a /clientes/${id}`)
     router.push(`/clientes/${id}`)
-  }
-
-  if (!hasPermission) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">No tiene permisos para ver esta página</Alert>
-      </Container>
-    )
   }
 
   return (

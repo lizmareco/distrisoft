@@ -271,6 +271,15 @@ export default function CuentasPorCobrarPage() {
     setOpenHistorialPagos(true)
   }
 
+  // Función para formatear el número de factura
+  const formatearNroFactura = (nroFactura) => {
+    // Si ya está formateado, no modificar
+    if (typeof nroFactura !== "string" && typeof nroFactura !== "number") return nroFactura;
+    const nro = nroFactura.toString().replace(/[^0-9]/g, "");
+    if (nro.length > 7) return nroFactura; // Si ya está largo, no tocar
+    return `001-001-${nro.padStart(7, "0")}`;
+  }
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
@@ -495,7 +504,7 @@ export default function CuentasPorCobrarPage() {
                   </Grid>
                   <Grid item xs={2}>
                     <Typography variant="subtitle1" fontWeight="bold">
-                      Factura #{cuenta.nroFactura}
+                      Factura #{formatearNroFactura(cuenta.nroFactura)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {formatearFecha(cuenta.fechaEmision)}
@@ -652,7 +661,7 @@ export default function CuentasPorCobrarPage() {
               <Grid item xs={12}>
                 <Alert severity="info">
                   <Typography variant="body2">
-                    <strong>Factura Nro. {cuentaSeleccionada.nroFactura}</strong>
+                    <strong>Factura Nro. {formatearNroFactura(cuentaSeleccionada.nroFactura)}</strong>
                     <br />
                     Cliente: {cuentaSeleccionada.cliente}
                     <br />

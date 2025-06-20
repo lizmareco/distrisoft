@@ -86,11 +86,19 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
     return `₲ ${Number(monto).toLocaleString("es-PY")}`
   }
 
+  // Función para formatear el número de factura
+  const formatearNroFactura = (nroFactura) => {
+    if (typeof nroFactura !== "string" && typeof nroFactura !== "number") return nroFactura;
+    const nro = nroFactura.toString().replace(/[^0-9]/g, "");
+    if (nro.length > 7) return nroFactura;
+    return `001-001-${nro.padStart(7, "0")}`;
+  }
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Historial de Cobros - Factura #{nroFactura}</Typography>
+          <Typography variant="h6">Historial de Cobros - Factura #{formatearNroFactura(nroFactura)}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -196,7 +204,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
                 No se encontraron pagos para esta factura.
                 {infoFactura && (
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    La factura #{nroFactura} aún no tiene pagos registrados.
+                    La factura #{formatearNroFactura(nroFactura)} aún no tiene pagos registrados.
                   </Typography>
                 )}
               </Alert>
@@ -238,7 +246,7 @@ export default function HistorialPagos({ open, onClose, nroFactura }) {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ maxWidth: 200, wordWrap: "break-word" }}>
-                            {pago.observaciones || "-"}
+                            {pago.observaciones?.replace(`#${nroFactura}`, `#${formatearNroFactura(nroFactura)}`)}
                           </Typography>
                         </TableCell>
                       </TableRow>

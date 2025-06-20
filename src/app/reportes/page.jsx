@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Box, Typography, Paper, Grid, Card, CardContent, CardActions, Button, Tabs, Tab } from "@mui/material"
+import { Box, Typography, Paper, Grid, Card, CardContent, CardActions, Button, Tabs, Tab, Alert, Container } from "@mui/material"
 import {
   BarChart as BarChartIcon,
   PieChart as PieChartIcon,
@@ -28,10 +28,17 @@ import { ArrowBack } from "@mui/icons-material"
 import ReporteComprasProveedor from "@/src/components/reportes/ReporteComprasProveedor"
 import ReporteComprasProducto from "@/src/components/reportes/ReporteComprasProducto"
 import ReporteComprasOrden from "@/src/components/reportes/ReporteComprasOrden"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function ReportesPage() {
   const [activeTab, setActiveTab] = useState("ventas")
   const [selectedReport, setSelectedReport] = useState(null)
+
+  // Permisos
+  const context = useRootContext()
+  const permisos = context.session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_EMPRESA") || context.session?.isAdmin
 
   // Cambiar pestaña activa
   const handleTabChange = (event, newValue) => {
@@ -73,11 +80,7 @@ export default function ReportesPage() {
         { id: "compras-producto", title: "Compras por Producto", icon: <ShoppingCartIcon fontSize="large" /> },
         { id: "ordenes", title: "Órdenes de Compra", icon: <InventoryIcon fontSize="large" /> },
       ],
-      inventario: [
-        { id: "stock", title: "Estado de Stock", icon: <InventoryIcon fontSize="large" /> },
-        { id: "movimientos", title: "Movimientos de Inventario", icon: <TrendingUpIcon fontSize="large" /> },
-        { id: "valoracion", title: "Valoración de Inventario", icon: <AttachMoneyIcon fontSize="large" /> },
-      ],
+
     }
 
     const reports = reportsByCategory[activeTab] || []
@@ -130,7 +133,6 @@ export default function ReportesPage() {
         return <ReporteComprasProducto />
       case "ordenes":
         return <ReporteComprasOrden onVolver={handleVolver} />
-      
       default:
         return (
           <Paper sx={{ p: 3, textAlign: "center" }}>
@@ -140,6 +142,15 @@ export default function ReportesPage() {
           </Paper>
         )
     }
+  }
+
+  // Permiso: si no tiene permiso, mostrar alerta y no permitir acceso
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   return (
@@ -166,7 +177,7 @@ export default function ReportesPage() {
             <Tab label="Administracion" value="administracion" icon={<AttachMoneyIcon />} iconPosition="start" />
             <Tab label="Ventas" value="ventas" icon={<StorefrontIcon />} iconPosition="start" />
             <Tab label="Compras" value="compras" icon={<ShoppingCartIcon />} iconPosition="start" />
-            <Tab label="Inventario" value="inventario" icon={<InventoryIcon />} iconPosition="start" />
+
           </Tabs>
 
           <Box sx={{ p: 3 }}>

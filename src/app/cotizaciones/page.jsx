@@ -58,7 +58,7 @@ export default function CotizacionesPage() {
 
   // Estados para filtros
   const [filtros, setFiltros] = useState({
-    cliente: "",
+    cliente: null,
     idCotizacion: "",
     idEstado: "",
   })
@@ -125,14 +125,10 @@ export default function CotizacionesPage() {
       if (mostrarTodas) {
         params.append("mostrarTodas", "true")
       } else {
-        if (filtros.cliente.trim()) {
-          // Buscar el cliente seleccionado en el array de clientes
-          const clienteSeleccionado = clientes.find(c => formatearCliente(c) === filtros.cliente)
-          if (clienteSeleccionado) {
-            // Si encontramos el cliente, usar su ID
-            params.append("idCliente", clienteSeleccionado.idCliente)
-          } else {
-            // Si no encontramos el cliente por el formato completo, usar el texto como búsqueda
+        if (filtros.cliente) {
+          if (typeof filtros.cliente === "object" && filtros.cliente.idCliente) {
+            params.append("idCliente", filtros.cliente.idCliente)
+          } else if (typeof filtros.cliente === "string" && filtros.cliente.trim()) {
             params.append("cliente", filtros.cliente.trim())
           }
         }
@@ -158,7 +154,7 @@ export default function CotizacionesPage() {
 
       // Mostrar mensaje según resultados
       if (data.length === 0) {
-        if (filtros.cliente.trim() && clientes.some(c => formatearCliente(c) === filtros.cliente)) {
+        if (filtros.cliente && typeof filtros.cliente === "object") {
           setSnackbarMessage("El cliente existe pero no tiene cotizaciones registradas")
         } else if (mostrarTodas) {
           setSnackbarMessage("No hay cotizaciones registradas")
@@ -190,8 +186,8 @@ export default function CotizacionesPage() {
       [campo]: valor,
     }))
 
-    // Si es el campo cliente, buscar clientes
-    if (campo === "cliente") {
+    // Si es el campo cliente y es texto, buscar clientes
+    if (campo === "cliente" && typeof valor === "string") {
       buscarClientes(valor)
     }
   }
@@ -206,7 +202,7 @@ export default function CotizacionesPage() {
   // Limpiar filtros
   const limpiarFiltros = () => {
     setFiltros({
-      cliente: "",
+      cliente: null,
       idCotizacion: "",
       idEstado: "",
     })
@@ -218,7 +214,7 @@ export default function CotizacionesPage() {
 
   // Verificar si hay filtros aplicados
   const hayFiltros = () => {
-    return filtros.cliente.trim() || filtros.idCotizacion.trim() || filtros.idEstado
+    return filtros.cliente || filtros.idCotizacion.trim() || filtros.idEstado
   }
 
   const handleNuevaCotizacion = () => {
@@ -301,8 +297,6 @@ export default function CotizacionesPage() {
     }
   }
 
-  
-
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" alignItems="center" mb={3}>
@@ -339,8 +333,15 @@ export default function CotizacionesPage() {
                 return formatearCliente(option)
               }}
               loading={loadingClientes}
-              onInputChange={(event, newInputValue) => {
-                handleFiltroChange("cliente", newInputValue)
+              value={filtros.cliente}
+              onChange={(event, newValue) => {
+                handleFiltroChange("cliente", newValue)
+              }}
+              onInputChange={(event, newInputValue, reason) => {
+                // Solo buscar si el usuario está escribiendo (no al seleccionar)
+                if (reason === "input") {
+                  handleFiltroChange("cliente", newInputValue)
+                }
               }}
               renderInput={(params) => (
                 <TextField
@@ -514,7 +515,7 @@ export default function CotizacionesPage() {
           </TableContainer>
         ) : (
           <Alert severity="info">
-            {filtros.cliente.trim() && clientes.some(c => formatearCliente(c) === filtros.cliente)
+            {filtros.cliente && typeof filtros.cliente === "object" && filtros.cliente.idCliente
               ? "El cliente existe pero no tiene cotizaciones registradas"
               : "No se encontraron cotizaciones que coincidan con los filtros aplicados"}
           </Alert>
