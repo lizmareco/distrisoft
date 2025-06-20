@@ -27,11 +27,12 @@ import {
   Search as SearchIcon, 
   Download as DownloadIcon,
   PictureAsPdf as PdfIcon,
-  TableChart as ExcelIcon
+  TableChart as ExcelIcon,
+  ArrowBack as ArrowBackIcon
 } from "@mui/icons-material"
 import { exportToExcel } from "@/src/utils/export-utils" // Asegúrate de tener esta utilidad
 
-export default function ReporteComprasProveedor() {
+export default function ReporteComprasProveedor({ onVolver }) {
   const [filtros, setFiltros] = useState({
     rucProveedor: "",
     fechaInicio: "",
@@ -285,6 +286,23 @@ export default function ReporteComprasProveedor() {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Botón de volver */}
+      <Box sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => {
+            if (typeof onVolver === "function") {
+              onVolver();
+            } else {
+              console.warn("No se pasó el prop onVolver al componente ReporteComprasProveedor");
+            }
+          }}
+        >
+          Volver a Reportes
+        </Button>
+      </Box>
+
       <Typography variant="h5" gutterBottom>
         Reporte de Compras por Proveedor
       </Typography>
