@@ -267,9 +267,9 @@ export default function VistaPreviaNotaDebito({ open, onClose, notaId }) {
           </Box>
           {/* Información adicional */}
           <Box sx={{ mt: 2, p: 2, border: "1px solid #000", backgroundColor: "#f9f9f9" }}>
-            <Typography variant="body2" sx={{ mb: 1 }}>
+            {/*<Typography variant="body2" sx={{ mb: 1 }}>
               <strong>Usuario Emisor:</strong> {datosNota.nota?.usuarioEmisor || 'N/A'}
-            </Typography>
+            </Typography>*/}
             <Typography variant="body2">
               <strong>Observaciones:</strong> {datosNota.nota?.motivo || 'Sin observaciones'}
             </Typography>
