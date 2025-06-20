@@ -79,7 +79,7 @@ export default function ReporteVentasProducto({ onVolver }) {
     setBusqueda(valor)
     if (valor.length > 2) {
       try {
-        const response = await fetch(`/api/productos?search=${encodeURIComponent(valor)}`)
+        const response = await fetch(`/api/productos?nombre=${encodeURIComponent(valor)}`)
         if (response.ok) {
           const data = await response.json()
           setResultados(data)

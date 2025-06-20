@@ -12,7 +12,7 @@ export async function GET(req) {
   const where = {
     ...(id_factura ? { id_factura_origen: Number(id_factura) } : {}),
     ...(anuladas
-      ? { id_estado: 3 }
+      ? { deleted_at: { not: null } }
       : { deleted_at: null })
   }
 
@@ -38,8 +38,13 @@ export async function POST(req) {
     const data = await req.json()
     console.log("Datos recibidos:", data)
 
+    // Generar número de nota de débito (incremental)
+    const cantidadNotas = await prisma.notaDebito.count()
+    const nroNotaFormateado = `001-001-${String(cantidadNotas + 1).padStart(5, "0")}`
+
     const nota = await prisma.notaDebito.create({
       data: {
+        nro_nota: nroNotaFormateado,
         id_factura_origen: Number(data.id_factura_origen),
         motivo: data.motivo,
         monto_total: data.monto_total,

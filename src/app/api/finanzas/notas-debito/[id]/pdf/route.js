@@ -37,8 +37,9 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Nota de débito no encontrada' }, { status: 404 })
     }
 
-    // Formatear la respuesta
-    const datosFormateados = {
+    // Generar el PDF (aquí puedes usar la librería que prefieras)
+    // Por ahora, vamos a devolver un JSON con los datos para que puedas implementar el PDF
+    const pdfData = {
       nota: {
         id: nota.id_notadb,
         numero: nota.nro_nota || `#${nota.id_notadb}`,
@@ -62,36 +63,15 @@ export async function GET(request, { params }) {
       }))
     }
 
+    // Por ahora devolvemos JSON, pero aquí deberías generar el PDF
     return NextResponse.json({
       success: true,
-      data: datosFormateados
+      data: pdfData,
+      message: 'Datos de nota de débito para generar PDF'
     })
 
   } catch (error) {
     console.error('Error al obtener nota de débito:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-}
-
-// Anular una nota de débito (soft delete: marca como anulada)
-export async function PATCH(request, { params }) {
-  const { id } = await params; // <-- importante, await aquí
-
-  if (!id) {
-    console.warn('PATCH llamado sin ID:', params);
-    return Response.json({ error: 'ID no proporcionado' }, { status: 400 });
-  }
-
-  try {
-    const nota = await prisma.notaDebito.update({
-      where: { id_notadb: Number(id) },
-      data: {
-        deleted_at: new Date()
-      }
-    });
-    return Response.json({ success: true });
-  } catch (error) {
-    console.error("Error al anular nota:", error);
-    return Response.json({ error: error.message }, { status: 400 });
-  }
-}
+} 

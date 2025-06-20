@@ -22,6 +22,7 @@ function formatFecha(fechaStr) {
 
 const ESTADOS = [
     { label: "Emitida", value: 1 },
+    { label: "Parcial", value: 5 },
     { label: "Cobrada", value: 3 },
     { label: "Anulada", value: 4 },
 ]

@@ -33,6 +33,7 @@ import {
   Warning,
   CheckCircle,
   Schedule,
+  Add,
 } from "@mui/icons-material"
 import VistaPreviaFactura from "../../components/facturas/VistaPrevia"
 import VisorFacturaProveedor from "../../components/facturas/VisorFacturaProveedor"
@@ -42,6 +43,7 @@ import CreditScoreSharpIcon from "@mui/icons-material/CreditScoreSharp"
 import { Menu } from "@mui/material"
 import MoreVertIcon from "@mui/icons-material/MoreVert"
 import VistaPreviaNotaCredito from "../../components/notas-credito/VistaPreviaNotaCredito"
+import VistaPreviaNotaDebito from "../../components/notas-debito/VistaPreviaNotaDebito"
 import { useRootContext } from "@/src/app/context/root"
 
 function TabPanel({ children, value, index, ...other }) {
@@ -95,6 +97,16 @@ export default function FinanzasPage() {
             onClick={() => router.push("/finanzas/cuentas-cobrar")}
           >
             IR A CUENTAS A COBRAR
+          </Button>
+        )}
+        {tabValue === 0 && (
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => router.push("/finanzas/notas-debito/buscar")}
+            sx={{ ml: 2 }}
+          >
+            IR A NOTAS DE DÉBITO
           </Button>
         )}
         {tabValue === 1 && (
@@ -174,6 +186,8 @@ function FacturacionClientes() {
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
   const [vistaPreviaNotaAbierta, setVistaPreviaNotaAbierta] = useState(false)
   const [notaParaPrevia, setNotaParaPrevia] = useState(null)
+  const [vistaPreviaNotaDebitoAbierta, setVistaPreviaNotaDebitoAbierta] = useState(false)
+  const [notaDebitoParaPrevia, setNotaDebitoParaPrevia] = useState(null)
 
   const cargarFacturas = async (nuevaPagina = paginacion.pagina) => {
     setCargando(true)
@@ -191,7 +205,9 @@ function FacturacionClientes() {
       const respuesta = await fetch(`/api/finanzas/facturas-clientes?${params.toString()}`)
       if (respuesta.ok) {
         const datos = await respuesta.json()
-        setFacturas(datos.data || [])
+        const facturas = datos.data || []
+
+        setFacturas(facturas)
 
         if (datos.meta) {
           setPaginacion((prev) => ({
@@ -268,6 +284,7 @@ function FacturacionClientes() {
   }
 
   const getEstadoCuentaIcon = (factura) => {
+    if (!factura) return <CheckCircle color="success" />
     if (factura.tipo === "contado") return <CheckCircle color="success" />
     if (factura.diasVencido > 0) return <Warning color="error" />
     if (factura.diasVencido > -7) return <Schedule color="warning" />
@@ -435,39 +452,39 @@ function FacturacionClientes() {
                             </Grid>
                             <Grid item xs={2}>
                               <Typography variant="subtitle1" fontWeight="bold">
-                                #001-001-{String(factura.nroFactura).padStart(7, "0")}
+                                #001-001-{String(factura?.nroFactura || '').padStart(7, "0")}
                               </Typography>
                               <Chip
-                                label={factura.tipo.toUpperCase()}
-                                color={getTipoColor(factura.tipo)}
+                                label={(factura?.tipo || '').toUpperCase()}
+                                color={getTipoColor(factura?.tipo)}
                                 size="small"
                               />
                             </Grid>
                             <Grid item xs={2}>
                               <Typography variant="body2">
-                                {new Date(factura.fechaEmision).toLocaleDateString("es-PY")}
+                                {factura?.fechaEmision ? new Date(factura.fechaEmision).toLocaleDateString("es-PY") : 'N/A'}
                               </Typography>
-                              {factura.fechaVencimiento && (
+                              {factura?.fechaVencimiento && (
                                 <Typography variant="caption" color="textSecondary">
                                   Vence: {new Date(factura.fechaVencimiento).toLocaleDateString("es-PY")}
                                 </Typography>
                               )}
                             </Grid>
                             <Grid item xs={3}>
-                              <Typography variant="body2">{factura.cliente}</Typography>
+                              <Typography variant="body2">{factura?.cliente || 'N/A'}</Typography>
                             </Grid>
                             <Grid item xs={2}>
                               <Typography variant="body2" fontWeight="bold">
-                                ₲ {factura.montoTotal.toLocaleString("es-PY")}
+                                ₲ {(factura?.montoTotal || 0).toLocaleString("es-PY")}
                               </Typography>
-                              {factura.tipo === "credito" && factura.saldoRestante > 0 && (
+                              {factura?.tipo === "credito" && factura?.saldoRestante > 0 && (
                                 <Typography variant="caption" color="error">
-                                  Saldo: ₲ {factura.saldoRestante.toLocaleString("es-PY")}
+                                  Saldo: ₲ {(factura.saldoRestante || 0).toLocaleString("es-PY")}
                                 </Typography>
                               )}
                             </Grid>
                             <Grid item xs={1}>
-                              <Chip label={factura.estado} color={getEstadoColor(factura.estado)} size="small" />
+                              <Chip label={factura?.estado || 'N/A'} color={getEstadoColor(factura?.estado)} size="small" />
                             </Grid>
                             <Grid item xs={1}>
                               <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -493,8 +510,19 @@ function FacturacionClientes() {
                                   <CreditScoreSharpIcon fontSize="small" />
                                 </IconButton>
 
+                                {/* Crear nueva nota de débito */}
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  title="Generar Nota Débito"
+                                  component={Link}
+                                  href={`/finanzas/notas-debito/nueva?nroFactura=${factura.nroFactura}`}
+                                >
+                                  <Add fontSize="small" />
+                                </IconButton>
+
                                 {/* Mostrar nota de crédito en PDF si existe */}
-                                {factura.notasCredito?.length === 1 && (
+                                {factura.notasCredito?.length === 1 && factura.notasCredito[0]?.idNotaCredito && (
                                   <IconButton
                                     size="small"
                                     color="success"
@@ -503,6 +531,21 @@ function FacturacionClientes() {
                                     href={`/api/finanzas/notas-credito/${factura.notasCredito[0].idNotaCredito}/pdf`}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                  >
+                                    <Assignment fontSize="small" />
+                                  </IconButton>
+                                )}
+
+                                {/* Mostrar nota de débito en PDF si existe exactamente 1 */}
+                                {factura.notasDebito?.length === 1 && factura.notasDebito[0]?.id_notadb && (
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    title="Ver Nota Débito"
+                                    onClick={() => {
+                                      setNotaDebitoParaPrevia(factura.notasDebito[0].id_notadb)
+                                      setVistaPreviaNotaDebitoAbierta(true)
+                                    }}
                                   >
                                     <Assignment fontSize="small" />
                                   </IconButton>
@@ -519,19 +562,50 @@ function FacturacionClientes() {
                             </Typography>
                             <Grid container spacing={1}>
                               {factura.notasCredito.map((nota) => (
-                                <Grid item key={nota.idNotaCredito}>
+                                <Grid item key={nota?.idNotaCredito || Math.random()}>
                                   <Button
                                     variant="outlined"
                                     color="success"
                                     size="small"
                                     startIcon={<Assignment />}
                                     onClick={() => {
-                                      setNotaParaPrevia(nota.idNotaCredito)
-                                      setVistaPreviaNotaAbierta(true)
+                                      if (nota?.idNotaCredito) {
+                                        setNotaParaPrevia(nota.idNotaCredito)
+                                        setVistaPreviaNotaAbierta(true)
+                                      }
                                     }}
                                     sx={{ mr: 1 }}
                                   >
-                                    {nota.nroNota} - ₲ {nota.montoTotal.toLocaleString("es-PY")}
+                                    {(nota?.nroNota || `#${nota?.idNotaCredito || 'N/A'}`)} - ₲ {(nota?.montoTotal || 0).toLocaleString("es-PY")}
+                                  </Button>
+                                </Grid>
+                              ))}
+                            </Grid>
+                          </Box>
+                        )}
+                        {/* Mostrar notas de débito asociadas */}
+                        {factura.notasDebito && factura.notasDebito.length > 0 && (
+                          <Box sx={{ mt: 2, ml: 4 }}>
+                            <Typography variant="subtitle2" color="error" gutterBottom>
+                              Notas de Débito Asociadas:
+                            </Typography>
+                            <Grid container spacing={1}>
+                              {factura.notasDebito.map((nota) => (
+                                <Grid item key={nota?.id_notadb || Math.random()}>
+                                  <Button
+                                    variant="outlined"
+                                    color="error"
+                                    size="small"
+                                    startIcon={<Assignment />}
+                                    onClick={() => {
+                                      if (nota?.id_notadb) {
+                                        setNotaDebitoParaPrevia(nota.id_notadb)
+                                        setVistaPreviaNotaDebitoAbierta(true)
+                                      }
+                                    }}
+                                    sx={{ mr: 1 }}
+                                  >
+                                    {(nota?.nro_nota || `#${nota?.id_notadb || 'N/A'}`)} - ₲ {(Number(nota?.monto_total) || 0).toLocaleString("es-PY")}
                                   </Button>
                                 </Grid>
                               ))}
@@ -577,6 +651,15 @@ function FacturacionClientes() {
           open={vistaPreviaNotaAbierta}
           onClose={() => setVistaPreviaNotaAbierta(false)}
           notaId={notaParaPrevia}
+        />
+      )}
+
+      {/* Vista previa de nota de débito */}
+      {notaDebitoParaPrevia && (
+        <VistaPreviaNotaDebito
+          open={vistaPreviaNotaDebitoAbierta}
+          onClose={() => setVistaPreviaNotaDebitoAbierta(false)}
+          notaId={notaDebitoParaPrevia}
         />
       )}
 
@@ -713,12 +796,11 @@ function FacturasProveedores() {
   }
 
   const getEstadoCuentaIcon = (factura) => {
+    if (!factura) return <CheckCircle color="success" />
     if (factura.tipo === "contado") return <CheckCircle color="success" />
-    if (factura.estado?.toLowerCase() === "pagada") return <CheckCircle color="success" />
-    if (factura.fechaVencimiento && new Date(factura.fechaVencimiento) < new Date()) {
-      return <Warning color="error" />
-    }
-    return <Schedule color="warning" />
+    if (factura.diasVencido > 0) return <Warning color="error" />
+    if (factura.diasVencido > -7) return <Schedule color="warning" />
+    return <CheckCircle color="success" />
   }
 
   // Obtener facturas para la página actual
@@ -958,19 +1040,21 @@ function FacturasProveedores() {
                               </Typography>
                               <Grid container spacing={1}>
                                 {factura.notasCredito.map((nota) => (
-                                  <Grid item key={nota.idNotaCredito}>
+                                  <Grid item key={nota?.idNotaCredito || Math.random()}>
                                     <Button
                                       variant="outlined"
                                       color="success"
                                       size="small"
                                       startIcon={<Assignment />}
                                       onClick={() => {
-                                        setNotaParaPrevia(nota.idNotaCredito)
-                                        setVistaPreviaNotaAbierta(true)
+                                        if (nota?.idNotaCredito) {
+                                          setNotaParaPrevia(nota.idNotaCredito)
+                                          setVistaPreviaNotaAbierta(true)
+                                        }
                                       }}
                                       sx={{ mr: 1 }}
                                     >
-                                      {nota.nroNota} - ₲ {nota.montoTotal.toLocaleString("es-PY")}
+                                      {(nota?.nroNota || `#${nota?.idNotaCredito || 'N/A'}`)} - ₲ {(nota?.montoTotal || 0).toLocaleString("es-PY")}
                                     </Button>
                                   </Grid>
                                 ))}

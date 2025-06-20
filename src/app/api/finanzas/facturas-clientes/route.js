@@ -107,6 +107,7 @@ export async function GET(request) {
         },
         pagos: true,
         notas: true,
+        notasDebito: true, // Incluir notas de débito si es necesario
       },
       orderBy: {
         fechaEmision: "desc",
@@ -135,6 +136,14 @@ export async function GET(request) {
         idNotaCredito: nc.idNota,
         nroNota: nc.nroNota,
         montoTotal: nc.montoTotal,
+      })),
+      notasDebito: (f.notasDebito || []).map(nd => ({
+        id_notadb: nd.id_notadb,
+        nro_nota: nd.nro_nota || `#${nd.id_notadb}`,
+        monto_total: Number(nd.monto_total),
+        motivo: nd.motivo,
+        fecha_emision: nd.fecha_emision,
+        estado: nd.estado?.desc_estado_nota || nd.id_estado
       })),
       debugNotas: f.notas
     }))

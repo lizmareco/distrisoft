@@ -20,6 +20,10 @@ export default function NuevaNotaDebito() {
     const nroFactura = searchParams.get('nroFactura')
     const nroFacturaFormateado = nroFactura ? `001-001-${String(nroFactura).padStart(7, "0")}` : "-"
 
+    // Determinar de dónde viene el usuario para la redirección
+    const vieneDeFacturacion = !!nroFactura
+    const urlRetorno = vieneDeFacturacion ? '/finanzas' : '/finanzas/notas-debito'
+
     const [motivo, setMotivo] = useState('')
     const [conceptos, setConceptos] = useState([
         { descripcion: '', cantidad: 1, precio_unitario: 0 }
@@ -104,7 +108,7 @@ export default function NuevaNotaDebito() {
             })
             if (!res.ok) throw new Error("Error al guardar")
             setSnackbar({ abierto: true, mensaje: "Nota de débito guardada correctamente.", tipo: "success" })
-            setTimeout(() => router.push('/finanzas/notas-debito'), 1200)
+            setTimeout(() => router.push(urlRetorno), 1200)
         } catch (err) {
             setSnackbar({ abierto: true, mensaje: err.message, tipo: "error" })
         }
@@ -113,7 +117,7 @@ export default function NuevaNotaDebito() {
 
     return (
         <Container maxWidth="md" sx={{ mt: 4 }}>
-            <Button component={Link} href="/finanzas/notas-debito" startIcon={<ArrowBackIcon />}>
+            <Button component={Link} href={urlRetorno} startIcon={<ArrowBackIcon />}>
                 Volver
             </Button>
             <Typography variant="h4" gutterBottom>Nueva Nota de Débito</Typography>

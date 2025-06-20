@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
     Container, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer,
     TableHead, TableRow, Paper, IconButton, Snackbar, Stack
@@ -10,8 +11,10 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import SearchIcon from '@mui/icons-material/Search'
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos'
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 
 export default function NotasDebitoPage() {
+    const searchParams = useSearchParams()
     const [notas, setNotas] = useState([])
     const [idFactura, setIdFactura] = useState('')
     const [loading, setLoading] = useState(false)
@@ -60,18 +63,37 @@ export default function NotasDebitoPage() {
             alert('ID de nota no válido')
             return
         }
+        
+        if (!confirm('¿Está seguro de que desea anular esta nota de débito?')) {
+            return
+        }
+        
         const res = await fetch(`/api/finanzas/notas-debito/${nota.id_notadb}`, {
             method: 'PATCH'
         });
         if (res.ok) {
-            alert('Nota anulada correctamente')
-            // Aquí puedes recargar la lista si lo necesitas
+            setSnackbar({ abierto: true, mensaje: 'Nota anulada correctamente', tipo: 'success' })
+            // Recargar la lista actual
+            fetchNotas({ 
+                id_factura_origen: idFactura, 
+                page: page,
+                anuladas: mostrarAnuladas ? '1' : undefined
+            })
         } else {
-            alert('Error al anular la nota')
+            setSnackbar({ abierto: true, mensaje: 'Error al anular la nota', tipo: 'error' })
         }
     }
 
-    useEffect(() => { fetchNotas({ page: 1 }) }, [])
+    useEffect(() => { 
+        // Verificar si hay parámetros en la URL
+        const idFacturaFromURL = searchParams.get('id_factura_origen')
+        if (idFacturaFromURL) {
+            setIdFactura(idFacturaFromURL)
+            fetchNotas({ id_factura_origen: idFacturaFromURL, page: 1 })
+        } else {
+            fetchNotas({ page: 1 })
+        }
+    }, [searchParams])
 
     const handleSearch = e => {
         e.preventDefault()
@@ -89,6 +111,9 @@ export default function NotasDebitoPage() {
 
     return (
         <Container maxWidth="lg" sx={{ mt: 4 }}>
+            <Button component={Link} href="/finanzas" startIcon={<ArrowBackIcon />} variant="outlined" sx={{ mb: 3 }}>
+                Volver a Finanzas
+            </Button>
             <Typography variant="h4" gutterBottom>Notas de Débito</Typography>
             <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 <TextField
@@ -125,11 +150,15 @@ export default function NotasDebitoPage() {
                                 <TableCell>
                                     {'₲ ' + nota.monto_total.toLocaleString('es-PY')}
                                 </TableCell>
-                                <TableCell>{nota.estado?.desc_estado_nota || nota.id_estado}</TableCell>
                                 <TableCell>
-                                    <IconButton color="error" onClick={() => handleAnular(nota)}>
-                                        <DeleteIcon />
-                                    </IconButton>
+                                    {nota.deleted_at ? 'Anulada' : 'Vigente'}
+                                </TableCell>
+                                <TableCell>
+                                    {!nota.deleted_at && (
+                                        <IconButton color="error" onClick={() => handleAnular(nota)}>
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}

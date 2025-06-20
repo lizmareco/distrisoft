@@ -1044,6 +1044,7 @@ model EstadoNotaDebito {
 
 model NotaDebito {
   id_notadb Int @id @default(autoincrement()) 
+  nro_nota String? @unique @map("nro_nota") @db.VarChar(20)
   fecha_emision DateTime @default(now())
   id_factura_origen Int
   motivo String
