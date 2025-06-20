@@ -80,11 +80,7 @@ export default function ReportesPage() {
         { id: "compras-producto", title: "Compras por Producto", icon: <ShoppingCartIcon fontSize="large" /> },
         { id: "ordenes", title: "Órdenes de Compra", icon: <InventoryIcon fontSize="large" /> },
       ],
-      inventario: [
-        { id: "stock", title: "Estado de Stock", icon: <InventoryIcon fontSize="large" /> },
-        { id: "movimientos", title: "Movimientos de Inventario", icon: <TrendingUpIcon fontSize="large" /> },
-        { id: "valoracion", title: "Valoración de Inventario", icon: <AttachMoneyIcon fontSize="large" /> },
-      ],
+
     }
 
     const reports = reportsByCategory[activeTab] || []
@@ -181,7 +177,7 @@ export default function ReportesPage() {
             <Tab label="Administracion" value="administracion" icon={<AttachMoneyIcon />} iconPosition="start" />
             <Tab label="Ventas" value="ventas" icon={<StorefrontIcon />} iconPosition="start" />
             <Tab label="Compras" value="compras" icon={<ShoppingCartIcon />} iconPosition="start" />
-            <Tab label="Inventario" value="inventario" icon={<InventoryIcon />} iconPosition="start" />
+
           </Tabs>
 
           <Box sx={{ p: 3 }}>
