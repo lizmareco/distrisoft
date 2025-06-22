@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import {
   Container,
   Typography,
@@ -27,8 +27,11 @@ import {
   MenuItem,
   Divider,
   Autocomplete,
+  Collapse,
+  Card,
+  CardContent,
 } from "@mui/material"
-import { Add, Visibility, ArrowBack, Search, Clear, FilterList, List, Person } from "@mui/icons-material"
+import { Add, Visibility, ArrowBack, Search, Clear, FilterList, List, Person, ExpandMore, ExpandLess, PictureAsPdf, ShoppingCart } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -67,6 +70,14 @@ export default function CotizacionesPage() {
   const [openSnackbar, setOpenSnackbar] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState("")
   const [snackbarSeverity, setSnackbarSeverity] = useState("success")
+
+  // Estados para el desplegable
+  const [expandedRows, setExpandedRows] = useState(new Set())
+  const [detallesCotizaciones, setDetallesCotizaciones] = useState({})
+  const [loadingDetalles, setLoadingDetalles] = useState({})
+
+  // Estado para generación de PDF
+  const [generandoPDF, setGenerandoPDF] = useState({})
 
   // Verificación de permisos
   const permisos = context.session?.permisos || []
@@ -114,6 +125,83 @@ export default function CotizacionesPage() {
     }
   }
 
+  // Función para cargar detalles de una cotización
+  const cargarDetallesCotizacion = async (idCotizacion) => {
+    if (detallesCotizaciones[idCotizacion]) {
+      return // Ya están cargados
+    }
+
+    try {
+      setLoadingDetalles(prev => ({ ...prev, [idCotizacion]: true }))
+      const response = await fetch(`/api/cotizaciones/${idCotizacion}`)
+      if (response.ok) {
+        const data = await response.json()
+        setDetallesCotizaciones(prev => ({
+          ...prev,
+          [idCotizacion]: data
+        }))
+      } else {
+        console.error("Error al cargar detalles de la cotización")
+      }
+    } catch (error) {
+      console.error("Error al cargar detalles:", error)
+    } finally {
+      setLoadingDetalles(prev => ({ ...prev, [idCotizacion]: false }))
+    }
+  }
+
+  // Manejar expansión/contracción de filas
+  const handleToggleRow = (idCotizacion) => {
+    const newExpandedRows = new Set(expandedRows)
+    if (newExpandedRows.has(idCotizacion)) {
+      newExpandedRows.delete(idCotizacion)
+    } else {
+      newExpandedRows.add(idCotizacion)
+      // Cargar detalles si no están cargados
+      cargarDetallesCotizacion(idCotizacion)
+    }
+    setExpandedRows(newExpandedRows)
+  }
+
+  // Función para generar y descargar PDF
+  const handleGenerarPDF = async (idCotizacion) => {
+    try {
+      setGenerandoPDF(prev => ({ ...prev, [idCotizacion]: true }))
+      setSnackbarMessage("Generando PDF, por favor espere...")
+      setSnackbarSeverity("info")
+      setOpenSnackbar(true)
+
+      const response = await fetch(`/api/cotizaciones/${idCotizacion}/pdf`)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Error al generar el PDF")
+      }
+
+      // Crear blob y descargar
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `cotizacion-${idCotizacion}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      setSnackbarMessage("PDF generado y descargado exitosamente")
+      setSnackbarSeverity("success")
+      setOpenSnackbar(true)
+    } catch (error) {
+      console.error("Error al generar PDF:", error)
+      setSnackbarMessage("Error al generar PDF: " + error.message)
+      setSnackbarSeverity("error")
+      setOpenSnackbar(true)
+    } finally {
+      setGenerandoPDF(prev => ({ ...prev, [idCotizacion]: false }))
+    }
+  }
+
   // Función para buscar cotizaciones
   const buscarCotizaciones = async (mostrarTodas = false) => {
     try {
@@ -151,6 +239,12 @@ export default function CotizacionesPage() {
       const data = await response.json()
       setCotizaciones(data)
       setHasSearched(true)
+
+      // Limpiar estados de expansión y detalles al hacer nueva búsqueda
+      setExpandedRows(new Set())
+      setDetallesCotizaciones({})
+      setLoadingDetalles({})
+      setGenerandoPDF({})
 
       // Mostrar mensaje según resultados
       if (data.length === 0) {
@@ -210,6 +304,10 @@ export default function CotizacionesPage() {
     setCotizaciones([])
     setHasSearched(false)
     setError(null)
+    setExpandedRows(new Set())
+    setDetallesCotizaciones({})
+    setLoadingDetalles({})
+    setGenerandoPDF({})
   }
 
   // Verificar si hay filtros aplicados
@@ -219,6 +317,10 @@ export default function CotizacionesPage() {
 
   const handleNuevaCotizacion = () => {
     router.push("/cotizaciones/nueva")
+  }
+
+  const handleIrAPedidos = () => {
+    router.push("/pedidos")
   }
 
   const handleVerCotizacion = (id) => {
@@ -307,11 +409,21 @@ export default function CotizacionesPage() {
 
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Cotizaciones
+          Cotizaciones Clientes
         </Typography>
-        <Button variant="contained" color="primary" startIcon={<Add />} onClick={handleNuevaCotizacion}>
-          Nueva Cotización
-        </Button>
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            startIcon={<ShoppingCart />} 
+            onClick={handleIrAPedidos}
+          >
+            Ir a Pedidos
+          </Button>
+          <Button variant="contained" color="primary" startIcon={<Add />} onClick={handleNuevaCotizacion}>
+            Nueva Cotización
+          </Button>
+        </Box>
       </Box>
 
       {/* Panel de filtros */}
@@ -449,6 +561,7 @@ export default function CotizacionesPage() {
             <Table>
               <TableHead>
                 <TableRow>
+                  <TableCell width="50px"></TableCell>
                   <TableCell>ID</TableCell>
                   <TableCell>Fecha</TableCell>
                   <TableCell>Cliente</TableCell>
@@ -460,56 +573,191 @@ export default function CotizacionesPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {cotizaciones.map((cotizacion) => (
-                  <TableRow key={cotizacion.idCotizacionCliente}>
-                    <TableCell>{cotizacion.idCotizacionCliente}</TableCell>
-                    <TableCell>{format(new Date(cotizacion.fechaCotizacion), "dd/MM/yyyy", { locale: es })}</TableCell>
-                    <TableCell>
-                      {cotizacion.cliente?.persona?.nombre} {cotizacion.cliente?.persona?.apellido}
-                      {cotizacion.cliente?.empresa && ` - ${cotizacion.cliente.empresa.razonSocial}`}
-                    </TableCell>
-                    <TableCell>
-                      {cotizacion.usuario?.persona?.nombre} {cotizacion.usuario?.persona?.apellido}
-                    </TableCell>
-                    <TableCell>
-                      {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                        cotizacion.montoTotal,
-                      )}
-                    </TableCell>
-                    <TableCell>{cotizacion.validez} días</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={cotizacion.estadoCotizacionCliente?.descEstadoCotizacionCliente || "Pendiente"}
-                        color={getEstadoChipColor(
-                          cotizacion.estadoCotizacionCliente?.descEstadoCotizacionCliente || "pendiente",
-                        )}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleVerCotizacion(cotizacion.idCotizacionCliente)}
-                        title="Ver cotización"
-                        size="small"
-                      >
-                        <Visibility />
-                      </IconButton>
-                      {/* Mostrar solo si es PENDIENTE */}
-                      {cotizacion.estadoCotizacionCliente?.idEstadoCotizacionCliente === 1 && (
-    <IconButton
-      color="error"
-      onClick={() => handleOpenConfirmDialog(cotizacion)}
-      title="Eliminar cotización"
-      size="small"
-      disabled={loading}
-    >
-      <Delete />
-    </IconButton>
-  )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {cotizaciones.map((cotizacion) => {
+                  const isExpanded = expandedRows.has(cotizacion.idCotizacionCliente)
+                  const detalles = detallesCotizaciones[cotizacion.idCotizacionCliente]
+                  const isLoadingDetalles = loadingDetalles[cotizacion.idCotizacionCliente]
+
+                  return (
+                    <React.Fragment key={cotizacion.idCotizacionCliente}>
+                      <TableRow>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleToggleRow(cotizacion.idCotizacionCliente)}
+                            disabled={isLoadingDetalles}
+                          >
+                            {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </IconButton>
+                        </TableCell>
+                        <TableCell>{cotizacion.idCotizacionCliente}</TableCell>
+                        <TableCell>{format(new Date(cotizacion.fechaCotizacion), "dd/MM/yyyy", { locale: es })}</TableCell>
+                        <TableCell>
+                          {cotizacion.cliente?.persona?.nombre} {cotizacion.cliente?.persona?.apellido}
+                          {cotizacion.cliente?.empresa && ` - ${cotizacion.cliente.empresa.razonSocial}`}
+                        </TableCell>
+                        <TableCell>
+                          {cotizacion.usuario?.persona?.nombre} {cotizacion.usuario?.persona?.apellido}
+                        </TableCell>
+                        <TableCell>
+                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                            cotizacion.montoTotal,
+                          )}
+                        </TableCell>
+                        <TableCell>{cotizacion.validez} días</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={cotizacion.estadoCotizacionCliente?.descEstadoCotizacionCliente || "Pendiente"}
+                            color={getEstadoChipColor(
+                              cotizacion.estadoCotizacionCliente?.descEstadoCotizacionCliente || "pendiente",
+                            )}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton
+                            color="primary"
+                            onClick={() => handleVerCotizacion(cotizacion.idCotizacionCliente)}
+                            title="Ver cotización"
+                            size="small"
+                          >
+                            <Visibility />
+                          </IconButton>
+                          <IconButton
+                            color="secondary"
+                            onClick={() => handleGenerarPDF(cotizacion.idCotizacionCliente)}
+                            title="Descargar PDF"
+                            size="small"
+                            disabled={generandoPDF[cotizacion.idCotizacionCliente]}
+                          >
+                            {generandoPDF[cotizacion.idCotizacionCliente] ? (
+                              <CircularProgress size={20} />
+                            ) : (
+                              <PictureAsPdf />
+                            )}
+                          </IconButton>
+                          {/* Mostrar solo si es PENDIENTE */}
+                          {cotizacion.estadoCotizacionCliente?.idEstadoCotizacionCliente === 1 && (
+                            <IconButton
+                              color="error"
+                              onClick={() => handleOpenConfirmDialog(cotizacion)}
+                              title="Eliminar cotización"
+                              size="small"
+                              disabled={loading}
+                            >
+                              <Delete />
+                            </IconButton>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+                          <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                            <Box sx={{ margin: 1 }}>
+                              {isLoadingDetalles ? (
+                                <Box display="flex" justifyContent="center" p={2}>
+                                  <CircularProgress size={24} />
+                                </Box>
+                              ) : detalles ? (
+                                <Card variant="outlined">
+                                  <CardContent>
+                                    <Typography variant="h6" gutterBottom>
+                                      Detalle de la Cotización #{cotizacion.idCotizacionCliente}
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                      <Grid item xs={12} md={6}>
+                                        <Typography variant="subtitle2" color="textSecondary">
+                                          Cliente:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                          {detalles.cliente?.persona?.nombre} {detalles.cliente?.persona?.apellido}
+                                          {detalles.cliente?.empresa && ` - ${detalles.cliente.empresa.razonSocial}`}
+                                        </Typography>
+                                        {detalles.cliente?.persona?.nroDocumento && (
+                                          <>
+                                            <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                              Documento:
+                                            </Typography>
+                                            <Typography variant="body2">
+                                              {detalles.cliente.persona.nroDocumento}
+                                            </Typography>
+                                          </>
+                                        )}
+                                      </Grid>
+                                      <Grid item xs={12} md={6}>
+                                        <Typography variant="subtitle2" color="textSecondary">
+                                          Vendedor:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                          {detalles.usuario?.persona?.nombre} {detalles.usuario?.persona?.apellido}
+                                        </Typography>
+                                        <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                          Fecha de Cotización:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                          {format(new Date(detalles.fechaCotizacion), "dd/MM/yyyy", { locale: es })}
+                                        </Typography>
+                                      </Grid>
+                                    </Grid>
+                                    
+                                    {detalles.detalleCotizacionCliente && detalles.detalleCotizacionCliente.length > 0 && (
+                                      <>
+                                        <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+                                          Productos Cotizados
+                                        </Typography>
+                                        <Table size="small">
+                                          <TableHead>
+                                            <TableRow>
+                                              <TableCell>Producto</TableCell>
+                                              <TableCell align="right">Cantidad</TableCell>
+                                              <TableCell align="right">Precio Unitario</TableCell>
+                                              <TableCell align="right">Subtotal</TableCell>
+                                            </TableRow>
+                                          </TableHead>
+                                          <TableBody>
+                                            {detalles.detalleCotizacionCliente.map((detalle, index) => {
+                                              const precioUnitario = detalle.subtotal / detalle.cantidad
+                                              return (
+                                                <TableRow key={`${cotizacion.idCotizacionCliente}-detalle-${index}`}>
+                                                  <TableCell>{detalle.producto?.nombreProducto}</TableCell>
+                                                  <TableCell align="right">{detalle.cantidad}</TableCell>
+                                                  <TableCell align="right">
+                                                    {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(precioUnitario)}
+                                                  </TableCell>
+                                                  <TableCell align="right">
+                                                    {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(detalle.subtotal)}
+                                                  </TableCell>
+                                                </TableRow>
+                                              )
+                                            })}
+                                            <TableRow>
+                                              <TableCell colSpan={3} align="right">
+                                                <strong>TOTAL:</strong>
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                <strong>
+                                                  {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(detalles.montoTotal)}
+                                                </strong>
+                                              </TableCell>
+                                            </TableRow>
+                                          </TableBody>
+                                        </Table>
+                                      </>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              ) : (
+                                <Alert severity="error">
+                                  No se pudieron cargar los detalles de la cotización
+                                </Alert>
+                              )}
+                            </Box>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  )
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -541,25 +789,25 @@ export default function CotizacionesPage() {
 
       {/* Dialog para confirmar eliminación */}
       <Dialog open={openConfirmDialog} onClose={handleCloseConfirmDialog} maxWidth="xs" fullWidth>
-      <DialogTitle>Confirmar eliminación</DialogTitle>
-      <DialogContent>
-        ¿Está seguro que desea eliminar la cotización
-        {cotizacionAEliminar ? ` #${cotizacionAEliminar.idCotizacionCliente}` : ""}? Esta acción no se puede deshacer.
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleCloseConfirmDialog} color="secondary" variant="outlined">
-          Cancelar
-        </Button>
-        <Button
-          onClick={handleEliminarCotizacion}
-          color="error"
-          variant="contained"
-          disabled={loading}
-        >
-          Eliminar
-        </Button>
-      </DialogActions>
-    </Dialog>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          ¿Está seguro que desea eliminar la cotización
+          {cotizacionAEliminar ? ` #${cotizacionAEliminar.idCotizacionCliente}` : ""}? Esta acción no se puede deshacer.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseConfirmDialog} color="secondary" variant="outlined">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleEliminarCotizacion}
+            color="error"
+            variant="contained"
+            disabled={loading}
+          >
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 }
