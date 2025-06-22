@@ -561,7 +561,6 @@ export default function CotizacionesPage() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell width="50px"></TableCell>
                   <TableCell>ID</TableCell>
                   <TableCell>Fecha</TableCell>
                   <TableCell>Cliente</TableCell>
@@ -581,15 +580,6 @@ export default function CotizacionesPage() {
                   return (
                     <React.Fragment key={cotizacion.idCotizacionCliente}>
                       <TableRow>
-                        <TableCell>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleToggleRow(cotizacion.idCotizacionCliente)}
-                            disabled={isLoadingDetalles}
-                          >
-                            {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                          </IconButton>
-                        </TableCell>
                         <TableCell>{cotizacion.idCotizacionCliente}</TableCell>
                         <TableCell>{format(new Date(cotizacion.fechaCotizacion), "dd/MM/yyyy", { locale: es })}</TableCell>
                         <TableCell>
@@ -615,43 +605,54 @@ export default function CotizacionesPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <IconButton
-                            color="primary"
-                            onClick={() => handleVerCotizacion(cotizacion.idCotizacionCliente)}
-                            title="Ver cotización"
-                            size="small"
-                          >
-                            <Visibility />
-                          </IconButton>
-                          <IconButton
-                            color="secondary"
-                            onClick={() => handleGenerarPDF(cotizacion.idCotizacionCliente)}
-                            title="Descargar PDF"
-                            size="small"
-                            disabled={generandoPDF[cotizacion.idCotizacionCliente]}
-                          >
-                            {generandoPDF[cotizacion.idCotizacionCliente] ? (
-                              <CircularProgress size={20} />
-                            ) : (
-                              <PictureAsPdf />
-                            )}
-                          </IconButton>
-                          {/* Mostrar solo si es PENDIENTE */}
-                          {cotizacion.estadoCotizacionCliente?.idEstadoCotizacionCliente === 1 && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <IconButton
-                              color="error"
-                              onClick={() => handleOpenConfirmDialog(cotizacion)}
-                              title="Eliminar cotización"
+                              color="primary"
+                              onClick={() => handleVerCotizacion(cotizacion.idCotizacionCliente)}
+                              title="Ver cotización"
                               size="small"
-                              disabled={loading}
                             >
-                              <Delete />
+                              <Visibility />
                             </IconButton>
-                          )}
+                            <IconButton
+                              color="secondary"
+                              onClick={() => handleGenerarPDF(cotizacion.idCotizacionCliente)}
+                              title="Descargar PDF"
+                              size="small"
+                              disabled={generandoPDF[cotizacion.idCotizacionCliente]}
+                            >
+                              {generandoPDF[cotizacion.idCotizacionCliente] ? (
+                                <CircularProgress size={20} />
+                              ) : (
+                                <PictureAsPdf />
+                              )}
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleToggleRow(cotizacion.idCotizacionCliente)}
+                              disabled={isLoadingDetalles}
+                              color="primary"
+                              title={isExpanded ? "Ocultar detalles" : "Ver detalles"}
+                            >
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </IconButton>
+                            {/* Mostrar solo si es PENDIENTE */}
+                            {cotizacion.estadoCotizacionCliente?.idEstadoCotizacionCliente === 1 && (
+                              <IconButton
+                                color="error"
+                                onClick={() => handleOpenConfirmDialog(cotizacion)}
+                                title="Eliminar cotización"
+                                size="small"
+                                disabled={loading}
+                              >
+                                <Delete />
+                              </IconButton>
+                            )}
+                          </Box>
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                             <Box sx={{ margin: 1 }}>
                               {isLoadingDetalles ? (
