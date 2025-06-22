@@ -9,11 +9,11 @@ export async function GET(request) {
     // Obtener parámetros de paginación de la URL
     const { searchParams } = new URL(request.url)
     const page = Number.parseInt(searchParams.get("page") || "1", 10)
-    const pageSize = Number.parseInt(searchParams.get("pageSize") || "100", 10)
+    const pageSize = Number.parseInt(searchParams.get("pageSize") || "10", 10)
 
     // Validar parámetros de paginación
     const validPage = page > 0 ? page : 1
-    const validPageSize = pageSize > 0 && pageSize <= 100 ? pageSize : 100
+    const validPageSize = pageSize > 0 && pageSize <= 100 ? pageSize : 10
 
     // Calcular el offset para la paginación
     const skip = (validPage - 1) * validPageSize
@@ -69,7 +69,7 @@ export async function GET(request) {
         personas: [],
         pagination: {
           page: 1,
-          pageSize: 100,
+          pageSize: 10,
           totalItems: 0,
           totalPages: 0,
           hasNextPage: false,

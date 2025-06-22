@@ -175,6 +175,15 @@ export async function GET(request) {
           },
         },
         estadoOrdenCompra: true,
+        facturaProveedor: {
+          select: {
+            idFacturaProveedor: true,
+            nroFactura: true,
+            fechaEmision: true,
+            idEstadoFacturaProv: true,
+          },
+          take: 1, // Tomar solo la primera factura
+        },
       },
       orderBy: {
         fechaOrden: "desc",

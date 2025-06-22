@@ -76,18 +76,21 @@ export default function VistaPreviaFactura({ open, onClose, facturaId }) {
         productos: (facturaData.detalles || []).map((detalle, index) => {
           console.log(`Procesando detalle real ${index}:`, detalle)
 
-          // Obtener información del producto según el tipo
-          const tipoProducto = detalle.tipoProducto?.toLowerCase() || ""
+          // Usar la descripción completa que ya viene de la API
           let descripcionCompleta = detalle.descripcion || `Producto ${index + 1}`
           const unidadesPorPaquete = detalle.unidadesPorPaquete || 1
 
-          // Agregar información de paquetes según el tipo
-          if (tipoProducto.includes("edulcorante") || tipoProducto.includes("sal")) {
-            descripcionCompleta += ` (${detalle.cantidad || 0} paq. x ${unidadesPorPaquete} sobres)`
-          } else if (tipoProducto.includes("azúcar") || tipoProducto.includes("azucar")) {
-            descripcionCompleta += ` (${detalle.cantidad || 0} paq. x ${unidadesPorPaquete} sobres)`
-          } else if (tipoProducto.includes("cocido")) {
-            descripcionCompleta += ` (${detalle.cantidad || 0} cajas x ${unidadesPorPaquete} unid.)`
+          // Solo agregar información de paquetes si no está ya incluida en la descripción
+          if (!descripcionCompleta.includes("paq.") && !descripcionCompleta.includes("cajas")) {
+            const tipoProducto = detalle.tipoProducto?.toLowerCase() || ""
+            
+            if (tipoProducto.includes("edulcorante") || tipoProducto.includes("sal")) {
+              descripcionCompleta += ` (${detalle.cantidad || 0} paq. x ${unidadesPorPaquete} sobres)`
+            } else if (tipoProducto.includes("azúcar") || tipoProducto.includes("azucar")) {
+              descripcionCompleta += ` (${detalle.cantidad || 0} paq. x ${unidadesPorPaquete} sobres)`
+            } else if (tipoProducto.includes("cocido")) {
+              descripcionCompleta += ` (${detalle.cantidad || 0} cajas x ${unidadesPorPaquete} unid.)`
+            }
           }
 
           return {
@@ -96,7 +99,7 @@ export default function VistaPreviaFactura({ open, onClose, facturaId }) {
             precioUnitario: detalle.precioUnitario || 0,
             total: detalle.totalLinea || 0, // Usar totalLinea de la BD
             iva: detalle.montoImpuesto || 0, // Usar montoImpuesto de la BD
-            tipoProducto,
+            tipoProducto: detalle.tipoProducto,
           }
         }),
 

@@ -24,6 +24,8 @@ import {
   Grid,
   InputAdornment,
   Tooltip,
+  Pagination,
+  Stack,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
@@ -43,8 +45,6 @@ export default function ProveedoresPage() {
   const [loading, setLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState(null)
-  const [tiposDocumento, setTiposDocumento] = useState([])
-  const [loadingTipos, setLoadingTipos] = useState(true)
   const router = useRouter()
   const context = useRootContext()
   const permisos = context.session?.permisos || []
@@ -53,12 +53,22 @@ export default function ProveedoresPage() {
 
   // Estado para el formulario de búsqueda
   const [busqueda, setBusqueda] = useState({
-    tipoDocumento: "",
-    numeroDocumento: "",
+    ruc: "",
+    razonSocial: "",
   })
 
   // Estado para controlar si ya se realizó una búsqueda
   const [busquedaRealizada, setBusquedaRealizada] = useState(false)
+
+  // Estado para la paginación
+  const [paginacion, setPaginacion] = useState({
+    page: 1,
+    pageSize: 10,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  })
 
   // Estado para el diálogo de confirmación
   const [confirmDialog, setConfirmDialog] = useState({
@@ -66,41 +76,6 @@ export default function ProveedoresPage() {
     proveedorId: null,
     proveedorNombre: "",
   })
-
-  // Cargar tipos de documento al iniciar
-  useEffect(() => {
-    const fetchTiposDocumento = async () => {
-      try {
-        setLoadingTipos(true)
-        setError(null)
-        console.log("Cargando tipos de documento...")
-
-        const response = await fetch("/api/tipos-documento")
-
-        if (!response.ok) {
-          throw new Error(`Error al cargar tipos de documento: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        // Verificar que los datos sean un array
-        if (!Array.isArray(data)) {
-          console.error("Respuesta inesperada para tipos de documento:", data)
-          throw new Error("Formato de respuesta inválido para tipos de documento")
-        }
-
-        console.log(`Se cargaron ${data.length} tipos de documento`)
-        setTiposDocumento(data)
-      } catch (error) {
-        console.error("Error:", error)
-        setError("Error al cargar tipos de documento: " + error.message)
-      } finally {
-        setLoadingTipos(false)
-      }
-    }
-
-    fetchTiposDocumento()
-  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -113,9 +88,9 @@ export default function ProveedoresPage() {
   const handleSearch = async (e) => {
     e.preventDefault()
 
-    // Validar que se hayan ingresado ambos campos
-    if (!busqueda.tipoDocumento || !busqueda.numeroDocumento) {
-      setError("Debe seleccionar un tipo de documento e ingresar un número de documento")
+    // Validar que se haya ingresado al menos un campo
+    if (!busqueda.ruc && !busqueda.razonSocial) {
+      setError("Debe ingresar un RUC o razón social")
       return
     }
 
@@ -124,16 +99,52 @@ export default function ProveedoresPage() {
     setBusquedaRealizada(true)
 
     try {
-      const response = await fetch(
-        `/api/proveedores?tipoDocumento=${busqueda.tipoDocumento}&numeroDocumento=${busqueda.numeroDocumento}`,
-      )
+      // Construir la URL con los parámetros proporcionados
+      const params = new URLSearchParams()
+      if (busqueda.ruc) params.append("ruc", busqueda.ruc)
+      if (busqueda.razonSocial) params.append("razonSocial", busqueda.razonSocial)
+
+      const response = await fetch(`/api/proveedores?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error(`Error al buscar proveedores: ${response.status}`)
       }
 
       const data = await response.json()
-      setProveedores(data)
+      
+      // La API ahora devuelve el formato correcto con paginación
+      if (data && data.proveedores && Array.isArray(data.proveedores)) {
+        setProveedores(data.proveedores)
+        setPaginacion(data.pagination || {
+          page: 1,
+          pageSize: 10,
+          totalItems: data.proveedores.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else if (Array.isArray(data)) {
+        // Fallback para formato antiguo (no debería ocurrir)
+        setProveedores(data)
+        setPaginacion({
+          page: 1,
+          pageSize: data.length,
+          totalItems: data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else {
+        setProveedores([])
+        setPaginacion({
+          page: 1,
+          pageSize: 0,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      }
     } catch (error) {
       console.error("Error:", error)
       setError(error.message)
@@ -142,33 +153,71 @@ export default function ProveedoresPage() {
     }
   }
 
-  // Función para listar todos los proveedores
-  const handleListAll = async () => {
+  // Función para listar todos los proveedores con paginación
+  const handleListAll = async (page = 1) => {
     setSearching(true)
     setError(null)
     setBusquedaRealizada(true)
 
     // Limpiar los campos de búsqueda
     setBusqueda({
-      tipoDocumento: "",
-      numeroDocumento: "",
+      ruc: "",
+      razonSocial: "",
     })
 
     try {
-      const response = await fetch("/api/proveedores/all")
+      const response = await fetch(`/api/proveedores/all?page=${page}&pageSize=${paginacion.pageSize}`)
 
       if (!response.ok) {
         throw new Error(`Error al obtener todos los proveedores: ${response.status}`)
       }
 
       const data = await response.json()
-      setProveedores(data)
+      
+      // Verificar si la respuesta tiene formato de paginación
+      if (data && data.proveedores && Array.isArray(data.proveedores)) {
+        setProveedores(data.proveedores)
+        setPaginacion(data.pagination || {
+          page: 1,
+          pageSize: data.proveedores.length,
+          totalItems: data.proveedores.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else if (Array.isArray(data)) {
+        // Formato antiguo sin paginación
+        setProveedores(data)
+        setPaginacion({
+          page: 1,
+          pageSize: data.length,
+          totalItems: data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else {
+        setProveedores([])
+        setPaginacion({
+          page: 1,
+          pageSize: 0,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      }
     } catch (error) {
       console.error("Error:", error)
       setError(error.message)
     } finally {
       setSearching(false)
     }
+  }
+
+  // Manejar cambio de página
+  const handlePageChange = (event, newPage) => {
+    handleListAll(newPage)
   }
 
   const handleDeleteClick = (id, nombre) => {
@@ -251,36 +300,35 @@ export default function ProveedoresPage() {
         </Typography>
         <form onSubmit={handleSearch}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth disabled={loadingTipos || searching}>
-                <InputLabel id="tipo-documento-label">Tipo de Documento</InputLabel>
-                <Select
-                  labelId="tipo-documento-label"
-                  id="tipoDocumento"
-                  name="tipoDocumento"
-                  value={busqueda.tipoDocumento}
-                  onChange={handleInputChange}
-                  label="Tipo de Documento"
-                  required
-                >
-                  {tiposDocumento.map((tipo) => (
-                    <MenuItem key={tipo.idTipoDocumento} value={tipo.idTipoDocumento}>
-                      {tipo.descTipoDocumento}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                label="RUC"
+                id="ruc"
+                name="ruc"
+                value={busqueda.ruc}
+                onChange={handleInputChange}
+                disabled={searching}
+                placeholder="Ingrese el RUC del proveedor"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             </Grid>
             <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
-                label="Número de Documento"
-                id="numeroDocumento"
-                name="numeroDocumento"
-                value={busqueda.numeroDocumento}
+                label="Razón Social"
+                id="razonSocial"
+                name="razonSocial"
+                value={busqueda.razonSocial}
                 onChange={handleInputChange}
-                required
                 disabled={searching}
+                placeholder="Ingrese la razón social"
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
@@ -296,19 +344,19 @@ export default function ProveedoresPage() {
                 variant="contained"
                 color="primary"
                 fullWidth
-                disabled={searching || loadingTipos}
+                disabled={searching}
                 sx={{ height: "56px" }}
               >
                 {searching ? <CircularProgress size={24} /> : "Buscar"}
               </Button>
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <Button
                 variant="outlined"
                 color="secondary"
                 fullWidth
                 startIcon={<ListIcon />}
-                onClick={handleListAll}
+                onClick={() => handleListAll()}
                 disabled={searching}
                 sx={{ height: "56px" }}
               >
@@ -419,6 +467,25 @@ export default function ProveedoresPage() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Controles de paginación */}
+        {busquedaRealizada && paginacion && paginacion.totalPages > 1 && (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+            <Stack spacing={2}>
+              <Pagination
+                count={paginacion.totalPages || 1}
+                page={paginacion.page || 1}
+                onChange={handlePageChange}
+                color="primary"
+                disabled={searching}
+              />
+              <Typography variant="body2" color="text.secondary" align="center">
+                Mostrando {proveedores ? proveedores.length : 0} de {paginacion.totalItems || 0} proveedores (Página{" "}
+                {paginacion.page || 1} de {paginacion.totalPages || 1})
+              </Typography>
+            </Stack>
+          </Box>
+        )}
       </Paper>
 
       {/* Diálogo de confirmación para eliminar */}

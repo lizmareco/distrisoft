@@ -30,6 +30,8 @@ import {
   MenuItem,
   Grid,
   InputAdornment,
+  Pagination,
+  Stack,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import EditIcon from "@mui/icons-material/Edit"
@@ -57,6 +59,14 @@ export default function UsuariosPage() {
   const [filtroEstado, setFiltroEstado] = useState("")
   const [roles, setRoles] = useState([])
   const [hasSearched, setHasSearched] = useState(false)
+  const [paginacion, setPaginacion] = useState({
+    page: 1,
+    pageSize: 10,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  })
   const estadosUsuario = [
     { value: "", label: "Todos" },
     { value: "ACTIVO", label: "Activo" },
@@ -88,7 +98,40 @@ export default function UsuariosPage() {
 
         const datos = await respuesta.json()
         console.log("Datos recibidos:", datos)
-        setUsuarios(datos.usuarios || [])
+        
+        // Verificar si la respuesta tiene formato de paginación
+        if (datos && datos.usuarios && Array.isArray(datos.usuarios)) {
+          setUsuarios(datos.usuarios)
+          setPaginacion(datos.pagination || {
+            page: 1,
+            pageSize: datos.usuarios.length,
+            totalItems: datos.usuarios.length,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          })
+        } else if (Array.isArray(datos)) {
+          // Formato antiguo sin paginación
+          setUsuarios(datos)
+          setPaginacion({
+            page: 1,
+            pageSize: datos.length,
+            totalItems: datos.length,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          })
+        } else {
+          setUsuarios([])
+          setPaginacion({
+            page: 1,
+            pageSize: 0,
+            totalItems: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPrevPage: false,
+          })
+        }
         setError(null)
       } catch (error) {
         console.error("Error detallado:", error)
@@ -202,13 +245,49 @@ export default function UsuariosPage() {
       if (params.rol) searchParams.append("rol", params.rol)
       if (params.estado) searchParams.append("estado", params.estado)
       if (params.all) searchParams.append("all", params.all)
+      if (params.page) searchParams.append("page", params.page)
+      if (params.pageSize) searchParams.append("pageSize", params.pageSize)
+      
       const respuesta = await fetch(`/api/usuarios?${searchParams.toString()}`, {
         method: "GET",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       })
       const datos = await respuesta.json()
-      setUsuarios(datos.usuarios || [])
+      
+      // Verificar si la respuesta tiene formato de paginación
+      if (datos && datos.usuarios && Array.isArray(datos.usuarios)) {
+        setUsuarios(datos.usuarios)
+        setPaginacion(datos.pagination || {
+          page: 1,
+          pageSize: datos.usuarios.length,
+          totalItems: datos.usuarios.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else if (Array.isArray(datos)) {
+        // Formato antiguo sin paginación
+        setUsuarios(datos)
+        setPaginacion({
+          page: 1,
+          pageSize: datos.length,
+          totalItems: datos.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else {
+        setUsuarios([])
+        setPaginacion({
+          page: 1,
+          pageSize: 0,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      }
       setError(null)
     } catch (error) {
       setError("No se pudieron cargar los usuarios. Por favor, intenta de nuevo más tarde.")
@@ -224,6 +303,8 @@ export default function UsuariosPage() {
       persona: filtroPersona,
       rol: filtroRol,
       estado: filtroEstado,
+      page: 1,
+      pageSize: paginacion.pageSize,
     })
   }
 
@@ -232,7 +313,11 @@ export default function UsuariosPage() {
     setFiltroPersona("")
     setFiltroRol("")
     setFiltroEstado("")
-    cargarUsuarios({ all: "true" })
+    cargarUsuarios({ 
+      all: "true", 
+      page: 1, 
+      pageSize: paginacion.pageSize 
+    })
   }
 
   const handleLimpiarFiltros = () => {
@@ -242,6 +327,26 @@ export default function UsuariosPage() {
     setFiltroEstado("")
     setUsuarios([])
     setHasSearched(false)
+    setPaginacion({
+      page: 1,
+      pageSize: 10,
+      totalItems: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPrevPage: false,
+    })
+  }
+
+  // Manejar cambio de página
+  const handlePageChange = (event, newPage) => {
+    cargarUsuarios({
+      nombreUsuario: filtroUsuario,
+      persona: filtroPersona,
+      rol: filtroRol,
+      estado: filtroEstado,
+      page: newPage,
+      pageSize: paginacion.pageSize,
+    })
   }
 
   if (loading) {
@@ -404,6 +509,25 @@ export default function UsuariosPage() {
                 )}
               </TableBody>
             </Table>
+            
+            {/* Controles de paginación */}
+            {hasSearched && paginacion && paginacion.totalPages > 1 && (
+              <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+                <Stack spacing={2}>
+                  <Pagination
+                    count={paginacion.totalPages || 1}
+                    page={paginacion.page || 1}
+                    onChange={handlePageChange}
+                    color="primary"
+                    disabled={loading}
+                  />
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Mostrando {usuarios ? usuarios.length : 0} de {paginacion.totalItems || 0} usuarios (Página{" "}
+                    {paginacion.page || 1} de {paginacion.totalPages || 1})
+                  </Typography>
+                </Stack>
+              </Box>
+            )}
           </TableContainer>
         )}
       </Paper>

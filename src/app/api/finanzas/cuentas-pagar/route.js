@@ -83,7 +83,9 @@ export async function GET(request) {
         },
       },
       orderBy: {
-        fechaVencimiento: "asc",
+        facturaProveedor: {
+          fechaEmision: "desc",
+        },
       },
       skip,
       take: limite,

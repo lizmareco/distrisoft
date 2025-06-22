@@ -56,6 +56,9 @@ export default function VerCotizacionPage({ params }) {
   const [openSnackbar, setOpenSnackbar] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState("")
   const [snackbarSeverity, setSnackbarSeverity] = useState("success")
+  
+  // Estado para información de pedido creado automáticamente
+  const [pedidoCreado, setPedidoCreado] = useState(null)
 
   useEffect(() => {
     if (!hasPermission) return
@@ -205,8 +208,19 @@ export default function VerCotizacionPage({ params }) {
       setCotizacion(data)
       handleCloseDialog()
 
-      // Mostrar mensaje de éxito
-      setSnackbarMessage(`Cotización ${dialogAction === "aprobar" ? "aprobada" : "rechazada"} exitosamente`)
+      // Guardar información del pedido creado automáticamente
+      if (dialogAction === "aprobar" && data.pedidoCreado) {
+        setPedidoCreado(data.pedidoCreado)
+      }
+
+      // Mostrar mensaje de éxito con información adicional si se creó un pedido
+      let mensajeExito = `Cotización ${dialogAction === "aprobar" ? "aprobada" : "rechazada"} exitosamente`
+      
+      if (dialogAction === "aprobar" && data.pedidoCreado) {
+        mensajeExito += `. Se creó automáticamente el pedido #${data.pedidoCreado.idPedido}`
+      }
+      
+      setSnackbarMessage(mensajeExito)
       setSnackbarSeverity("success")
       setOpenSnackbar(true)
     } catch (error) {
@@ -317,6 +331,29 @@ export default function VerCotizacionPage({ params }) {
               </Button>
             </Box>
           </Box>
+
+          {/* Alerta informativa sobre pedido creado automáticamente */}
+          {pedidoCreado && (
+            <Alert 
+              severity="info" 
+              sx={{ mb: 3 }}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  component={Link}
+                  href={`/pedidos/${pedidoCreado.idPedido}`}
+                >
+                  Ver Pedido
+                </Button>
+              }
+            >
+              <Typography variant="body2">
+                <strong>¡Pedido creado automáticamente!</strong><br />
+                Se ha generado el pedido #{pedidoCreado.idPedido} para esta cotización aprobada.
+              </Typography>
+            </Alert>
+          )}
 
           <Paper sx={{ p: 3, mb: 4 }}>
             <Grid container spacing={3}>
@@ -439,7 +476,7 @@ export default function VerCotizacionPage({ params }) {
         <DialogContent>
           <DialogContentText>
             {dialogAction === "aprobar"
-              ? "¿Está seguro de que desea aprobar esta cotización? Esta acción cambiará el estado de la cotización a 'Aprobada'."
+              ? "¿Está seguro de que desea aprobar esta cotización? Esta acción cambiará el estado de la cotización a 'Aprobada' y se creará automáticamente un pedido."
               : "¿Está seguro de que desea rechazar esta cotización? Esta acción cambiará el estado de la cotización a 'Rechazada'."}
           </DialogContentText>
         </DialogContent>

@@ -26,6 +26,8 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Pagination,
+  Stack,
 } from "@mui/material"
 import { Refresh as RefreshIcon, Search as SearchIcon, ArrowBack } from "@mui/icons-material"
 import InventarioNav from "@/src/components/inventario-nav"
@@ -52,6 +54,14 @@ export default function ProductosInventarioPage() {
     severity: "info",
   })
   const [loadingEstados, setLoadingEstados] = useState(true)
+  const [paginacion, setPaginacion] = useState({
+    page: 1,
+    pageSize: 10,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  })
 
   // Obtener contexto y permisos incondicionalmente
   const context = useRootContext()
@@ -60,7 +70,7 @@ export default function ProductosInventarioPage() {
     permisos.find((permiso) => permiso === "VIEW_INVENTARIOPRODUCTO") || context.session?.isAdmin
 
   // Función para cargar productos
-  const fetchProductos = async () => {
+  const fetchProductos = async (page = 1) => {
     setLoading(true)
     try {
       let url = "/api/productos/stock"
@@ -85,6 +95,10 @@ export default function ProductosInventarioPage() {
         params.append("loadAll", "true")
       }
 
+      // Agregar parámetros de paginación
+      params.append("page", page.toString())
+      params.append("pageSize", paginacion.pageSize.toString())
+
       if (params.toString()) {
         url += `?${params.toString()}`
       }
@@ -97,7 +111,40 @@ export default function ProductosInventarioPage() {
 
       const data = await response.json()
       console.log("Productos recibidos:", data)
-      setProductos(data.productos || [])
+      
+      // Verificar si la respuesta tiene formato de paginación
+      if (data && data.productos && Array.isArray(data.productos)) {
+        setProductos(data.productos)
+        setPaginacion(data.pagination || {
+          page: page,
+          pageSize: data.productos.length,
+          totalItems: data.productos.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else if (Array.isArray(data)) {
+        // Formato antiguo sin paginación
+        setProductos(data)
+        setPaginacion({
+          page: 1,
+          pageSize: data.length,
+          totalItems: data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else {
+        setProductos([])
+        setPaginacion({
+          page: 1,
+          pageSize: 0,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      }
       setHasSearched(true)
       setError(null)
     } catch (err) {
@@ -146,7 +193,12 @@ export default function ProductosInventarioPage() {
 
   // Actualizar productos al aplicar filtros
   const handleSearch = () => {
-    fetchProductos()
+    fetchProductos(1)
+  }
+
+  // Manejar cambio de página
+  const handlePageChange = (event, newPage) => {
+    fetchProductos(newPage)
   }
 
   // Abrir diálogo para ajustar stock
@@ -372,6 +424,25 @@ export default function ProductosInventarioPage() {
               ))}
             </TableBody>
           </Table>
+          
+          {/* Controles de paginación */}
+          {hasSearched && paginacion && paginacion.totalPages > 1 && (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+              <Stack spacing={2}>
+                <Pagination
+                  count={paginacion.totalPages || 1}
+                  page={paginacion.page || 1}
+                  onChange={handlePageChange}
+                  color="primary"
+                  disabled={loading}
+                />
+                <Typography variant="body2" color="text.secondary" align="center">
+                  Mostrando {productos ? productos.length : 0} de {paginacion.totalItems || 0} productos (Página{" "}
+                  {paginacion.page || 1} de {paginacion.totalPages || 1})
+                </Typography>
+              </Stack>
+            </Box>
+          )}
         </TableContainer>
       )}
 

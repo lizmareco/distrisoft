@@ -21,14 +21,14 @@ import {
   Alert,
   Tooltip,
 } from "@mui/material"
-import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import EditIcon from "@mui/icons-material/Edit"
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 import PersonIcon from "@mui/icons-material/Person"
 import InventoryIcon from "@mui/icons-material/Inventory"
 import FactoryIcon from "@mui/icons-material/Factory"
+import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 
-export default function DetallePedido({ id }) {
+export default function DetallePedido({ id, isEmbedded = false }) {
   const router = useRouter()
   const [pedido, setPedido] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -89,11 +89,6 @@ export default function DetallePedido({ id }) {
     return `No se puede editar o generar orden de producción. El pedido está en estado: ${estadoActual}`
   }
 
-  // Volver a la lista de pedidos
-  const volverALista = () => {
-    router.push("/pedidos")
-  }
-
   // Ir a editar pedido
   const irAEditarPedido = (e) => {
     e.preventDefault()
@@ -106,6 +101,11 @@ export default function DetallePedido({ id }) {
 
     console.log("Redirigiendo a editar pedido")
     router.push(`/pedidos/editar/${id}`)
+  }
+
+  // Volver a la lista de pedidos
+  const volverALista = () => {
+    router.push("/pedidos")
   }
 
   // Función para formatear fecha
@@ -263,9 +263,6 @@ export default function DetallePedido({ id }) {
     return (
       <Box sx={{ mt: 2 }}>
         <Typography color="error">{error}</Typography>
-        <Button startIcon={<ArrowBackIcon />} onClick={volverALista} sx={{ mt: 2 }}>
-          Volver a la lista
-        </Button>
       </Box>
     )
   }
@@ -274,9 +271,6 @@ export default function DetallePedido({ id }) {
     return (
       <Box sx={{ mt: 2 }}>
         <Typography>No se encontró el pedido solicitado.</Typography>
-        <Button startIcon={<ArrowBackIcon />} onClick={volverALista} sx={{ mt: 2 }}>
-          Volver a la lista
-        </Button>
       </Box>
     )
   }
@@ -286,66 +280,77 @@ export default function DetallePedido({ id }) {
 
   return (
     <>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Button startIcon={<ArrowBackIcon />} onClick={volverALista}>
-          Volver a la lista
-        </Button>
-        <Box sx={{ display: "flex", gap: 2 }}>
-          {pedidoPendiente ? (
-            <>
-              <Button variant="outlined" startIcon={<EditIcon />} onClick={irAEditarPedido} type="button">
-                Editar Pedido
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={verificandoStock ? <CircularProgress size={20} color="inherit" /> : <FactoryIcon />}
-                onClick={verificarStockYGenerarOrden}
-                disabled={verificandoStock}
-                type="button"
-              >
-                {verificandoStock ? "Verificando..." : "Generar Orden de Producción"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Tooltip title={getMensajeBotonDeshabilitado()}>
-                <span>
-                  <Button
-                    variant="outlined"
-                    startIcon={<EditIcon />}
-                    disabled
-                    type="button"
-                    sx={{
-                      opacity: 0.5,
-                      cursor: "not-allowed",
-                    }}
-                  >
-                    Editar Pedido
-                  </Button>
-                </span>
-              </Tooltip>
-              <Tooltip title={getMensajeBotonDeshabilitado()}>
-                <span>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<FactoryIcon />}
-                    disabled
-                    type="button"
-                    sx={{
-                      opacity: 0.5,
-                      cursor: "not-allowed",
-                    }}
-                  >
-                    Generar Orden de Producción
-                  </Button>
-                </span>
-              </Tooltip>
-            </>
-          )}
+      {/* Solo mostrar botones de acción si no está embebido */}
+      {!isEmbedded && (
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+          {/* Botón Volver a la izquierda */}
+          <Button 
+            variant="outlined" 
+            startIcon={<ArrowBackIcon />} 
+            onClick={volverALista}
+            sx={{ mr: 2 }}
+          >
+            Volver a Pedidos
+          </Button>
+          
+          {/* Botones de acción a la derecha */}
+          <Box sx={{ display: "flex", gap: 2 }}>
+            {pedidoPendiente ? (
+              <>
+                <Button variant="outlined" startIcon={<EditIcon />} onClick={irAEditarPedido} type="button">
+                  Editar Pedido
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={verificandoStock ? <CircularProgress size={20} color="inherit" /> : <FactoryIcon />}
+                  onClick={verificarStockYGenerarOrden}
+                  disabled={verificandoStock}
+                  type="button"
+                >
+                  {verificandoStock ? "Verificando..." : "Generar Orden de Producción"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Tooltip title={getMensajeBotonDeshabilitado()}>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      startIcon={<EditIcon />}
+                      disabled
+                      type="button"
+                      sx={{
+                        opacity: 0.5,
+                        cursor: "not-allowed",
+                      }}
+                    >
+                      Editar Pedido
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={getMensajeBotonDeshabilitado()}>
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<FactoryIcon />}
+                      disabled
+                      type="button"
+                      sx={{
+                        opacity: 0.5,
+                        cursor: "not-allowed",
+                      }}
+                    >
+                      Generar Orden de Producción
+                    </Button>
+                  </span>
+                </Tooltip>
+              </>
+            )}
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Mostrar alerta informativa si el pedido no está pendiente */}
       {!pedidoPendiente && (
@@ -406,183 +411,297 @@ export default function DetallePedido({ id }) {
         </Alert>
       )}
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
-          <ShoppingCartIcon sx={{ mr: 1 }} /> Información del Pedido
-        </Typography>
-
-        <Grid container spacing={2}>
+      {isEmbedded ? (
+        // Vista simplificada para modo embebido
+        <Grid container spacing={3}>
+          {/* Información básica del pedido */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Número de Pedido</Typography>
-            <Typography variant="body1" gutterBottom>
-              #{pedido.idPedido}
-            </Typography>
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, color: "#1976d2" }}>
+                Información del Pedido
+              </Typography>
+              <Grid container spacing={1}>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Fecha Pedido:</Typography>
+                  <Typography variant="body2">{formatearFecha(pedido.fechaPedido)}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Fecha Entrega:</Typography>
+                  <Typography variant="body2">{formatearFecha(pedido.fechaEntrega)}</Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Estado:</Typography>
+                  <Chip
+                    label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
+                    color={getEstadoColor(pedido.estadoPedido)}
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary">Total:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Paper>
           </Grid>
 
+          {/* Información del cliente */}
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Fecha de Pedido</Typography>
-            <Typography variant="body1" gutterBottom>
-              {formatearFecha(pedido.fechaPedido)}
-            </Typography>
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, color: "#1976d2" }}>
+                Cliente
+              </Typography>
+              {pedido.cliente ? (
+                <>
+                  <Typography variant="body2" color="text.secondary">Nombre:</Typography>
+                  <Typography variant="body2" gutterBottom>
+                    {pedido.cliente.persona ? 
+                      `${pedido.cliente.persona.nombre} ${pedido.cliente.persona.apellido}` : 
+                      "No especificado"
+                    }
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Documento:</Typography>
+                  <Typography variant="body2">
+                    {pedido.cliente.persona?.nroDocumento || "No especificado"}
+                  </Typography>
+                </>
+              ) : (
+                <Typography color="error">Cliente no encontrado</Typography>
+              )}
+            </Paper>
           </Grid>
 
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Fecha de Entrega</Typography>
-            <Typography variant="body1" gutterBottom>
-              {formatearFecha(pedido.fechaEntrega)}
-            </Typography>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Estado</Typography>
-            <Chip
-              label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
-              color={getEstadoColor(pedido.estadoPedido)}
-              size="small"
-            />
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2">Total</Typography>
-            <Typography variant="body1" gutterBottom>
-              ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
-            </Typography>
-          </Grid>
-
+          {/* Productos del pedido */}
           <Grid item xs={12}>
-            <Typography variant="subtitle2">Observaciones</Typography>
-            <Typography variant="body1" gutterBottom>
-              {pedido.observacion || "Sin observaciones"}
-            </Typography>
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600, color: "#1976d2" }}>
+                Productos ({pedido.pedidoDetalle?.length || 0} productos)
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Producto</TableCell>
+                      <TableCell align="right">Cantidad</TableCell>
+                      <TableCell align="right">Precio Unit.</TableCell>
+                      <TableCell align="right">Subtotal</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {pedido.pedidoDetalle && pedido.pedidoDetalle.length > 0 ? (
+                      pedido.pedidoDetalle.map((detalle, index) => {
+                        const precioUnitario = detalle.precioUnitarioCalculado || 0
+                        const cantidadUnidades = detalle.cantidadUnidades || detalle.cantidad
+                        const subtotal = detalle.subtotalCalculado || detalle.subtotal || 0
+
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>
+                              {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
+                            </TableCell>
+                            <TableCell align="right">{cantidadUnidades} unid.</TableCell>
+                            <TableCell align="right">₲ {precioUnitario.toLocaleString("es-PY")}</TableCell>
+                            <TableCell align="right">₲ {subtotal.toLocaleString("es-PY")}</TableCell>
+                          </TableRow>
+                        )
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center">
+                          No hay productos en este pedido
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
           </Grid>
         </Grid>
-      </Paper>
-
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, mb: 3, height: "100%" }}>
+      ) : (
+        // Vista completa para modo normal
+        <>
+          <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
-              <PersonIcon sx={{ mr: 1 }} /> Cliente
+              <ShoppingCartIcon sx={{ mr: 1 }} /> Información del Pedido
             </Typography>
 
-            {pedido.cliente ? (
-              <>
-                {pedido.cliente.persona && (
-                  <>
-                    <Typography variant="subtitle2">Nombre</Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {pedido.cliente.persona.nombre} {pedido.cliente.persona.apellido}
-                    </Typography>
-
-                    <Typography variant="subtitle2">Documento</Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {pedido.cliente.persona.nroDocumento || "No especificado"}
-                    </Typography>
-                  </>
-                )}
-              </>
-            ) : (
-              <Typography color="error">Cliente no encontrado</Typography>
-            )}
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, mb: 3, height: "100%" }}>
-            <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
-              <PersonIcon sx={{ mr: 1 }} /> Usuario
-            </Typography>
-
-            {pedido.usuario ? (
-              <>
-                <Typography variant="subtitle2">Nombre de Usuario</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2">Número de Pedido</Typography>
                 <Typography variant="body1" gutterBottom>
-                  {pedido.usuario.nombreUsuario}
+                  #{pedido.idPedido}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2">Fecha de Pedido</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {formatearFecha(pedido.fechaPedido)}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2">Fecha de Entrega</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {formatearFecha(pedido.fechaEntrega)}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2">Estado</Typography>
+                <Chip
+                  label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
+                  color={getEstadoColor(pedido.estadoPedido)}
+                  size="small"
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2">Total</Typography>
+                <Typography variant="body1" gutterBottom>
+                  ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2">Observaciones</Typography>
+                <Typography variant="body1" gutterBottom>
+                  {pedido.observacion || "Sin observaciones"}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Paper>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, mb: 3, height: "100%" }}>
+                <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
+                  <PersonIcon sx={{ mr: 1 }} /> Cliente
                 </Typography>
 
-                {pedido.usuario.persona && (
+                {pedido.cliente ? (
                   <>
-                    <Typography variant="subtitle2">Nombre</Typography>
-                    <Typography variant="body1" gutterBottom>
-                      {pedido.usuario.persona.nombre} {pedido.usuario.persona.apellido}
-                    </Typography>
+                    {pedido.cliente.persona && (
+                      <>
+                        <Typography variant="subtitle2">Nombre</Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {pedido.cliente.persona.nombre} {pedido.cliente.persona.apellido}
+                        </Typography>
+
+                        <Typography variant="subtitle2">Documento</Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {pedido.cliente.persona.nroDocumento || "No especificado"}
+                        </Typography>
+                      </>
+                    )}
                   </>
+                ) : (
+                  <Typography color="error">Cliente no encontrado</Typography>
                 )}
-              </>
-            ) : (
-              <Typography color="error">Usuario no encontrado</Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
+              </Paper>
+            </Grid>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
-          <InventoryIcon sx={{ mr: 1 }} /> Productos
-        </Typography>
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, mb: 3, height: "100%" }}>
+                <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
+                  <PersonIcon sx={{ mr: 1 }} /> Usuario
+                </Typography>
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Producto</TableCell>
-                <TableCell align="right">Precio Unit.</TableCell>
-                <TableCell align="right">Cantidad (Unidades)</TableCell>
-                <TableCell align="right">Paquetes Necesarios</TableCell>
-                <TableCell align="right">Subtotal</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {pedido.pedidoDetalle && pedido.pedidoDetalle.length > 0 ? (
-                pedido.pedidoDetalle.map((detalle, index) => {
-                  const precioUnitario = detalle.precioUnitarioCalculado || 0
-                  const cantidadUnidades = detalle.cantidadUnidades || detalle.cantidad
-                  const cantidadPaquetes = detalle.cantidadPaquetes || 0
-                  const subtotal = detalle.subtotalCalculado || detalle.subtotal || 0
+                {pedido.usuario ? (
+                  <>
+                    <Typography variant="subtitle2">Nombre de Usuario</Typography>
+                    <Typography variant="body1" gutterBottom>
+                      {pedido.usuario.nombreUsuario}
+                    </Typography>
 
-                  return (
-                    <TableRow key={index}>
-                      <TableCell>
-                        {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
-                      </TableCell>
-                      <TableCell align="right">₲ {precioUnitario.toLocaleString("es-PY")}</TableCell>
-                      <TableCell align="right">{cantidadUnidades}</TableCell>
-                      <TableCell align="right">{cantidadPaquetes}</TableCell>
-                      <TableCell align="right">₲ {subtotal.toLocaleString("es-PY")}</TableCell>
-                    </TableRow>
-                  )
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    No hay productos en este pedido
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {/* Información adicional sobre el cálculo */}
-        <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            <strong>Nota:</strong> Los pedidos se ingresan por unidades individuales (sobres), pero se facturan por
-            paquetes completos. El sistema calcula automáticamente los paquetes necesarios y el costo correspondiente.
-          </Typography>
-        </Box>
-      </Paper>
-
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container justifyContent="flex-end">
-            <Grid item xs={12} md={4}>
-              <Typography variant="h6" align="right">
-                Total: ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
-              </Typography>
+                    {pedido.usuario.persona && (
+                      <>
+                        <Typography variant="subtitle2">Nombre</Typography>
+                        <Typography variant="body1" gutterBottom>
+                          {pedido.usuario.persona.nombre} {pedido.usuario.persona.apellido}
+                        </Typography>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <Typography color="error">Usuario no encontrado</Typography>
+                )}
+              </Paper>
             </Grid>
           </Grid>
-        </CardContent>
-      </Card>
+
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: "flex", alignItems: "center" }}>
+              <InventoryIcon sx={{ mr: 1 }} /> Productos
+            </Typography>
+
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Producto</TableCell>
+                    <TableCell align="right">Precio Unit.</TableCell>
+                    <TableCell align="right">Cantidad (Unidades)</TableCell>
+                    <TableCell align="right">Paquetes Necesarios</TableCell>
+                    <TableCell align="right">Subtotal</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pedido.pedidoDetalle && pedido.pedidoDetalle.length > 0 ? (
+                    pedido.pedidoDetalle.map((detalle, index) => {
+                      const precioUnitario = detalle.precioUnitarioCalculado || 0
+                      const cantidadUnidades = detalle.cantidadUnidades || detalle.cantidad
+                      const cantidadPaquetes = detalle.cantidadPaquetes || 0
+                      const subtotal = detalle.subtotalCalculado || detalle.subtotal || 0
+
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>
+                            {detalle.producto ? detalle.producto.nombreProducto : `Producto #${detalle.idProducto}`}
+                          </TableCell>
+                          <TableCell align="right">₲ {precioUnitario.toLocaleString("es-PY")}</TableCell>
+                          <TableCell align="right">{cantidadUnidades}</TableCell>
+                          <TableCell align="right">{cantidadPaquetes}</TableCell>
+                          <TableCell align="right">₲ {subtotal.toLocaleString("es-PY")}</TableCell>
+                        </TableRow>
+                      )
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center">
+                        No hay productos en este pedido
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Información adicional sobre el cálculo */}
+            <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Nota:</strong> Los pedidos se ingresan por unidades individuales (sobres), pero se facturan por
+                paquetes completos. El sistema calcula automáticamente los paquetes necesarios y el costo correspondiente.
+              </Typography>
+            </Box>
+          </Paper>
+
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Grid container justifyContent="flex-end">
+                <Grid item xs={12} md={4}>
+                  <Typography variant="h6" align="right">
+                    Total: ₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </>
   )
 }

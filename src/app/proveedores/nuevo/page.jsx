@@ -45,8 +45,8 @@ export default function NuevoProveedorPage() {
 
   // Estado para los datos de búsqueda
   const [busquedaEmpresa, setBusquedaEmpresa] = useState({
-    tipoDocumento: "",
-    numeroDocumento: "",
+    ruc: "",
+    razonSocial: "",
   })
 
   // Estado para los resultados de búsqueda
@@ -58,7 +58,6 @@ export default function NuevoProveedorPage() {
   // Estado para indicar si ya se realizó una búsqueda
   const [busquedaEmpresaRealizada, setBusquedaEmpresaRealizada] = useState(false)
 
-  const [tiposDocumento, setTiposDocumento] = useState([])
   const [selectedEmpresa, setSelectedEmpresa] = useState(null)
 
   const [loading, setLoading] = useState(true)
@@ -69,21 +68,11 @@ export default function NuevoProveedorPage() {
     const fetchData = async () => {
       try {
         console.log("Cargando datos para nuevo proveedor...")
-        // Cargar tipos de documento
-        const tiposDocRes = await fetch("/api/tipos-documento")
-
-        if (!tiposDocRes.ok) {
-          throw new Error("Error al cargar tipos de documento")
-        }
-
-        const tiposDocData = await tiposDocRes.json()
-        console.log("Tipos de documento cargados:", tiposDocData.length)
-        setTiposDocumento(tiposDocData)
+        // Ya no necesitamos cargar tipos de documento
+        setLoading(false)
       } catch (error) {
         console.error("Error al cargar datos:", error)
         setError(error.message)
-      } finally {
-        setLoading(false)
       }
     }
 
@@ -109,9 +98,9 @@ export default function NuevoProveedorPage() {
   const handleBuscarEmpresa = async (e) => {
     e.preventDefault()
 
-    // Validar que se hayan ingresado ambos campos
-    if (!busquedaEmpresa.tipoDocumento || !busquedaEmpresa.numeroDocumento) {
-      setError("Debe seleccionar un tipo de documento e ingresar un número de documento")
+    // Validar que se haya ingresado al menos un campo
+    if (!busquedaEmpresa.ruc && !busquedaEmpresa.razonSocial) {
+      setError("Debe ingresar un RUC o razón social")
       return
     }
 
@@ -122,9 +111,12 @@ export default function NuevoProveedorPage() {
     setFormData((prev) => ({ ...prev, idEmpresa: "" }))
 
     try {
-      const response = await fetch(
-        `/api/empresas/disponibles?tipoDocumento=${busquedaEmpresa.tipoDocumento}&numeroDocumento=${busquedaEmpresa.numeroDocumento}`,
-      )
+      // Construir la URL con los parámetros proporcionados
+      const params = new URLSearchParams()
+      if (busquedaEmpresa.ruc) params.append("ruc", busquedaEmpresa.ruc)
+      if (busquedaEmpresa.razonSocial) params.append("razonSocial", busquedaEmpresa.razonSocial)
+
+      const response = await fetch(`/api/empresas/disponibles?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error("Error al buscar empresas")
@@ -226,7 +218,7 @@ export default function NuevoProveedorPage() {
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <Typography variant="h6" sx={{ mb: 2, display: "flex", alignItems: "center" }}>
-                <BusinessIcon sx={{ mr: 1 }} /> Buscar Empresa
+                <BusinessIcon sx={{ mr: 1 }} /> Buscar Empresa por RUC
               </Typography>
               <Divider sx={{ mb: 2 }} />
             </Grid>
@@ -236,34 +228,14 @@ export default function NuevoProveedorPage() {
                 <form onSubmit={handleBuscarEmpresa}>
                   <Grid container spacing={2} alignItems="center">
                     <Grid item xs={12} md={4}>
-                      <FormControl fullWidth disabled={loading}>
-                        <InputLabel id="tipo-documento-empresa-label">Tipo de Documento</InputLabel>
-                        <Select
-                          labelId="tipo-documento-empresa-label"
-                          id="tipoDocumento"
-                          name="tipoDocumento"
-                          value={busquedaEmpresa.tipoDocumento}
-                          onChange={handleBusquedaEmpresaChange}
-                          label="Tipo de Documento"
-                          required
-                        >
-                          {tiposDocumento.map((tipo) => (
-                            <MenuItem key={tipo.idTipoDocumento} value={tipo.idTipoDocumento}>
-                              {tipo.descTipoDocumento}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} md={5}>
                       <TextField
                         fullWidth
-                        label="Número de Documento"
-                        id="numeroDocumento"
-                        name="numeroDocumento"
-                        value={busquedaEmpresa.numeroDocumento}
+                        label="RUC"
+                        id="ruc"
+                        name="ruc"
+                        value={busquedaEmpresa.ruc}
                         onChange={handleBusquedaEmpresaChange}
-                        required
+                        placeholder="Ingrese el RUC de la empresa"
                         InputProps={{
                           endAdornment: (
                             <InputAdornment position="end">
@@ -273,7 +245,25 @@ export default function NuevoProveedorPage() {
                         }}
                       />
                     </Grid>
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        fullWidth
+                        label="Razón Social"
+                        id="razonSocial"
+                        name="razonSocial"
+                        value={busquedaEmpresa.razonSocial}
+                        onChange={handleBusquedaEmpresaChange}
+                        placeholder="Ingrese la razón social"
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <SearchIcon />
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
                       <Button
                         type="submit"
                         variant="contained"

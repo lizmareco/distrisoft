@@ -1,3 +1,4 @@
+import { Container, Box } from '@mui/material';
 import DetallePedido from "../../../components/pedidos/DetallePedido"
 
 export const metadata = {
@@ -11,9 +12,10 @@ export default async function DetallePedidoPage({ params }) {
   const id = params ? params.id : ""
 
   return (
-    <div>
-      <h1>Detalle de Pedido</h1>
-      <DetallePedido id={id} />
-    </div>
+    <Container maxWidth="xl">
+      <Box sx={{ py: 4 }}>
+        <DetallePedido id={id} />
+      </Box>
+    </Container>
   )
 }

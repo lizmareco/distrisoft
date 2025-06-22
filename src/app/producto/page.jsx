@@ -32,6 +32,8 @@ import {
   MenuItem,
   Grid,
   InputAdornment,
+  Pagination,
+  Stack,
 } from "@mui/material"
 import { Add, Edit, Delete, ArrowBack } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
@@ -58,6 +60,14 @@ export default function ListaProducto() {
   const [tiposProducto, setTiposProducto] = useState([])
   const [estadosProducto, setEstadosProducto] = useState([])
   const [hasSearched, setHasSearched] = useState(false)
+  const [paginacion, setPaginacion] = useState({
+    page: 1,
+    pageSize: 10,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false,
+  })
   const context = useRootContext()
   const permisos = context.session?.permisos || []
   const hasPermission =
@@ -74,10 +84,46 @@ export default function ListaProducto() {
       if (params.tipo) searchParams.append("tipo", params.tipo)
       if (params.estado) searchParams.append("estado", params.estado)
       if (params.all) searchParams.append("all", params.all)
+      if (params.page) searchParams.append("page", params.page)
+      if (params.pageSize) searchParams.append("pageSize", params.pageSize)
+      
       const response = await fetch(`/api/productos?${searchParams.toString()}`)
       if (!response.ok) throw new Error("Error al cargar productos")
       const data = await response.json()
-      setProductos(data)
+      
+      // Verificar si la respuesta tiene formato de paginación
+      if (data && data.productos && Array.isArray(data.productos)) {
+        setProductos(data.productos)
+        setPaginacion(data.pagination || {
+          page: 1,
+          pageSize: data.productos.length,
+          totalItems: data.productos.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else if (Array.isArray(data)) {
+        // Formato antiguo sin paginación
+        setProductos(data)
+        setPaginacion({
+          page: 1,
+          pageSize: data.length,
+          totalItems: data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else {
+        setProductos([])
+        setPaginacion({
+          page: 1,
+          pageSize: 0,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      }
     } catch (error) {
       showSnackbar(`Error al cargar los productos: ${error.message}`, "error")
     } finally {
@@ -164,6 +210,8 @@ export default function ListaProducto() {
       descripcion: filtroDescripcion,
       tipo: filtroTipo,
       estado: filtroEstado,
+      page: 1,
+      pageSize: paginacion.pageSize,
     })
   }
 
@@ -173,7 +221,11 @@ export default function ListaProducto() {
     setFiltroDescripcion("")
     setFiltroTipo("")
     setFiltroEstado("")
-    fetchProductos({ all: "true" })
+    fetchProductos({ 
+      all: "true", 
+      page: 1, 
+      pageSize: paginacion.pageSize 
+    })
   }
 
   const handleLimpiarFiltros = () => {
@@ -184,6 +236,27 @@ export default function ListaProducto() {
     setFiltroEstado("")
     setProductos([])
     setHasSearched(false)
+    setPaginacion({
+      page: 1,
+      pageSize: 10,
+      totalItems: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPrevPage: false,
+    })
+  }
+
+  // Manejar cambio de página
+  const handlePageChange = (event, newPage) => {
+    fetchProductos({
+      id: filtroId,
+      nombre: filtroNombre,
+      descripcion: filtroDescripcion,
+      tipo: filtroTipo,
+      estado: filtroEstado,
+      page: newPage,
+      pageSize: paginacion.pageSize,
+    })
   }
 
   if (!hasPermission) {
@@ -351,6 +424,25 @@ export default function ListaProducto() {
               )}
             </TableBody>
           </Table>
+          
+          {/* Controles de paginación */}
+          {hasSearched && paginacion && paginacion.totalPages > 1 && (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+              <Stack spacing={2}>
+                <Pagination
+                  count={paginacion.totalPages || 1}
+                  page={paginacion.page || 1}
+                  onChange={handlePageChange}
+                  color="primary"
+                  disabled={loading}
+                />
+                <Typography variant="body2" color="text.secondary" align="center">
+                  Mostrando {productos ? productos.length : 0} de {paginacion.totalItems || 0} productos (Página{" "}
+                  {paginacion.page || 1} de {paginacion.totalPages || 1})
+                </Typography>
+              </Stack>
+            </Box>
+          )}
         </TableContainer>
       )}
 

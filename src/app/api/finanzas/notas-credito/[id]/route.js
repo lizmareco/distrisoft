@@ -68,4 +68,27 @@ export async function GET(request, { params }) {
     console.error("Error al obtener nota de crédito:", error)
     return NextResponse.json({ success: false, error: "Error interno del servidor" }, { status: 500 })
   }
+}
+
+// Anular una nota de crédito (soft delete: marca como anulada)
+export async function PATCH(request, { params }) {
+  const { id } = await params; // <-- importante, await aquí
+
+  if (!id) {
+    console.warn('PATCH llamado sin ID:', params);
+    return NextResponse.json({ error: 'ID no proporcionado' }, { status: 400 });
+  }
+
+  try {
+    const nota = await prisma.notaCredito.update({
+      where: { idNota: Number(id) },
+      data: {
+        deletedAt: new Date()
+      }
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error al anular nota:", error);
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
 } 

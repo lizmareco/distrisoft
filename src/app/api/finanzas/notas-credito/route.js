@@ -34,6 +34,103 @@ async function getUserIdFromRequest(request) {
   return userData?.idUsuario || 1
 }
 
+// Buscar todas las notas de crédito (con filtros básicos)
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const fechaDesde = searchParams.get('fechaDesde')
+  const fechaHasta = searchParams.get('fechaHasta')
+  const cliente = searchParams.get('cliente')
+  const facturaOrigen = searchParams.get('facturaOrigen')
+  const page = parseInt(searchParams.get('page') || '1', 10)
+  const limit = parseInt(searchParams.get('limit') || '10', 10)
+  const skip = (page - 1) * limit
+
+  const where = {
+    deletedAt: null
+  }
+
+  // Filtro por rango de fechas
+  if (fechaDesde || fechaHasta) {
+    where.fechaEmision = {}
+    if (fechaDesde) where.fechaEmision.gte = new Date(fechaDesde)
+    if (fechaHasta) where.fechaEmision.lte = new Date(fechaHasta)
+  }
+
+  // Filtro por cliente
+  if (cliente) {
+    where.cliente = {
+      persona: {
+        OR: [
+          { nombre: { contains: cliente, mode: 'insensitive' } },
+          { apellido: { contains: cliente, mode: 'insensitive' } }
+        ]
+      }
+    }
+  }
+
+  // Filtro por factura origen
+  if (facturaOrigen && facturaOrigen.trim() !== '') {
+    const numeroFactura = parseInt(facturaOrigen.trim(), 10);
+    if (!isNaN(numeroFactura)) {
+      where.idFacturaOrigen = numeroFactura;
+    }
+  }
+
+  try {
+    const [total, notas] = await Promise.all([
+      prisma.notaCredito.count({ where }),
+      prisma.notaCredito.findMany({
+        where,
+        orderBy: { fechaEmision: 'desc' },
+        skip,
+        take: limit,
+        include: { 
+          cliente: {
+            include: {
+              persona: true
+            }
+          },
+          estadoNotaCredito: true,
+          facturaOrigen: true
+        }
+      })
+    ])
+
+    // Formatear los datos para la respuesta
+    const notasFormateadas = notas.map(nota => ({
+      idNota: nota.idNota,
+      nroNota: nota.nroNota,
+      fechaEmision: nota.fechaEmision,
+      idFacturaOrigen: nota.idFacturaOrigen,
+      motivo: nota.motivo,
+      montoTotal: nota.montoTotal,
+      deletedAt: nota.deletedAt,
+      cliente: {
+        nombre: `${nota.cliente.persona.nombre} ${nota.cliente.persona.apellido}`.trim(),
+        ruc: nota.cliente.persona.nroDocumento
+      },
+      estado: nota.estadoNotaCredito?.descEstadoNota || 'N/A'
+    }))
+
+    return NextResponse.json({
+      success: true,
+      data: notasFormateadas,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    })
+  } catch (error) {
+    console.error('Error al obtener notas de crédito:', error)
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 })
+  }
+}
+
 export async function POST(request) {
   try {
     const auditoriaService = new AuditoriaService()

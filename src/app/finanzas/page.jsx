@@ -102,34 +102,44 @@ export default function FinanzasPage() {
         <Typography variant="h4" component="h1">
           Gestión Financiera
         </Typography>
-        {tabValue === 0 && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => router.push("/finanzas/cuentas-cobrar")}
-          >
-            IR A CUENTAS A COBRAR
-          </Button>
-        )}
-        {tabValue === 0 && (
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={() => router.push("/finanzas/notas-debito/buscar")}
-            sx={{ ml: 2 }}
-          >
-            IR A NOTAS DE DÉBITO
-          </Button>
-        )}
-        {tabValue === 1 && (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => router.push("/finanzas/cuentas-pagar")}
-          >
-            IR A CUENTAS POR PAGAR
-          </Button>
-        )}
+        <Box sx={{ display: "flex", gap: 2 }}>
+          {tabValue === 0 && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => router.push("/finanzas/cuentas-cobrar")}
+            >
+              IR A CUENTAS A COBRAR
+            </Button>
+          )}
+          {tabValue === 0 && (
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={() => router.push("/finanzas/notas-debito/buscar")}
+            >
+              IR A NOTAS DE DÉBITO
+            </Button>
+          )}
+          {tabValue === 0 && (
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => router.push("/finanzas/notas-credito/buscar")}
+            >
+              IR A NOTAS DE CRÉDITO
+            </Button>
+          )}
+          {tabValue === 1 && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => router.push("/finanzas/cuentas-pagar")}
+            >
+              IR A CUENTAS POR PAGAR
+            </Button>
+          )}
+        </Box>
       </Box>
       {/* Navegación por pestañas */}
       <Paper sx={{ width: "100%", mb: 3 }}>
@@ -397,8 +407,8 @@ function FacturacionClientes() {
             </Box>
 
             {/* Cabecera de la tabla */}
-            <Box sx={{ mb: 1, px: 2, py: 1, backgroundColor: "grey.100", borderRadius: 1 }}>
-              <Grid container alignItems="center" spacing={2}>
+            <Box sx={{ mb: 2, px: 3, py: 2, backgroundColor: "grey.100", borderRadius: 1 }}>
+              <Grid container alignItems="center" spacing={3}>
                 <Grid item xs={1}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Estado
@@ -414,7 +424,7 @@ function FacturacionClientes() {
                     Fecha
                   </Typography>
                 </Grid>
-                <Grid item xs={3}>
+                <Grid item xs={2.5}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Cliente
                   </Typography>
@@ -429,7 +439,7 @@ function FacturacionClientes() {
                     Estado
                   </Typography>
                 </Grid>
-                <Grid item xs={1}>
+                <Grid item xs={1.5}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Acciones
                   </Typography>
@@ -456,9 +466,9 @@ function FacturacionClientes() {
                   {/* Lista simple de facturas */}
                   <Box>
                     {facturas.map((factura) => (
-                      <Card key={factura.nroFactura} sx={{ mb: 1, position: "relative" }}>
-                        <CardContent sx={{ pb: 1 }}>
-                          <Grid container alignItems="center" spacing={2}>
+                      <Card key={factura.nroFactura} sx={{ mb: 2, position: "relative" }}>
+                        <CardContent sx={{ pb: 2, pt: 2 }}>
+                          <Grid container alignItems="center" spacing={3}>
                             <Grid item xs={1}>
                               {getEstadoCuentaIcon(factura)}
                             </Grid>
@@ -482,7 +492,7 @@ function FacturacionClientes() {
                                 </Typography>
                               )}
                             </Grid>
-                            <Grid item xs={3}>
+                            <Grid item xs={2.5}>
                               <Typography variant="body2">{factura?.cliente || 'N/A'}</Typography>
                             </Grid>
                             <Grid item xs={2}>
@@ -498,8 +508,8 @@ function FacturacionClientes() {
                             <Grid item xs={1}>
                               <Chip label={factura?.estado || 'N/A'} color={getEstadoColor(factura?.estado)} size="small" />
                             </Grid>
-                            <Grid item xs={1}>
-                              <Box sx={{ display: "flex", gap: 0.5 }}>
+                            <Grid item xs={1.5}>
+                              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-start" }}>
                                 {/* Vista previa de factura */}
                                 <IconButton
                                   size="small"
@@ -925,8 +935,8 @@ function FacturasProveedores() {
             </Box>
 
             {/* Cabecera de la tabla */}
-            <Box sx={{ mb: 1, px: 2, py: 1, backgroundColor: "grey.100", borderRadius: 1 }}>
-              <Grid container alignItems="center" spacing={2}>
+            <Box sx={{ mb: 2, px: 3, py: 2, backgroundColor: "grey.100", borderRadius: 1 }}>
+              <Grid container alignItems="center" spacing={3}>
                 <Grid item xs={1}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Estado
@@ -942,7 +952,7 @@ function FacturasProveedores() {
                     Fecha
                   </Typography>
                 </Grid>
-                <Grid item xs={3}>
+                <Grid item xs={2.5}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Proveedor
                   </Typography>
@@ -957,7 +967,7 @@ function FacturasProveedores() {
                     Estado
                   </Typography>
                 </Grid>
-                <Grid item xs={1}>
+                <Grid item xs={1.5}>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Acciones
                   </Typography>
@@ -984,9 +994,9 @@ function FacturasProveedores() {
                   {/* Lista de facturas */}
                   <Box>
                     {facturasPaginadas.map((factura) => (
-                      <Card key={factura.idFactura} sx={{ mb: 1, position: "relative" }}>
-                        <CardContent sx={{ pb: 1 }}>
-                          <Grid container alignItems="center" spacing={2}>
+                      <Card key={factura.idFactura} sx={{ mb: 2, position: "relative" }}>
+                        <CardContent sx={{ pb: 2, pt: 2 }}>
+                          <Grid container alignItems="center" spacing={3}>
                             <Grid item xs={1}>
                               {getEstadoCuentaIcon(factura)}
                             </Grid>
@@ -1010,7 +1020,7 @@ function FacturasProveedores() {
                                 </Typography>
                               )}
                             </Grid>
-                            <Grid item xs={3}>
+                            <Grid item xs={2.5}>
                               <Typography variant="body2">{factura.proveedor}</Typography>
                               {factura.ordenCompra && (
                                 <Typography variant="caption" color="textSecondary">
@@ -1031,17 +1041,19 @@ function FacturasProveedores() {
                             <Grid item xs={1}>
                               <Chip label={factura.estado} color={getEstadoColor(factura.estado)} size="small" />
                             </Grid>
-                            <Grid item xs={1}>
+                            <Grid item xs={1.5}>
                               {/* Botón de acción */}
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                title="Ver factura"
-                                onClick={() => verFactura(factura)}
-                                disabled={cargandoFactura}
-                              >
-                                <VisibilityIcon fontSize="small" />
-                              </IconButton>
+                              <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-start" }}>
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  title="Ver factura"
+                                  onClick={() => verFactura(factura)}
+                                  disabled={cargandoFactura}
+                                >
+                                  <VisibilityIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
                             </Grid>
                           </Grid>
                           {/* Mostrar notas de crédito asociadas */}

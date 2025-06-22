@@ -122,7 +122,36 @@ export default function CuentasPorPagarPage() {
       const respuesta = await fetch(`/api/finanzas/cuentas-pagar?${params.toString()}`)
       if (respuesta.ok) {
         const datos = await respuesta.json()
-        setCuentas(datos.data || [])
+        
+        // Ordenar por fecha de emisión descendente (más nuevas primero)
+        const cuentasOrdenadas = (datos.data || []).sort((a, b) => {
+          try {
+            // Manejar diferentes formatos de fecha
+            const fechaA = a.fechaEmision ? new Date(a.fechaEmision) : new Date(0)
+            const fechaB = b.fechaEmision ? new Date(b.fechaEmision) : new Date(0)
+            
+            // Verificar que las fechas sean válidas
+            if (isNaN(fechaA.getTime()) || isNaN(fechaB.getTime())) {
+              console.warn('Fecha inválida encontrada:', { a: a.fechaEmision, b: b.fechaEmision })
+              return 0
+            }
+            
+            return fechaB.getTime() - fechaA.getTime() // Orden descendente
+          } catch (error) {
+            console.error('Error al ordenar fechas:', error)
+            return 0
+          }
+        })
+        
+        console.log('Cuentas ordenadas por fecha (más nuevas primero):', 
+          cuentasOrdenadas.slice(0, 3).map(c => ({ 
+            nroFactura: c.nroFactura, 
+            fechaEmision: c.fechaEmision,
+            fechaFormateada: new Date(c.fechaEmision).toLocaleDateString()
+          }))
+        )
+        
+        setCuentas(cuentasOrdenadas)
         setResumen(datos.resumen || {})
 
         if (datos.meta) {
@@ -533,22 +562,64 @@ export default function CuentasPorPagarPage() {
         </Card>
       ) : (
         <Box>
+          {/* Encabezados de columnas */}
+          <Card sx={{ mb: 2 }}>
+            <CardContent sx={{ py: 2 }}>
+              <Grid container alignItems="center" spacing={2}>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Fecha Emisión
+                  </Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Factura
+                  </Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Proveedor
+                  </Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Vencimiento
+                  </Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Monto
+                  </Typography>
+                </Grid>
+                <Grid item xs={1}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Estado
+                  </Typography>
+                </Grid>
+                <Grid item xs={1}>
+                  <Typography variant="subtitle2" fontWeight="bold" color="text.secondary">
+                    Acciones
+                  </Typography>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
           {cuentas.map((cuenta) => (
             <Accordion key={cuenta.idCuentaPagar} sx={{ mb: 1 }}>
               <AccordionSummary expandIcon={<ExpandMore />}>
                 <Grid container alignItems="center" spacing={2}>
-                  <Grid item xs={1}>
-                    {getEstadoIcon(cuenta.estadoCuenta, cuenta.diasVencido)}
-                  </Grid>
                   <Grid item xs={2}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      Factura #{cuenta.nroFactura}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="body2" fontWeight="bold">
                       {formatearFecha(cuenta.fechaEmision)}
                     </Typography>
                   </Grid>
-                  <Grid item xs={3}>
+                  <Grid item xs={2}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      #{cuenta.nroFactura}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={2}>
                     <Typography variant="body2">{cuenta.proveedor}</Typography>
                   </Grid>
                   <Grid item xs={2}>

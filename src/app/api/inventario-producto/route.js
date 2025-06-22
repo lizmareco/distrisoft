@@ -43,12 +43,15 @@ export async function GET(request) {
     const productoId = searchParams.get("productoId")
     const ordenProduccionId = searchParams.get("ordenProduccionId")
     const tipoMovimiento = searchParams.get("tipoMovimiento")
-    const fechaInicio = searchParams.get("fechaInicio")
-    const fechaFin = searchParams.get("fechaFin")
+    const fechaDesde = searchParams.get("fechaDesde")
+    const fechaHasta = searchParams.get("fechaHasta")
+    const page = Number.parseInt(searchParams.get("page") || "1")
+    const limit = Number.parseInt(searchParams.get("limit") || "10")
+    const skip = (page - 1) * limit
     const loadAll = searchParams.get("loadAll") === "true"
 
     // Si no hay filtros y no se solicita cargar todo, devolver array vacío
-    if (!productoId && !ordenProduccionId && !tipoMovimiento && !fechaInicio && !fechaFin && !loadAll) {
+    if (!productoId && !ordenProduccionId && !tipoMovimiento && !fechaDesde && !fechaHasta && !loadAll) {
       console.log("API: No se proporcionaron filtros y no se solicitó cargar todo")
       return NextResponse.json({ movimientos: [] })
     }
@@ -70,15 +73,18 @@ export async function GET(request) {
       where.tipoMovimiento = tipoMovimiento.toUpperCase()
     }
 
-    if (fechaInicio || fechaFin) {
+    if (fechaDesde || fechaHasta) {
       where.fechaMovimiento = {}
-      if (fechaInicio) {
-        where.fechaMovimiento.gte = new Date(fechaInicio)
+      if (fechaDesde) {
+        where.fechaMovimiento.gte = new Date(fechaDesde)
       }
-      if (fechaFin) {
-        where.fechaMovimiento.lte = new Date(fechaFin)
+      if (fechaHasta) {
+        where.fechaMovimiento.lte = new Date(fechaHasta)
       }
     }
+
+    // Contar total de registros para paginación
+    const totalRegistros = await prisma.inventarioProducto.count({ where })
 
     // Buscar registros de inventario de productos (SIN incluir usuario)
     const movimientos = await prisma.inventarioProducto.findMany({
@@ -112,12 +118,21 @@ export async function GET(request) {
       orderBy: {
         fechaMovimiento: "desc",
       },
+      skip,
+      take: limit,
     })
 
     console.log(`API: Se encontraron ${movimientos.length} registros de inventario de productos`)
 
-
-    return NextResponse.json({ movimientos }, { status: HTTP_STATUS_CODES.ok })
+    return NextResponse.json({ 
+      movimientos,
+      meta: {
+        total: totalRegistros,
+        page,
+        limit,
+        totalPages: Math.ceil(totalRegistros / limit),
+      }
+    }, { status: HTTP_STATUS_CODES.ok })
   } catch (error) {
     console.error("API: Error al consultar inventario de productos:", error)
     return NextResponse.json(

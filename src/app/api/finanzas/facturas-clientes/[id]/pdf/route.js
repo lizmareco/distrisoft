@@ -56,14 +56,32 @@ export async function GET(request, { params }) {
         ruc: facturaDB.cliente.persona?.nroDocumento || "N/A",
         direccion: facturaDB.cliente.persona?.direccion || "N/A",
       },
-      productos: (facturaDB.detalleFactura || []).map((detalle) => ({
-        cantidad: detalle.cantidad || 1,
-        descripcion: detalle.producto?.nombreProducto || "Producto",
-        precioUnitario: Number.parseFloat(detalle.precioUnitario || 0),
-        subtotal: Number.parseFloat(detalle.subtotal || 0),
-        iva: Number.parseFloat(detalle.montoImpuesto || 0),
-        total: Number.parseFloat(detalle.totalLinea || 0),
-      })),
+      productos: (facturaDB.detalleFactura || []).map((detalle) => {
+        // Formar descripción completa con nombre, descripción y peso
+        const nombreProducto = detalle.producto?.nombreProducto || "Producto"
+        const descripcionProducto = detalle.producto?.descripcion || ""
+        const pesoUnidad = detalle.producto?.pesoUnidad || 0
+        
+        let descripcionCompleta = nombreProducto
+        if (descripcionProducto) {
+          descripcionCompleta += ` (${descripcionProducto}`
+          if (pesoUnidad > 0) {
+            descripcionCompleta += ` - ${pesoUnidad}g`
+          }
+          descripcionCompleta += ")"
+        } else if (pesoUnidad > 0) {
+          descripcionCompleta += ` (${pesoUnidad}g)`
+        }
+
+        return {
+          cantidad: detalle.cantidad || 1,
+          descripcion: descripcionCompleta,
+          precioUnitario: Number.parseFloat(detalle.precioUnitario || 0),
+          subtotal: Number.parseFloat(detalle.subtotal || 0),
+          iva: Number.parseFloat(detalle.montoImpuesto || 0),
+          total: Number.parseFloat(detalle.totalLinea || 0),
+        }
+      }),
       observaciones: facturaDB.observacion || "",
     }
 

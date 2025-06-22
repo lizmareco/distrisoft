@@ -624,7 +624,7 @@ export default function NuevaCotizacionPage() {
                 </Tooltip>
               </Typography>
               <Typography variant="body2">
-                <strong>Peso por unidad:</strong> {productoSeleccionado.pesoUnidad} kg
+                <strong>Peso por unidad:</strong> {productoSeleccionado.pesoUnidad} g
               </Typography>
               <Typography variant="body2">
                 <strong>Precio:</strong>{" "}
@@ -673,7 +673,7 @@ export default function NuevaCotizacionPage() {
                           <span>{item.nombreProducto}</span>
                         </Tooltip>
                       </TableCell>
-                      <TableCell>{item.pesoUnidad} kg</TableCell>
+                      <TableCell>{item.pesoUnidad} g</TableCell>
                       <TableCell align="right">
                         {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
                           item.precioUnitario,

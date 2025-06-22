@@ -56,6 +56,9 @@ export default function VerCotizacionProveedorPage({ params }) {
   const [openSnackbar, setOpenSnackbar] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState("")
   const [snackbarSeverity, setSnackbarSeverity] = useState("success")
+  
+  // Estado para información de orden de compra creada automáticamente
+  const [ordenCompraCreada, setOrdenCompraCreada] = useState(null)
 
   useEffect(() => {
     if (!hasPermission) return
@@ -160,15 +163,26 @@ export default function VerCotizacionProveedorPage({ params }) {
       setCotizacion(data)
       handleCloseDialog()
 
-      // Mostrar mensaje de éxito
-      setSnackbarMessage(`Cotización ${dialogAction === "aprobar" ? "aprobada" : "rechazada"} exitosamente`)
+      // Guardar información de la orden de compra creada automáticamente
+      if (dialogAction === "aprobar" && data.ordenCompraCreada) {
+        setOrdenCompraCreada(data.ordenCompraCreada)
+      }
+
+      // Mostrar mensaje de éxito con información adicional si se creó una orden de compra
+      let mensajeExito = `Cotización ${dialogAction === "aprobar" ? "aprobada" : "rechazada"} exitosamente`
+      
+      if (dialogAction === "aprobar" && data.ordenCompraCreada) {
+        mensajeExito += `. Se creó automáticamente la orden de compra #${data.ordenCompraCreada.idOrdenCompra}`
+      }
+      
+      setSnackbarMessage(mensajeExito)
       setSnackbarSeverity("success")
       setOpenSnackbar(true)
 
-      // NUEVO: Redireccionar después de un breve retraso
+      // Redireccionar después de un breve retraso
       setTimeout(() => {
         router.push("/cotizaciones-proveedor")
-      }, 1500)
+      }, 2000) // Aumentado a 2 segundos para dar tiempo a leer el mensaje
     } catch (error) {
       console.error("Error:", error)
       setError(error.message)
@@ -376,6 +390,29 @@ export default function VerCotizacionProveedorPage({ params }) {
             </Box>
           </Box>
 
+          {/* Alerta informativa sobre orden de compra creada automáticamente */}
+          {ordenCompraCreada && (
+            <Alert 
+              severity="info" 
+              sx={{ mb: 3 }}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  component={Link}
+                  href={`/ordenes-compra/${ordenCompraCreada.idOrdenCompra}`}
+                >
+                  Ver Orden
+                </Button>
+              }
+            >
+              <Typography variant="body2">
+                <strong>¡Orden de compra creada automáticamente!</strong><br />
+                Se ha generado la orden de compra #{ordenCompraCreada.idOrdenCompra} para esta cotización aprobada.
+              </Typography>
+            </Alert>
+          )}
+
           <Paper sx={{ p: 3, mb: 4 }}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
@@ -495,7 +532,7 @@ export default function VerCotizacionProveedorPage({ params }) {
         <DialogContent>
           <DialogContentText>
             {dialogAction === "aprobar"
-              ? "¿Está seguro de que desea aprobar esta cotización? Esta acción cambiará el estado de la cotización a 'APROBADA'."
+              ? "¿Está seguro de que desea aprobar esta cotización? Esta acción cambiará el estado de la cotización a 'APROBADA' y se creará automáticamente una orden de compra."
               : "¿Está seguro de que desea rechazar esta cotización? Esta acción cambiará el estado de la cotización a 'RECHAZADA'."}
           </DialogContentText>
         </DialogContent>

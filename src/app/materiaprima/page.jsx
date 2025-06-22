@@ -26,7 +26,8 @@ import {
   Select,
   MenuItem,
   Grid,
-  Alert
+  Alert,
+  TablePagination
 } from "@mui/material"
 import { Add, Edit, Delete, ArrowBack } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
@@ -40,12 +41,18 @@ export default function ListaMateriaPrima() {
   const [openDelete, setOpenDelete] = useState(false)
   const [selectedMateriaPrima, setSelectedMateriaPrima] = useState(null)
   const [loading, setLoading] = useState(false)
+  
   // Filtros
   const [filtroId, setFiltroId] = useState("")
   const [filtroDescripcion, setFiltroDescripcion] = useState("")
   const [filtroEstado, setFiltroEstado] = useState("")
   const [estados, setEstados] = useState([])
   const [hasSearched, setHasSearched] = useState(false)
+  
+  // Paginación
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [totalRegistros, setTotalRegistros] = useState(0)
 
   // Obtener contexto y permisos
   const context = useRootContext()
@@ -79,6 +86,8 @@ export default function ListaMateriaPrima() {
       if (params.id) searchParams.append("id", params.id)
       if (params.descripcion) searchParams.append("query", params.descripcion)
       if (params.estado) searchParams.append("estado", params.estado)
+      searchParams.append("page", (page + 1).toString())
+      searchParams.append("limit", rowsPerPage.toString())
       url += searchParams.toString()
       const response = await fetch(url, {
         credentials: "include",
@@ -88,7 +97,8 @@ export default function ListaMateriaPrima() {
       })
       if (!response.ok) throw new Error("Error al cargar materias primas")
       const data = await response.json()
-      setMateriasPrimas(data)
+      setMateriasPrimas(data.materiasPrimas || data || [])
+      setTotalRegistros(data.meta?.total || data.length || 0)
     } catch (error) {
       console.error("Error:", error)
       alert("Error al cargar las materias primas")
@@ -97,8 +107,20 @@ export default function ListaMateriaPrima() {
     }
   }
 
+  // Cargar datos cuando cambia la paginación, pero solo si ya se realizó una búsqueda
+  useEffect(() => {
+    if (hasSearched) {
+      fetchMateriasPrimas({
+        id: filtroId,
+        descripcion: filtroDescripcion,
+        estado: filtroEstado,
+      })
+    }
+  }, [page, rowsPerPage])
+
   const handleBuscar = (e) => {
     e.preventDefault()
+    setPage(0) // Resetear a la primera página
     fetchMateriasPrimas({
       id: filtroId,
       descripcion: filtroDescripcion,
@@ -110,17 +132,27 @@ export default function ListaMateriaPrima() {
     setFiltroId("")
     setFiltroDescripcion("")
     setFiltroEstado("")
+    setPage(0)
     fetchMateriasPrimas({})
   }
 
   const handleLimpiarFiltros = () => {
     setFiltroId("")
-    setFiltroNombre("")
     setFiltroDescripcion("")
-    setFiltroTipo("")
     setFiltroEstado("")
-    setProductos([])
+    setPage(0)
+    setMateriasPrimas([])
+    setTotalRegistros(0)
     setHasSearched(false)
+  }
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage)
+  }
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(Number.parseInt(event.target.value, 10))
+    setPage(0)
   }
 
   const handleEdit = (materiaPrima) => {
@@ -149,7 +181,14 @@ export default function ListaMateriaPrima() {
 
       if (!response.ok) throw new Error("Error al eliminar materia prima")
 
-      await fetchMateriasPrimas()
+      // Recargar los datos solo si ya se realizó una búsqueda
+      if (hasSearched) {
+        fetchMateriasPrimas({
+          id: filtroId,
+          descripcion: filtroDescripcion,
+          estado: filtroEstado,
+        })
+      }
       handleCloseDelete()
     } catch (error) {
       console.error("Error:", error)
@@ -238,8 +277,17 @@ export default function ListaMateriaPrima() {
         <Box display="flex" justifyContent="center" my={4}>
           <CircularProgress />
         </Box>
+      ) : !hasSearched ? (
+        <Paper sx={{ p: 4, textAlign: "center" }}>
+          <Typography variant="h6" gutterBottom>
+            Utilice los filtros para buscar materias primas
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Seleccione los criterios de búsqueda y haga clic en "Buscar"
+          </Typography>
+        </Paper>
       ) : (
-        hasSearched && (
+        <>
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -273,15 +321,30 @@ export default function ListaMateriaPrima() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      No hay materias primas registradas
+                    <TableCell colSpan={5} align="center">
+                      No se encontraron materias primas con los criterios seleccionados
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </TableContainer>
-        )
+
+          {/* Paginación */}
+          {hasSearched && totalRegistros > 0 && (
+            <TablePagination
+              component="div"
+              count={totalRegistros}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              labelRowsPerPage="Filas por página:"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`}
+            />
+          )}
+        </>
       )}
 
       {/* Confirmación de Eliminación */}

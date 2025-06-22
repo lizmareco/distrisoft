@@ -62,7 +62,7 @@ export default function PersonasPage() {
   // Estado para la paginación
   const [paginacion, setPaginacion] = useState({
     page: 1,
-    pageSize: 100,
+    pageSize: 10,
     totalItems: 0,
     totalPages: 0,
     hasNextPage: false,
@@ -146,7 +146,7 @@ export default function PersonasPage() {
       // Resetear la paginación
       setPaginacion({
         page: 1,
-        pageSize: 100,
+        pageSize: 10,
         totalItems: data.length,
         totalPages: 1,
         hasNextPage: false,
@@ -173,7 +173,7 @@ export default function PersonasPage() {
     })
 
     try {
-      const response = await fetch(`/api/personas/all?page=${page}&pageSize=100`)
+      const response = await fetch(`/api/personas/all?page=${page}&pageSize=${paginacion.pageSize}`)
 
       if (!response.ok) {
         throw new Error("Error al obtener personas")
@@ -182,9 +182,19 @@ export default function PersonasPage() {
       const data = await response.json()
       console.log("Datos recibidos:", data) // Para depuración
 
-      // Verificar que la estructura de datos sea la esperada
-      if (data && Array.isArray(data)) {
-        // Si la respuesta es un array (formato antiguo)
+      // La API ya devuelve el formato correcto con paginación
+      if (data && data.personas && Array.isArray(data.personas)) {
+        setPersonas(data.personas)
+        setPaginacion(data.pagination || {
+          page: page,
+          pageSize: paginacion.pageSize,
+          totalItems: data.personas.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        })
+      } else if (data && Array.isArray(data)) {
+        // Fallback para formato antiguo (no debería ocurrir)
         setPersonas(data)
         setPaginacion({
           page: 1,
@@ -194,19 +204,6 @@ export default function PersonasPage() {
           hasNextPage: false,
           hasPrevPage: false,
         })
-      } else if (data && data.personas && Array.isArray(data.personas)) {
-        // Si la respuesta tiene el formato nuevo con paginación
-        setPersonas(data.personas)
-        setPaginacion(
-          data.pagination || {
-            page: 1,
-            pageSize: data.personas.length,
-            totalItems: data.personas.length,
-            totalPages: 1,
-            hasNextPage: false,
-            hasPrevPage: false,
-          },
-        )
       } else {
         // Si la estructura no es la esperada
         setPersonas([])

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import {
   Container,
   Typography,
@@ -48,12 +48,17 @@ import {
   Receipt as ReceiptIcon,
   Inventory as InventoryIcon,
   MoreVert as MoreVertIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  UnfoldMore as UnfoldMoreIcon,
+  UnfoldLess as UnfoldLessIcon,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { ArrowBack } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
+import VisorFacturaProveedor from "@/src/components/facturas/VisorFacturaProveedor"
 
 export default function OrdenesCompraPage() {
   console.log("Renderizando OrdenesCompraPage");
@@ -105,6 +110,13 @@ export default function OrdenesCompraPage() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" })
   const [anchorEl, setAnchorEl] = useState(null)
   const [selectedOrden, setSelectedOrden] = useState(null)
+
+  // Estados para el acordeón de detalles
+  const [expandedOrden, setExpandedOrden] = useState(null)
+  const [expandAll, setExpandAll] = useState(false)
+
+  // Estados para el visor de facturas
+  const [visorFactura, setVisorFactura] = useState({ open: false, facturaId: null })
 
   // Estados para formularios
   const [nuevoEstado, setNuevoEstado] = useState("")
@@ -585,9 +597,29 @@ export default function OrdenesCompraPage() {
   }
 
   const tieneFacturaGuardada = (orden) => {
-    if (!orden || !orden.estadoOrdenCompra) return false
-    const esRecibido = orden.estadoOrdenCompra?.descEstadoOrdenCompra?.toLowerCase() === "recibido"
-    return esRecibido && facturasExistentes.has(orden.idOrdenCompra)
+    if (!orden) return false
+    
+    // Verificar si tiene factura asociada directamente
+    // facturaProveedor es un array, tomamos la primera factura si existe
+    const tieneFactura = orden.facturaProveedor && 
+                        Array.isArray(orden.facturaProveedor) && 
+                        orden.facturaProveedor.length > 0 && 
+                        orden.facturaProveedor[0].idFacturaProveedor
+    
+    return tieneFactura
+  }
+
+  const puedeVerFactura = (orden) => {
+    if (!orden) return false
+    
+    // Puede ver factura si tiene factura asociada, sin importar el estado
+    // facturaProveedor es un array, tomamos la primera factura si existe
+    const tieneFactura = orden.facturaProveedor && 
+                        Array.isArray(orden.facturaProveedor) && 
+                        orden.facturaProveedor.length > 0 && 
+                        orden.facturaProveedor[0].idFacturaProveedor
+    
+    return tieneFactura
   }
 
   // Verificar si se puede eliminar
@@ -600,6 +632,39 @@ export default function OrdenesCompraPage() {
   const puedeRecepcionar = (orden) => {
     if (!orden || !orden.estadoOrdenCompra) return false
     return orden.estadoOrdenCompra?.descEstadoOrdenCompra?.toLowerCase() === "parcialmente recibido"
+  }
+
+  // Funciones para manejar el acordeón
+  const handleExpandOrden = (ordenId) => {
+    setExpandedOrden(expandedOrden === ordenId ? null : ordenId)
+  }
+
+  const handleExpandAll = () => {
+    if (expandAll) {
+      setExpandedOrden(null)
+      setExpandAll(false)
+    } else {
+      // Expandir la primera orden si existe
+      const primeraOrden = ordenesCompra[0]
+      if (primeraOrden) {
+        setExpandedOrden(primeraOrden.idOrdenCompra)
+        setExpandAll(true)
+      }
+    }
+  }
+
+  const isOrdenExpanded = (ordenId) => {
+    return expandedOrden === ordenId
+  }
+
+  const handleVerFactura = (orden) => {
+    if (orden.facturaProveedor && 
+        Array.isArray(orden.facturaProveedor) && 
+        orden.facturaProveedor.length > 0 && 
+        orden.facturaProveedor[0].idFacturaProveedor) {
+      setVisorFactura({ open: true, facturaId: orden.facturaProveedor[0].idFacturaProveedor })
+      handleMenuClose()
+    }
   }
 
   // Definir el contenido a renderizar según el permiso
@@ -618,12 +683,12 @@ export default function OrdenesCompraPage() {
         </Typography>
         <Button
           component={Link}
-          href="/ordenes-compra/nueva"
+          href="/finanzas"
           variant="contained"
           color="primary"
-          startIcon={<AddIcon />}
+          startIcon={<ReceiptIcon />}
         >
-          Nueva Orden de Compra
+          IR A FINANZAS
         </Button>
       </Box>
 
@@ -703,6 +768,17 @@ export default function OrdenesCompraPage() {
         ) : mostrarOrdenes ? (
           ordenesCompra.length > 0 ? (
             <>
+              <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
+                <Typography variant="h6">Órdenes de Compra</Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={expandAll ? <UnfoldLessIcon /> : <UnfoldMoreIcon />}
+                  onClick={handleExpandAll}
+                  size="small"
+                >
+                  {expandAll ? 'Contraer Todo' : 'Expandir Primero'}
+                </Button>
+              </Box>
               <TableContainer component={Paper}>
                 <Table>
                   <TableHead>
@@ -761,40 +837,104 @@ export default function OrdenesCompraPage() {
                       </TableRow>
                     ) : (
                       ordenesCompra.map((orden) => (
-                        <TableRow hover key={orden.idOrdenCompra}>
-                          <TableCell>{orden.idOrdenCompra}</TableCell>
-                          <TableCell>{format(new Date(orden.fechaOrden), "dd/MM/yyyy", { locale: es })}</TableCell>
-                          <TableCell>{orden.cotizacionProveedor?.proveedor?.empresa?.razonSocial || "N/A"}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={orden.estadoOrdenCompra?.descEstadoOrdenCompra || "Pendiente"}
-                              color={getEstadoChipColor(orden.estadoOrdenCompra?.descEstadoOrdenCompra)}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                              orden.cotizacionProveedor?.montoTotal || 0,
-                            )}
-                          </TableCell>
-                          <TableCell align="center">
-                            <Tooltip title="Ver detalles">
-                              <IconButton
-                                component={Link}
-                                href={`/ordenes-compra/${orden.idOrdenCompra}`}
-                                color="primary"
-                                size="small"
-                              >
-                                <VisibilityIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Más acciones">
-                              <IconButton size="small" onClick={(e) => handleMenuClick(e, orden)}>
-                                <MoreVertIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
+                        <React.Fragment key={orden.idOrdenCompra}>
+                          <TableRow hover>
+                            <TableCell>{orden.idOrdenCompra}</TableCell>
+                            <TableCell>{format(new Date(orden.fechaOrden), "dd/MM/yyyy", { locale: es })}</TableCell>
+                            <TableCell>{orden.cotizacionProveedor?.proveedor?.empresa?.razonSocial || "N/A"}</TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Chip
+                                  label={orden.estadoOrdenCompra?.descEstadoOrdenCompra || "Pendiente"}
+                                  color={getEstadoChipColor(orden.estadoOrdenCompra?.descEstadoOrdenCompra)}
+                                  size="small"
+                                />
+                                {tieneFacturaGuardada(orden) && (
+                                  <Tooltip title="Tiene factura asociada">
+                                    <ReceiptIcon color="success" fontSize="small" />
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>
+                              {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                                orden.cotizacionProveedor?.montoTotal || 0,
+                              )}
+                            </TableCell>
+                            <TableCell align="center">
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Tooltip title="Ver detalles">
+                                  <IconButton
+                                    component={Link}
+                                    href={`/ordenes-compra/${orden.idOrdenCompra}`}
+                                    color="primary"
+                                    size="small"
+                                  >
+                                    <VisibilityIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Más acciones">
+                                  <IconButton size="small" onClick={(e) => handleMenuClick(e, orden)}>
+                                    <MoreVertIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title={isOrdenExpanded(orden.idOrdenCompra) ? "Ocultar detalles" : "Ver materias primas"}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleExpandOrden(orden.idOrdenCompra)}
+                                    color="primary"
+                                  >
+                                    {isOrdenExpanded(orden.idOrdenCompra) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                          {/* Fila expandible con detalles */}
+                          {isOrdenExpanded(orden.idOrdenCompra) && (
+                            <TableRow>
+                              <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
+                                <Box sx={{ bgcolor: 'grey.50', p: 2 }}>
+                                  <Typography variant="h6" gutterBottom>
+                                    Detalles de Materias Primas
+                                  </Typography>
+                                  <TableContainer component={Paper} variant="outlined">
+                                    <Table size="small">
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell>Materia Prima</TableCell>
+                                          <TableCell align="right">Cantidad</TableCell>
+                                          <TableCell align="right">Precio Unitario</TableCell>
+                                          <TableCell align="right">Subtotal</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {orden.cotizacionProveedor?.detallesCotizacionProv?.map((detalle, index) => (
+                                          <TableRow key={index}>
+                                            <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
+                                            <TableCell align="right">
+                                              {detalle.cantidad} {detalle.unidadMedida || "Unidad"}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                                                detalle.precioUnitario || 0
+                                              )}
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                                                (detalle.cantidad || 0) * (detalle.precioUnitario || 0)
+                                              )}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       ))
                     )}
                   </TableBody>
@@ -833,13 +973,22 @@ export default function OrdenesCompraPage() {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        {selectedOrden && [
+        {selectedOrden && (() => {
+          return [
             <MenuItem key="verDetalles" onClick={() => handleMenuClose()}>
               <ListItemIcon>
                 <VisibilityIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Ver detalles</ListItemText>
             </MenuItem>,
+            puedeVerFactura(selectedOrden) && (
+              <MenuItem key="verFactura" onClick={() => handleVerFactura(selectedOrden)}>
+                <ListItemIcon>
+                  <ReceiptIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Ver Factura</ListItemText>
+              </MenuItem>
+            ),
             <MenuItem
               key="cambiarEstado"
               onClick={() => {
@@ -877,18 +1026,8 @@ export default function OrdenesCompraPage() {
                 <ListItemText>Recepcionar</ListItemText>
               </MenuItem>
             ),
-            puedeEliminar(selectedOrden) && (
-              <MenuItem key="eliminar" onClick={() => {
-                setDialogEliminar({ open: true, orden: selectedOrden });
-                handleMenuClose();
-              }}>
-                <ListItemIcon>
-                  <DeleteIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Eliminar</ListItemText>
-              </MenuItem>
-            ),
-        ].filter(Boolean)}
+          ].filter(Boolean)
+        })()}
       </Menu>
 
       {/* Diálogo de cambio de estado */}
@@ -1129,6 +1268,13 @@ export default function OrdenesCompraPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Visor de Factura de Proveedor */}
+      <VisorFacturaProveedor
+        open={visorFactura.open}
+        onClose={() => setVisorFactura({ open: false, facturaId: null })}
+        facturaId={visorFactura.facturaId}
+      />
     </Container>
   )
 

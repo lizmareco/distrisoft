@@ -45,8 +45,13 @@ export async function GET(request) {
     const nombreRol = searchParams.get("nombreRol")
     const estadoRol = searchParams.get("estadoRol")
     const permiso = searchParams.get("permiso")
+    
+    // Parámetros de paginación
+    const page = Number.parseInt(searchParams.get("page") || "1", 10)
+    const pageSize = Number.parseInt(searchParams.get("pageSize") || "10", 10)
 
     console.log(`API roles: Incluir inactivos: ${includeInactive}`)
+    console.log(`API roles: Parámetros de paginación - Página: ${page}, Tamaño: ${pageSize}`)
 
     // Verificar autenticación
     const accessToken = await authController.hasAccessToken(request)
@@ -68,10 +73,10 @@ export async function GET(request) {
       // En desarrollo, permitir acceso sin token para pruebas
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso sin token")
-        // Obtener roles con sus permisos
-        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
-        console.log("API: Roles obtenidos en modo desarrollo sin token", { cantidad: roles.length })
-        return NextResponse.json({ roles }, { status: 200 })
+        // Obtener roles con sus permisos y paginación
+        const result = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso, page, pageSize)
+        console.log("API: Roles obtenidos en modo desarrollo sin token", { cantidad: result.roles.length })
+        return NextResponse.json(result, { status: 200 })
       }
 
       return NextResponse.json({ message: "No autorizado" }, { status: 401 })
@@ -88,9 +93,9 @@ export async function GET(request) {
       // En desarrollo, permitir acceso con token inválido
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso con token inválido")
-        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
-        console.log("API: Roles obtenidos en modo desarrollo con token inválido", { cantidad: roles.length })
-        return NextResponse.json({ roles }, { status: 200 })
+        const result = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso, page, pageSize)
+        console.log("API: Roles obtenidos en modo desarrollo con token inválido", { cantidad: result.roles.length })
+        return NextResponse.json(result, { status: 200 })
       }
     }
 
@@ -100,9 +105,9 @@ export async function GET(request) {
       // En desarrollo, permitir acceso sin datos de usuario
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso sin datos de usuario")
-        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
-        console.log("API: Roles obtenidos en modo desarrollo sin permisos adecuados", { cantidad: roles.length })
-        return NextResponse.json({ roles }, { status: 200 })
+        const result = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso, page, pageSize)
+        console.log("API: Roles obtenidos en modo desarrollo sin permisos adecuados", { cantidad: result.roles.length })
+        return NextResponse.json(result, { status: 200 })
       }
 
       return NextResponse.json({ message: "No autorizado" }, { status: 401 })
@@ -115,19 +120,19 @@ export async function GET(request) {
       // En desarrollo, permitir acceso sin importar el rol
       if (process.env.NODE_ENV === "development") {
         console.log("API roles: Modo desarrollo - Permitiendo acceso sin importar el rol")
-        const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
-        console.log("API: Roles obtenidos en modo desarrollo sin permisos adecuados", { cantidad: roles.length })
-        return NextResponse.json({ roles }, { status: 200 })
+        const result = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso, page, pageSize)
+        console.log("API: Roles obtenidos en modo desarrollo sin permisos adecuados", { cantidad: result.roles.length })
+        return NextResponse.json(result, { status: 200 })
       }
 
       return NextResponse.json({ message: "No tienes permisos para gestionar roles" }, { status: 403 })
     }
 
-    // Obtener roles con sus permisos
-    const roles = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso)
+    // Obtener roles con sus permisos y paginación
+    const result = await obtenerRoles(includeInactive, nombreRol, estadoRol, permiso, page, pageSize)
 
-    console.log("API: Roles obtenidos correctamente", { cantidad: roles.length })
-    return NextResponse.json({ roles }, { status: 200 })
+    console.log("API: Roles obtenidos correctamente", { cantidad: result.roles.length })
+    return NextResponse.json(result, { status: 200 })
   } catch (error) {
     console.error("API: Error al obtener roles:", error)
 
@@ -135,20 +140,39 @@ export async function GET(request) {
     if (process.env.NODE_ENV === "development") {
       console.log("API roles: Modo desarrollo - Permitiendo acceso a pesar del error")
       try {
-        const roles = await obtenerRoles(true)
-        console.log("API: Roles obtenidos en modo desarrollo a pesar del error", { cantidad: roles.length })
-        return NextResponse.json({ roles }, { status: 200 })
+        const result = await obtenerRoles(true, "", "", "", 1, 10)
+        console.log("API: Roles obtenidos en modo desarrollo a pesar del error", { cantidad: result.roles.length })
+        return NextResponse.json(result, { status: 200 })
       } catch (innerError) {
         console.error("Error en el modo de recuperación:", innerError)
       }
     }
 
-    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 })
+    return NextResponse.json({ 
+      roles: [],
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        totalItems: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+      error: error.message, 
+      stack: error.stack 
+    }, { status: 500 })
   }
 }
 
-// Función auxiliar para obtener roles con filtros
-async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol = "", permiso = "") {
+// Función auxiliar para obtener roles con filtros y paginación
+async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol = "", permiso = "", page = 1, pageSize = 10) {
+  // Parámetros de paginación
+  const validPage = page > 0 ? page : 1
+  const validPageSize = pageSize > 0 && pageSize <= 100 ? pageSize : 10
+  const skip = (validPage - 1) * validPageSize
+
+  console.log(`Obteniendo roles con paginación - Página: ${validPage}, Tamaño: ${validPageSize}, Skip: ${skip}`)
+
   // Construir la condición where basada en si se incluyen inactivos o no
   const whereCondition = {
     // Siempre excluir roles borrados (con deletedAt)
@@ -169,7 +193,12 @@ async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol =
 
   console.log(`Obteniendo roles con condición:`, whereCondition)
 
-  // Obtener roles con sus permisos
+  // Obtener el total de registros para calcular el total de páginas
+  const totalRoles = await prisma.rol.count({
+    where: whereCondition,
+  })
+
+  // Obtener roles con sus permisos y paginación
   const roles = await prisma.rol.findMany({
     where: whereCondition,
     include: {
@@ -190,6 +219,8 @@ async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol =
     orderBy: {
       nombreRol: "asc",
     },
+    skip: skip,
+    take: validPageSize,
   })
 
   // Si hay filtro de permiso, filtrar los roles en JS
@@ -204,7 +235,7 @@ async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol =
   }
 
   // Transformar los datos para una respuesta más limpia
-  return rolesFiltrados.map((rol) => ({
+  const rolesTransformados = rolesFiltrados.map((rol) => ({
     idRol: rol.idRol,
     nombreRol: rol.nombreRol,
     estadoRol: rol.estadoRol,
@@ -213,6 +244,21 @@ async function obtenerRoles(includeInactive = false, nombreRol = "", estadoRol =
       nombrePermiso: rp.permiso.nombrePermiso,
     })),
   }))
+
+  // Calcular el total de páginas
+  const totalPages = Math.ceil(totalRoles / validPageSize)
+
+  return {
+    roles: rolesTransformados,
+    pagination: {
+      page: validPage,
+      pageSize: validPageSize,
+      totalItems: totalRoles,
+      totalPages,
+      hasNextPage: validPage < totalPages,
+      hasPrevPage: validPage > 1,
+    }
+  }
 }
 
 // POST /api/roles - Crear un nuevo rol

@@ -48,9 +48,23 @@ export async function GET(request) {
     const descripcionRol = searchParams.get("descripcionRol") // Nueva: descripción del rol (ej: "PRODUCCION")
     const estado = searchParams.get("estado")
     const all = searchParams.get("all") === "true"
+    
+    // Parámetros de paginación
+    const page = Number.parseInt(searchParams.get("page") || "1", 10)
+    const pageSize = Number.parseInt(searchParams.get("pageSize") || "10", 10)
+    const validPage = page > 0 ? page : 1
+    const validPageSize = pageSize > 0 && pageSize <= 100 ? pageSize : 10
+    const skip = (validPage - 1) * validPageSize
 
-    // Si all=true, traer todos
+    console.log(`API: Parámetros de paginación - Página: ${validPage}, Tamaño: ${validPageSize}, Skip: ${skip}`)
+
+    // Si all=true, traer todos con paginación
     if (all) {
+      // Obtener el total de registros para calcular el total de páginas
+      const totalUsuarios = await prisma.usuario.count({
+        where: { deletedAt: null },
+      })
+
       const usuarios = await prisma.usuario.findMany({
         where: { deletedAt: null },
         include: {
@@ -58,13 +72,39 @@ export async function GET(request) {
           rol: { select: { nombreRol: true } },
         },
         orderBy: { createdAt: "desc" },
+        skip: skip,
+        take: validPageSize,
       })
-      return NextResponse.json({ usuarios }, { status: 200 })
+
+      // Calcular el total de páginas
+      const totalPages = Math.ceil(totalUsuarios / validPageSize)
+
+      return NextResponse.json({ 
+        usuarios,
+        pagination: {
+          page: validPage,
+          pageSize: validPageSize,
+          totalItems: totalUsuarios,
+          totalPages,
+          hasNextPage: validPage < totalPages,
+          hasPrevPage: validPage > 1,
+        }
+      }, { status: 200 })
     }
 
     // Si no hay filtros, devolver array vacío
     if (!nombreUsuario && !persona && !rol && !estado && !descripcionRol) {
-      return NextResponse.json({ usuarios: [] }, { status: 200 })
+      return NextResponse.json({ 
+        usuarios: [],
+        pagination: {
+          page: 1,
+          pageSize: validPageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        }
+      }, { status: 200 })
     }
 
     // Construir condiciones de búsqueda
@@ -84,7 +124,12 @@ export async function GET(request) {
       }
     }
 
-    // Buscar usuarios incluyendo el rol
+    // Obtener el total de registros para calcular el total de páginas
+    const totalUsuarios = await prisma.usuario.count({
+      where,
+    })
+
+    // Buscar usuarios incluyendo el rol con paginación
     let usuarios = await prisma.usuario.findMany({
       where,
       include: {
@@ -92,6 +137,8 @@ export async function GET(request) {
         rol: { select: { nombreRol: true } },
       },
       orderBy: { createdAt: "desc" },
+      skip: skip,
+      take: validPageSize,
     })
 
     // Filtrar por persona si corresponde
@@ -118,10 +165,34 @@ export async function GET(request) {
       )
     }
 
-    return NextResponse.json({ usuarios }, { status: 200 })
+    // Calcular el total de páginas (ajustar después de filtros JS)
+    const totalPages = Math.ceil(totalUsuarios / validPageSize)
+
+    return NextResponse.json({ 
+      usuarios,
+      pagination: {
+        page: validPage,
+        pageSize: validPageSize,
+        totalItems: totalUsuarios,
+        totalPages,
+        hasNextPage: validPage < totalPages,
+        hasPrevPage: validPage > 1,
+      }
+    }, { status: 200 })
   } catch (error) {
     console.error("API: Error al obtener usuarios:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ 
+      usuarios: [],
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        totalItems: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false,
+      },
+      error: error.message 
+    }, { status: 500 })
   }
 }
 

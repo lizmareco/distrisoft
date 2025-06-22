@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Button,
@@ -34,6 +34,10 @@ import {
   CardContent,
   Pagination,
   InputAdornment,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Collapse,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -42,6 +46,10 @@ import SearchIcon from "@mui/icons-material/Search"
 import FilterListIcon from "@mui/icons-material/FilterList"
 import ClearIcon from "@mui/icons-material/Clear"
 import ReceiptIcon from "@mui/icons-material/Receipt"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import ExpandLessIcon from "@mui/icons-material/ExpandLess"
+import Link from "next/link"
+import DetallePedido from "./DetallePedido"
 
 export default function ListaPedidos() {
   const router = useRouter()
@@ -100,6 +108,27 @@ export default function ListaPedidos() {
   // Estado mejorado para tracking de facturas
   const [pedidosConFacturas, setPedidosConFacturas] = useState(new Set())
   const [cargandoFacturas, setCargandoFacturas] = useState(false)
+
+  // Estado para el acordeón expandido
+  const [pedidoExpandido, setPedidoExpandido] = useState(null)
+
+  // Función para manejar la expansión del acordeón
+  const handleExpansion = (idPedido) => {
+    setPedidoExpandido(pedidoExpandido === idPedido ? null : idPedido)
+  }
+
+  // Función para expandir/contraer todos los pedidos
+  const toggleAllExpansions = () => {
+    if (pedidoExpandido === null) {
+      // Si no hay ninguno expandido, expandir el primero
+      if (pedidos.length > 0) {
+        setPedidoExpandido(pedidos[0].idPedido)
+      }
+    } else {
+      // Si hay alguno expandido, contraer todos
+      setPedidoExpandido(null)
+    }
+  }
 
   // Función mejorada para verificar si un pedido ya tiene facturas
   const verificarFacturasExistentes = async (idPedido) => {
@@ -885,21 +914,34 @@ export default function ListaPedidos() {
 
   return (
     <>
-      {/* Título */}
-      <Typography
-        variant="h4"
-        component="h1"
-        sx={{
-          fontSize: "28px",
-          fontWeight: 400,
-          color: "#333",
-          mb: 3,
-          borderBottom: "1px solid #eaeaea",
-          paddingBottom: "8px",
-        }}
-      >
-        Lista Pedidos
-      </Typography>
+      {/* Título con botón de finanzas */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, borderBottom: "1px solid #eaeaea", paddingBottom: "8px" }}>
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{
+            fontSize: "28px",
+            fontWeight: 400,
+            color: "#333",
+          }}
+        >
+          Lista Pedidos
+        </Typography>
+        <Button
+          variant="contained"
+          color="secondary"
+          component={Link}
+          href="/finanzas"
+          sx={{
+            backgroundColor: "#1976d2",
+            "&:hover": {
+              backgroundColor: "#1565c0",
+            },
+          }}
+        >
+          IR A FINANZAS
+        </Button>
+      </Box>
 
       {/* Panel de Filtros */}
       <Card sx={{ mb: 3 }}>
@@ -1026,25 +1068,20 @@ export default function ListaPedidos() {
                 >
                   {cargando ? "Buscando..." : "Buscar"}
                 </Button>
-                <Button
-                  variant="outlined"
-                  color="secondary"
-                  onClick={() => mostrarTodos(1)}
-                  disabled={cargando}
-                  fullWidth
-                  size="small"
-                >
-                  Mostrar Todos
-                </Button>
               </Box>
             </Grid>
           </Grid>
 
           {/* Botones adicionales */}
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2 }}>
-            <Button variant="outlined" color="error" startIcon={<ClearIcon />} onClick={limpiarFiltros} size="small">
-              Limpiar Filtros
-            </Button>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button variant="outlined" color="secondary" onClick={() => mostrarTodos(1)} disabled={cargando} size="small">
+                Mostrar Todos
+              </Button>
+              <Button variant="outlined" color="error" startIcon={<ClearIcon />} onClick={limpiarFiltros} size="small">
+                Limpiar Filtros
+              </Button>
+            </Box>
             <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={irACrearPedido}>
               Nuevo Pedido
             </Button>
@@ -1055,11 +1092,24 @@ export default function ListaPedidos() {
       {/* Información de paginación */}
       {filtrosAplicados && (
         <Box sx={{ mb: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            Mostrando {pedidos.length} de {paginacion.totalRegistros} pedidos
-            {paginacion.totalPaginas > 1 && ` (Página ${paginacion.pagina} de ${paginacion.totalPaginas})`}
-            {cargandoFacturas && " (Cargando estado de facturas...)"}
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Mostrando {pedidos.length} de {paginacion.totalRegistros} pedidos
+              {paginacion.totalPaginas > 1 && ` (Página ${paginacion.pagina} de ${paginacion.totalPaginas})`}
+              {cargandoFacturas && " (Cargando estado de facturas...)"}
+            </Typography>
+            {pedidos.length > 0 && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={toggleAllExpansions}
+                startIcon={pedidoExpandido === null ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                sx={{ ml: 2 }}
+              >
+                {pedidoExpandido === null ? "Expandir Primero" : "Contraer Todo"}
+              </Button>
+            )}
+          </Box>
           {paginacion.totalPaginas > 1 && (
             <Pagination
               count={paginacion.totalPaginas}
@@ -1121,42 +1171,99 @@ export default function ListaPedidos() {
                 </TableRow>
               ) : (
                 pedidos.map((pedido) => (
-                  <TableRow key={pedido.idPedido}>
-                    <TableCell>{pedido.idPedido}</TableCell>
-                    <TableCell>{formatearFecha(pedido.fechaPedido)}</TableCell>
-                    <TableCell>{formatearFecha(pedido.fechaEntrega)}</TableCell>
-                    <TableCell>
-                      {pedido.cliente ? (
-                        formatearNombreCliente(pedido.cliente)
-                      ) : (
-                        <Typography variant="caption" color="error">
-                          Sin asignar
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
-                        color={getEstadoColor(pedido.estadoPedido)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {pedido.observacion ? (
-                        <Tooltip title={pedido.observacion}>
-                          <Typography noWrap sx={{ maxWidth: 150 }}>
-                            {pedido.observacion}
+                  <React.Fragment key={pedido.idPedido}>
+                    <TableRow>
+                      <TableCell>{pedido.idPedido}</TableCell>
+                      <TableCell>{formatearFecha(pedido.fechaPedido)}</TableCell>
+                      <TableCell>{formatearFecha(pedido.fechaEntrega)}</TableCell>
+                      <TableCell>
+                        {pedido.cliente ? (
+                          formatearNombreCliente(pedido.cliente)
+                        ) : (
+                          <Typography variant="caption" color="error">
+                            Sin asignar
                           </Typography>
-                        </Tooltip>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          Sin observaciones
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}</TableCell>
-                    <TableCell>{renderBotonesAccion(pedido)}</TableCell>
-                  </TableRow>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={pedido.estadoPedido?.descEstadoPedido || "Desconocido"}
+                          color={getEstadoColor(pedido.estadoPedido)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {pedido.observacion ? (
+                          <Tooltip title={pedido.observacion}>
+                            <Typography noWrap sx={{ maxWidth: 150 }}>
+                              {pedido.observacion}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">
+                            Sin observaciones
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>₲ {pedido.montoTotal?.toLocaleString("es-PY") || "0"}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                          {renderBotonesAccion(pedido)}
+                          <Tooltip title={pedidoExpandido === pedido.idPedido ? "Contraer detalles" : "Expandir detalles"}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleExpansion(pedido.idPedido)}
+                              sx={{ 
+                                p: 0,
+                                color: pedidoExpandido === pedido.idPedido ? "#1976d2" : "#666",
+                                "&:hover": {
+                                  color: "#1976d2",
+                                  backgroundColor: "rgba(25, 118, 210, 0.04)"
+                                }
+                              }}
+                            >
+                              {pedidoExpandido === pedido.idPedido ? (
+                                <ExpandLessIcon />
+                              ) : (
+                                <ExpandMoreIcon />
+                              )}
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                    {/* Fila expandible con detalles */}
+                    <TableRow>
+                      <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
+                        <Collapse in={pedidoExpandido === pedido.idPedido} timeout="auto" unmountOnExit>
+                          <Box sx={{ 
+                            p: 3, 
+                            backgroundColor: "#fafafa", 
+                            borderTop: "2px solid #e3f2fd",
+                            borderLeft: "4px solid #1976d2",
+                            borderRadius: "0 0 8px 8px",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                          }}>
+                            <Typography
+                              variant="h4"
+                              component="h2"
+                              sx={{
+                                fontSize: "28px",
+                                fontWeight: 400,
+                                color: "#333",
+                                mb: 3,
+                                borderBottom: "1px solid #eaeaea",
+                                paddingBottom: "8px"
+                              }}
+                            >
+                              Detalles Pedido #{pedido.idPedido}
+                            </Typography>
+                            <DetallePedido id={pedido.idPedido} isEmbedded={true} />
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 ))
               )}
             </TableBody>

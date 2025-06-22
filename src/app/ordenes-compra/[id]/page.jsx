@@ -550,17 +550,7 @@ export default function VerOrdenCompraPage({ params }) {
                   </Button>
                 </>
               )}
-              {!editMode && canDelete() && (
-                <Button
-                  variant="contained"
-                  color="error"
-                  startIcon={<Delete />}
-                  onClick={handleOpenDeleteDialog}
-                  disabled={procesandoAccion}
-                >
-                  Eliminar
-                </Button>
-              )}
+
             </Box>
           </Box>
 

@@ -47,11 +47,24 @@ export async function GET(request) {
     const tipo = searchParams.get("tipo")
     const estado = searchParams.get("estado")
     const all = searchParams.get("all") === "true"
+    
+    // Parámetros de paginación
+    const page = Number.parseInt(searchParams.get("page") || "1", 10)
+    const pageSize = Number.parseInt(searchParams.get("pageSize") || "10", 10)
+    const validPage = page > 0 ? page : 1
+    const validPageSize = pageSize > 0 && pageSize <= 100 ? pageSize : 10
+    const skip = (validPage - 1) * validPageSize
 
     console.log(`API: Incluir inactivos: ${includeInactive}`)
+    console.log(`API: Parámetros de paginación - Página: ${validPage}, Tamaño: ${validPageSize}, Skip: ${skip}`)
 
-    // Si recibe all=true, traer todos los productos (sin filtros, solo deletedAt: null)
+    // Si recibe all=true, traer todos los productos con paginación
     if (all) {
+      // Obtener el total de registros para calcular el total de páginas
+      const totalProductos = await prisma.producto.count({
+        where: { deletedAt: null },
+      })
+
       const productos = await prisma.producto.findMany({
         where: { deletedAt: null },
         include: {
@@ -60,7 +73,10 @@ export async function GET(request) {
           estadoProducto: true,
         },
         orderBy: { nombreProducto: "asc" },
+        skip: skip,
+        take: validPageSize,
       })
+      
       const productosFormateados = productos.map((producto) => {
         const productoFormateado = { ...producto }
         if (productoFormateado.tipoProducto) {
@@ -71,11 +87,36 @@ export async function GET(request) {
         }
         return productoFormateado
       })
-      return NextResponse.json(productosFormateados)
+
+      // Calcular el total de páginas
+      const totalPages = Math.ceil(totalProductos / validPageSize)
+
+      return NextResponse.json({
+        productos: productosFormateados,
+        pagination: {
+          page: validPage,
+          pageSize: validPageSize,
+          totalItems: totalProductos,
+          totalPages,
+          hasNextPage: validPage < totalPages,
+          hasPrevPage: validPage > 1,
+        },
+      })
     }
+    
     // Si no hay filtros, devolver array vacío
     if (!id && !nombre && !descripcion && !tipo && !estado) {
-      return NextResponse.json([])
+      return NextResponse.json({
+        productos: [],
+        pagination: {
+          page: 1,
+          pageSize: validPageSize,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+      })
     }
 
     // Construir la consulta
@@ -89,6 +130,11 @@ export async function GET(request) {
       whereClause.idEstadoProducto = 1
     }
 
+    // Obtener el total de registros para calcular el total de páginas
+    const totalProductos = await prisma.producto.count({
+      where: whereClause,
+    })
+
     const productos = await prisma.producto.findMany({
       where: whereClause,
       include: {
@@ -99,6 +145,8 @@ export async function GET(request) {
       orderBy: {
         nombreProducto: "asc",
       },
+      skip: skip,
+      take: validPageSize,
     })
 
     // Mapear los productos para asegurar que tipoProducto tenga nombreTipoProducto
@@ -127,11 +175,36 @@ export async function GET(request) {
       })
     }
 
-    return NextResponse.json(productosFormateados)
+    // Calcular el total de páginas
+    const totalPages = Math.ceil(totalProductos / validPageSize)
+
+    return NextResponse.json({
+      productos: productosFormateados,
+      pagination: {
+        page: validPage,
+        pageSize: validPageSize,
+        totalItems: totalProductos,
+        totalPages,
+        hasNextPage: validPage < totalPages,
+        hasPrevPage: validPage > 1,
+      },
+    })
   } catch (error) {
     console.error("API: Error al obtener productos:", error)
     return NextResponse.json(
-      { message: "Error al obtener productos", error: error.message },
+      { 
+        productos: [],
+        pagination: {
+          page: 1,
+          pageSize: 10,
+          totalItems: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false,
+        },
+        message: "Error al obtener productos", 
+        error: error.message 
+      },
       { status: HTTP_STATUS_CODES.internalServerError },
     )
   }

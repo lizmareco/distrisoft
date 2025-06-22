@@ -128,20 +128,38 @@ export async function GET(request, { params }) {
       metodoPago: factura.metodoPago?.descMetodoPago || "Sin método",
 
       // Detalles de la factura con datos reales
-      detalles: factura.detalleFactura.map((detalle) => ({
-        idDetalleFactura: detalle.idDetalleFactura,
-        cantidad: detalle.cantidad, // Cantidad en paquetes
-        descripcion: detalle.producto?.nombreProducto || "Producto sin nombre",
-        precioUnitario: Number.parseFloat(detalle.precioUnitario), // Precio por paquete
-        subtotal: Number.parseFloat(detalle.subtotal),
-        montoImpuesto: Number.parseFloat(detalle.montoImpuesto),
-        totalLinea: Number.parseFloat(detalle.totalLinea),
-        tipoProducto: detalle.producto?.tipoProducto?.descTipoProducto || "Sin tipo",
-        pesoUnidad: detalle.producto?.pesoUnidad || 0,
-        unidadesPorPaquete: detalle.producto?.unidadesPorPaquete || 1,
-        impuesto: detalle.impuesto?.descImpuesto || "Sin impuesto",
-        acreditado: acreditadoPorDetalle[detalle.idDetalleFactura] || 0,
-      })),
+      detalles: factura.detalleFactura.map((detalle) => {
+        // Formar descripción completa con nombre, descripción y peso
+        const nombreProducto = detalle.producto?.nombreProducto || "Producto sin nombre"
+        const descripcionProducto = detalle.producto?.descripcion || ""
+        const pesoUnidad = detalle.producto?.pesoUnidad || 0
+        
+        let descripcionCompleta = nombreProducto
+        if (descripcionProducto) {
+          descripcionCompleta += ` (${descripcionProducto}`
+          if (pesoUnidad > 0) {
+            descripcionCompleta += ` - ${pesoUnidad}g`
+          }
+          descripcionCompleta += ")"
+        } else if (pesoUnidad > 0) {
+          descripcionCompleta += ` (${pesoUnidad}g)`
+        }
+
+        return {
+          idDetalleFactura: detalle.idDetalleFactura,
+          cantidad: detalle.cantidad, // Cantidad en paquetes
+          descripcion: descripcionCompleta,
+          precioUnitario: Number.parseFloat(detalle.precioUnitario), // Precio por paquete
+          subtotal: Number.parseFloat(detalle.subtotal),
+          montoImpuesto: Number.parseFloat(detalle.montoImpuesto),
+          totalLinea: Number.parseFloat(detalle.totalLinea),
+          tipoProducto: detalle.producto?.tipoProducto?.descTipoProducto || "Sin tipo",
+          pesoUnidad: detalle.producto?.pesoUnidad || 0,
+          unidadesPorPaquete: detalle.producto?.unidadesPorPaquete || 1,
+          impuesto: detalle.impuesto?.descImpuesto || "Sin impuesto",
+          acreditado: acreditadoPorDetalle[detalle.idDetalleFactura] || 0,
+        }
+      }),
 
       // Información específica para crédito
       cuentaPorCobrar: factura.cuentaPorCobrar
