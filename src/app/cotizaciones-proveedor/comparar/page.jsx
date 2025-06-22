@@ -187,7 +187,9 @@ export default function CompararCotizacionesPage() {
                       <TableCell key={`${c.idCotizacionProveedor}-${materia}`} align="center">
                         {detalle ? (
                           <>
-                            {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(detalle.subtotal)}
+                            <div><strong>Subtotal:</strong> {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(detalle.subtotal)}</div>
+                            <div><strong>Cantidad:</strong> {detalle.cantidad}</div>
+                            <div><strong>Precio unitario:</strong> {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(detalle.precioUnitario)}</div>
                           </>
                         ) : <span style={{ color: '#aaa' }}>-</span>}
                       </TableCell>
