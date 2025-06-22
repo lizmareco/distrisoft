@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { useState } from "react"
 import {
   Container,
@@ -26,8 +27,12 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Collapse,
+  Card,
+  CardContent,
+  Divider,
 } from "@mui/material"
-import { Add, Visibility, Search, Clear, Delete } from "@mui/icons-material"
+import { Add, Visibility, Search, Clear, Delete, ExpandMore, ExpandLess } from "@mui/icons-material"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -54,6 +59,14 @@ export default function CotizacionesProveedorPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [cotizacionToDelete, setCotizacionToDelete] = useState(null)
   const [procesandoEliminacion, setProcesandoEliminacion] = useState(false)
+  // Estados para el despliegue rápido
+  const [expandedRows, setExpandedRows] = useState(new Set())
+  const [detallesCotizaciones, setDetallesCotizaciones] = useState({})
+  const [loadingDetalles, setLoadingDetalles] = useState({})
+  // Estado para IDs de proveedores seleccionados
+  const [proveedoresSeleccionados, setProveedoresSeleccionados] = useState([])
+  // Estado para filtro de estado
+  const [filtroEstado, setFiltroEstado] = useState('PENDIENTE')
 
   // Ya no cargamos automáticamente las cotizaciones al inicio
 
@@ -89,11 +102,31 @@ export default function CotizacionesProveedorPage() {
   }
 
   const handleToggleSeleccion = (id) => {
-    setCotizacionesSeleccionadas((prev) =>
-      prev.includes(id)
-        ? prev.filter((cid) => cid !== id)
-        : [...prev, id]
-    )
+    const cotizacion = cotizaciones.find((c) => c.idCotizacionProveedor === id)
+    if (!cotizacion) return
+    const proveedorId = cotizacion.proveedor?.idProveedor
+    // Solo permitir seleccionar cotizaciones PENDIENTES
+    if (cotizacion.estado !== 'PENDIENTE') {
+      setSnackbarMessage("Solo puede comparar cotizaciones con estado PENDIENTE.")
+      setSnackbarSeverity("error")
+      setOpenSnackbar(true)
+      return
+    }
+    // Si ya está seleccionada, quitarla
+    if (cotizacionesSeleccionadas.includes(id)) {
+      setCotizacionesSeleccionadas((prev) => prev.filter((cid) => cid !== id))
+      setProveedoresSeleccionados((prev) => prev.filter((pid) => pid !== proveedorId))
+    } else {
+      // Si el proveedor ya está seleccionado, mostrar error y no permitir
+      if (proveedoresSeleccionados.includes(proveedorId)) {
+        setSnackbarMessage("Solo puede comparar cotizaciones de proveedores distintos.")
+        setSnackbarSeverity("error")
+        setOpenSnackbar(true)
+        return
+      }
+      setCotizacionesSeleccionadas((prev) => [...prev, id])
+      setProveedoresSeleccionados((prev) => [...prev, proveedorId])
+    }
   }
 
   const handleCloseSnackbar = (event, reason) => {
@@ -174,24 +207,26 @@ export default function CotizacionesProveedorPage() {
         headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`
       }
 
-      const response = await fetch(`/api/cotizaciones-proveedor/${cotizacionToDelete.idCotizacionProveedor}`, {
-        method: "DELETE",
+      // Cambiar el estado a RECHAZADA en vez de eliminar
+      const response = await fetch(`/api/cotizaciones-proveedor/${cotizacionToDelete.idCotizacionProveedor}/estado`, {
+        method: "PUT",
         headers,
+        body: JSON.stringify({ estado: "RECHAZADA" })
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.message || "Error al eliminar la cotización")
+        throw new Error(errorData.message || "Error al rechazar la cotización")
       }
 
       // Actualizar la lista de cotizaciones
       setCotizaciones(cotizaciones.filter((c) => c.idCotizacionProveedor !== cotizacionToDelete.idCotizacionProveedor))
 
-      setSnackbarMessage("Cotización eliminada exitosamente")
+      setSnackbarMessage("Cotización rechazada exitosamente")
       setSnackbarSeverity("success")
       setOpenSnackbar(true)
     } catch (error) {
-      console.error("Error al eliminar cotización:", error)
+      console.error("Error al rechazar cotización:", error)
       setSnackbarMessage(`Error: ${error.message}`)
       setSnackbarSeverity("error")
       setOpenSnackbar(true)
@@ -239,6 +274,38 @@ export default function CotizacionesProveedorPage() {
     // Si no hay información disponible
     return "Sin información"
   }
+
+  // Cargar detalles de cotización proveedor
+  const cargarDetallesCotizacion = async (idCotizacion) => {
+    if (detallesCotizaciones[idCotizacion]) return
+    try {
+      setLoadingDetalles((prev) => ({ ...prev, [idCotizacion]: true }))
+      const response = await fetch(`/api/cotizaciones-proveedor/${idCotizacion}`)
+      if (response.ok) {
+        const data = await response.json()
+        setDetallesCotizaciones((prev) => ({ ...prev, [idCotizacion]: data }))
+      }
+    } catch (error) {
+      // No hacer nada especial, el error se muestra en el render
+    } finally {
+      setLoadingDetalles((prev) => ({ ...prev, [idCotizacion]: false }))
+    }
+  }
+
+  // Manejar expansión/contracción de filas
+  const handleToggleRow = (idCotizacion) => {
+    const newExpandedRows = new Set(expandedRows)
+    if (newExpandedRows.has(idCotizacion)) {
+      newExpandedRows.delete(idCotizacion)
+    } else {
+      newExpandedRows.add(idCotizacion)
+      cargarDetallesCotizacion(idCotizacion)
+    }
+    setExpandedRows(newExpandedRows)
+  }
+
+  // Filtrar cotizaciones según el estado seleccionado
+  const cotizacionesFiltradas = cotizaciones.filter(c => c.estado === filtroEstado)
 
   if (!hasPermission) {
     return (
@@ -303,79 +370,273 @@ export default function CotizacionesProveedorPage() {
         </Grid>
       </Paper>
 
+      <Box display="flex" gap={2} mb={2}>
+        <Button
+          variant={filtroEstado === 'PENDIENTE' ? 'contained' : 'outlined'}
+          color="primary"
+          onClick={() => setFiltroEstado('PENDIENTE')}
+        >
+          Ver Pendientes
+        </Button>
+        <Button
+          variant={filtroEstado === 'APROBADA' ? 'contained' : 'outlined'}
+          color="success"
+          onClick={() => setFiltroEstado('APROBADA')}
+        >
+          Ver Aprobadas
+        </Button>
+        <Button
+          variant={filtroEstado === 'RECHAZADA' ? 'contained' : 'outlined'}
+          color="error"
+          onClick={() => setFiltroEstado('RECHAZADA')}
+        >
+          Ver Rechazadas
+        </Button>
+      </Box>
+
+      {/* Botón de comparar cotizaciones (arriba) */}
+      {cotizacionesSeleccionadas.length >= 2 && (
+        <Box my={2} display="flex" justifyContent="flex-end">
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => router.push(`/cotizaciones-proveedor/comparar?ids=${cotizacionesSeleccionadas.join(",")}`)}
+          >
+            Comparar Cotizaciones Seleccionadas
+          </Button>
+        </Box>
+      )}
+
       {loading ? (
         <Box display="flex" justifyContent="center" my={4}>
           <CircularProgress />
         </Box>
       ) : hasSearched ? (
-        cotizaciones.length > 0 ? (
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Fecha</TableCell>
-                  <TableCell>Proveedor</TableCell>
-                  <TableCell>Monto Total</TableCell>
-                  <TableCell>Validez</TableCell>
-                  <TableCell>Estado</TableCell>
-                  <TableCell>Acciones</TableCell>
-                  <TableCell>Seleccionar</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {cotizaciones.map((cotizacion) => (
-                  <TableRow key={cotizacion.idCotizacionProveedor}>
-                    <TableCell>{cotizacion.idCotizacionProveedor}</TableCell>
-                    <TableCell>{formatDate(cotizacion.fechaCotizacionProveedor)}</TableCell>
-                    <TableCell>{getProveedorNombre(cotizacion)}</TableCell>
-                    <TableCell>
-                      {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                        cotizacion.montoTotal || 0,
-                      )}
-                    </TableCell>
-                    <TableCell>{cotizacion.validez || "N/A"} días</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={cotizacion.estado || "PENDIENTE"}
-                        color={getEstadoChipColor(cotizacion.estado)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box display="flex">
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleVerCotizacion(cotizacion.idCotizacionProveedor)}
-                          title="Ver cotización"
-                          size="small"
-                        >
-                          <Visibility />
-                        </IconButton>
-                        {cotizacion.estado === "PENDIENTE" && (
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDeleteClick(cotizacion)}
-                            title="Eliminar cotización"
-                            size="small"
-                          >
-                            <Delete />
-                          </IconButton>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox
-                        checked={cotizacionesSeleccionadas.includes(cotizacion.idCotizacionProveedor)}
-                        onChange={() => handleToggleSeleccion(cotizacion.idCotizacionProveedor)}
-                        color="primary"
-                      />
-                    </TableCell>
+        cotizacionesFiltradas.length > 0 ? (
+          <>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell />
+                    <TableCell>ID</TableCell>
+                    <TableCell>Fecha</TableCell>
+                    <TableCell>Proveedor</TableCell>
+                    <TableCell>Monto Total</TableCell>
+                    <TableCell>Validez</TableCell>
+                    <TableCell>Estado</TableCell>
+                    <TableCell>Acciones</TableCell>
+                    <TableCell>Seleccionar</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {cotizacionesFiltradas.map((cotizacion) => {
+                    const isExpanded = expandedRows.has(cotizacion.idCotizacionProveedor)
+                    const detalles = detallesCotizaciones[cotizacion.idCotizacionProveedor]
+                    const isLoadingDetalles = loadingDetalles[cotizacion.idCotizacionProveedor]
+                    return (
+                      <React.Fragment key={cotizacion.idCotizacionProveedor}>
+                        <TableRow>
+                          {/* Botón de expandir/colapsar a la izquierda */}
+                          <TableCell>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleToggleRow(cotizacion.idCotizacionProveedor)}
+                              disabled={isLoadingDetalles}
+                              color="primary"
+                              title={isExpanded ? "Ocultar detalles" : "Ver detalles rápidos"}
+                            >
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </IconButton>
+                          </TableCell>
+                          <TableCell>{cotizacion.idCotizacionProveedor}</TableCell>
+                          <TableCell>{formatDate(cotizacion.fechaCotizacionProveedor)}</TableCell>
+                          <TableCell>{getProveedorNombre(cotizacion)}</TableCell>
+                          <TableCell>
+                            {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                              cotizacion.montoTotal || 0,
+                            )}
+                          </TableCell>
+                          <TableCell>{cotizacion.validez || "N/A"} días</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={cotizacion.estado || "PENDIENTE"}
+                              color={getEstadoChipColor(cotizacion.estado)}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box display="flex">
+                              <IconButton
+                                color="primary"
+                                onClick={() => handleVerCotizacion(cotizacion.idCotizacionProveedor)}
+                                title="Ver cotización"
+                                size="small"
+                              >
+                                <Visibility />
+                              </IconButton>
+                              {cotizacion.estado === "PENDIENTE" && (
+                                <IconButton
+                                  color="error"
+                                  onClick={() => handleDeleteClick(cotizacion)}
+                                  title="Eliminar cotización"
+                                  size="small"
+                                >
+                                  <Delete />
+                                </IconButton>
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Checkbox
+                              checked={cotizacionesSeleccionadas.includes(cotizacion.idCotizacionProveedor)}
+                              onChange={() => handleToggleSeleccion(cotizacion.idCotizacionProveedor)}
+                              color="primary"
+                            />
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+                            <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                              <Box sx={{ margin: 1 }}>
+                                {isLoadingDetalles ? (
+                                  <Box display="flex" justifyContent="center" p={2}>
+                                    <CircularProgress size={24} />
+                                  </Box>
+                                ) : detalles ? (
+                                  <Card variant="outlined">
+                                    <CardContent>
+                                      <Typography variant="h6" gutterBottom>
+                                        Detalle de la Cotización #{cotizacion.idCotizacionProveedor}
+                                      </Typography>
+                                      <Grid container spacing={2}>
+                                        <Grid item xs={12} md={6}>
+                                          <Typography variant="subtitle2" color="textSecondary">
+                                            Proveedor:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {detalles.proveedor?.empresa?.razonSocial || "N/A"}
+                                          </Typography>
+                                          <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                            RUC:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {detalles.proveedor?.empresa?.ruc || "N/A"}
+                                          </Typography>
+                                          <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                            Contacto:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {detalles.proveedor?.empresa?.contacto || "N/A"}
+                                          </Typography>
+                                          <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                            Teléfono:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {detalles.proveedor?.empresa?.telefono || "N/A"}
+                                          </Typography>
+                                        </Grid>
+                                        <Grid item xs={12} md={6}>
+                                          <Typography variant="subtitle2" color="textSecondary">
+                                            Fecha:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {formatDate(detalles.fechaCotizacionProveedor)}
+                                          </Typography>
+                                          <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                            Estado:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {detalles.estado || "PENDIENTE"}
+                                          </Typography>
+                                          <Typography variant="subtitle2" color="textSecondary" sx={{ mt: 1 }}>
+                                            Validez:
+                                          </Typography>
+                                          <Typography variant="body2">
+                                            {detalles.validez || "N/A"} días
+                                          </Typography>
+                                        </Grid>
+                                      </Grid>
+                                      <Divider sx={{ my: 2 }} />
+                                      <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                                        Materias Primas Cotizadas
+                                      </Typography>
+                                      {detalles.detallesCotizacionProv && detalles.detallesCotizacionProv.length > 0 ? (
+                                        <Table size="small">
+                                          <TableHead>
+                                            <TableRow>
+                                              <TableCell>Materia Prima</TableCell>
+                                              <TableCell align="right">Precio Unitario</TableCell>
+                                              <TableCell align="right">Cantidad</TableCell>
+                                              <TableCell align="right">Subtotal</TableCell>
+                                            </TableRow>
+                                          </TableHead>
+                                          <TableBody>
+                                            {detalles.detallesCotizacionProv.map((detalle, index) => (
+                                              <TableRow key={detalle.idDetalleCotizacionProv || index}>
+                                                <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
+                                                <TableCell align="right">
+                                                  {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                                                    detalle.precioUnitario || 0,
+                                                  )}
+                                                </TableCell>
+                                                <TableCell align="right">{detalle.cantidad}</TableCell>
+                                                <TableCell align="right">
+                                                  {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                                                    detalle.subtotal || 0,
+                                                  )}
+                                                </TableCell>
+                                              </TableRow>
+                                            ))}
+                                            <TableRow>
+                                              <TableCell colSpan={3} align="right">
+                                                <strong>TOTAL:</strong>
+                                              </TableCell>
+                                              <TableCell align="right">
+                                                <strong>
+                                                  {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
+                                                    detalles.montoTotal || 0,
+                                                  )}
+                                                </strong>
+                                              </TableCell>
+                                            </TableRow>
+                                          </TableBody>
+                                        </Table>
+                                      ) : (
+                                        <Alert severity="info" sx={{ mt: 2 }}>
+                                          No hay detalles disponibles para esta cotización
+                                        </Alert>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                ) : (
+                                  <Alert severity="error">
+                                    No se pudieron cargar los detalles de la cotización
+                                  </Alert>
+                                )}
+                              </Box>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            {/* Botón de comparar cotizaciones (abajo) */}
+            {cotizacionesSeleccionadas.length >= 2 && (
+              <Box my={2} display="flex" justifyContent="flex-end">
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={() => router.push(`/cotizaciones-proveedor/comparar?ids=${cotizacionesSeleccionadas.join(",")}`)}
+                >
+                  Comparar Cotizaciones Seleccionadas
+                </Button>
+              </Box>
+            )}
+          </>
         ) : (
           <Alert severity="info">No se encontraron cotizaciones que coincidan con la búsqueda</Alert>
         )
@@ -421,18 +682,6 @@ export default function CotizacionesProveedorPage() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
-
-      {cotizacionesSeleccionadas.length >= 2 && (
-        <Box my={2}>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={() => router.push(`/cotizaciones-proveedor/comparar?ids=${cotizacionesSeleccionadas.join(",")}`)}
-          >
-            Comparar Cotizaciones Seleccionadas
-          </Button>
-        </Box>
-      )}
     </Container>
   )
 }
