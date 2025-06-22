@@ -107,7 +107,9 @@ export async function GET(request) {
         },
         pagos: true,
         notas: true,
-        notasDebito: true, // Incluir notas de débito si es necesario
+        notasDebito: {
+          where: { deleted_at: null },
+        },
       },
       orderBy: {
         fechaEmision: "desc",

@@ -559,7 +559,7 @@ function FacturacionClientes() {
                                 )}
 
                                 {/* Mostrar nota de débito en PDF si existe exactamente 1 */}
-                                {factura.notasDebito?.length === 1 && factura.notasDebito[0]?.id_notadb && (
+                                {factura.notasDebito && factura.notasDebito.filter(nota => !nota.deleted_at).length === 1 && factura.notasDebito[0]?.id_notadb && (
                                   <IconButton
                                     size="small"
                                     color="error"
@@ -606,13 +606,13 @@ function FacturacionClientes() {
                           </Box>
                         )}
                         {/* Mostrar notas de débito asociadas */}
-                        {factura.notasDebito && factura.notasDebito.length > 0 && (
+                        {factura.notasDebito && factura.notasDebito.filter(nota => !nota.deleted_at).length > 0 && (
                           <Box sx={{ mt: 2, ml: 4 }}>
                             <Typography variant="subtitle2" color="error" gutterBottom>
                               Notas de Débito Asociadas:
                             </Typography>
                             <Grid container spacing={1}>
-                              {factura.notasDebito.map((nota) => (
+                              {factura.notasDebito.filter(nota => !nota.deleted_at).map((nota) => (
                                 <Grid item key={nota?.id_notadb || Math.random()}>
                                   <Button
                                     variant="outlined"

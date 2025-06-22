@@ -10,6 +10,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import AddIcon from "@mui/icons-material/Add"
 import DeleteIcon from "@mui/icons-material/Delete"
 import Link from 'next/link'
+import { useRootContext } from '@/src/app/context/root'
 
 const IMPUESTO_PORCENTAJE = 0.10
 const IMPUESTO_ID = 2 // según tu modelo
@@ -17,6 +18,7 @@ const IMPUESTO_ID = 2 // según tu modelo
 export default function NuevaNotaDebito() {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const { session } = useRootContext()
     const nroFactura = searchParams.get('nroFactura')
     const nroFacturaFormateado = nroFactura ? `001-001-${String(nroFactura).padStart(7, "0")}` : "-"
 
@@ -32,7 +34,7 @@ export default function NuevaNotaDebito() {
     const [snackbar, setSnackbar] = useState({ abierto: false, mensaje: '', tipo: 'success' })
 
     // Simula usuario actual (reemplaza por tu auth real)
-    const usuario_emisor = "usuario_demo"
+    const usuario_emisor = session?.usuario || ""
 
     const handleConceptoChange = (idx, field, value) => {
         setConceptos(conceptos =>
@@ -52,9 +54,10 @@ export default function NuevaNotaDebito() {
     const conceptosCalculados = conceptos.map(c => {
         const cantidad = Number(c.cantidad) || 0
         const precio_unitario = Number(c.precio_unitario) || 0
-        const subtotal = cantidad * precio_unitario
-        const monto_impuesto = subtotal * IMPUESTO_PORCENTAJE
-        const total_item = subtotal + monto_impuesto
+        // Ahora el precio_unitario ya incluye el impuesto
+        const subtotal = cantidad * (precio_unitario / (1 + IMPUESTO_PORCENTAJE))
+        const monto_impuesto = cantidad * (precio_unitario - (precio_unitario / (1 + IMPUESTO_PORCENTAJE)))
+        const total_item = cantidad * precio_unitario
         return { ...c, cantidad, precio_unitario, subtotal, monto_impuesto, total_item }
     })
     const monto_total = conceptosCalculados.reduce((sum, c) => sum + c.total_item, 0)
