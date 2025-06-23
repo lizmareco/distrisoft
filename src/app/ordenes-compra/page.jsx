@@ -59,6 +59,7 @@ import { es } from "date-fns/locale"
 import { ArrowBack } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 import VisorFacturaProveedor from "@/src/components/facturas/VisorFacturaProveedor"
+import FacturasOrdenCompra from "@/src/components/facturas/FacturasOrdenCompra"
 
 export default function OrdenesCompraPage() {
   console.log("Renderizando OrdenesCompraPage");
@@ -128,6 +129,12 @@ export default function OrdenesCompraPage() {
 
   // Después de la línea donde defines otros estados, agregar:
   const [facturasExistentes, setFacturasExistentes] = useState(new Set())
+
+  // Agregar estado para el diálogo de facturas
+  const [dialogFacturas, setDialogFacturas] = useState({ open: false, orden: null })
+
+  // Agregar estado para controlar si el diálogo de factura se abrió automáticamente
+  const [facturaAbiertaAutomaticamente, setFacturaAbiertaAutomaticamente] = useState(false)
 
   // Efecto para cargar datos iniciales
   useEffect(() => {
@@ -326,6 +333,9 @@ export default function OrdenesCompraPage() {
       const esCambioAParcialmenteRecibido =
         estadoAnterior?.toLowerCase() === "enviado" && nuevoEstado === "PARCIALMENTE RECIBIDO"
 
+      // Detectar si el cambio es a RECIBIDO
+      const esCambioARecibido = nuevoEstado === "RECIBIDO"
+
       if (esCambioAParcialmenteRecibido) {
         // Inicializar items para recepción parcial
         const detalles = dialogEstado.orden?.cotizacionProveedor?.detallesCotizacionProv || []
@@ -344,7 +354,44 @@ export default function OrdenesCompraPage() {
         return
       }
 
-      // Si no es cambio a parcialmente recibido, proceder normalmente
+      // Si es cambio a RECIBIDO, primero cambiar el estado y luego abrir factura
+      if (esCambioARecibido) {
+        const response = await fetch(`/api/ordenes-compra/${dialogEstado.orden.idOrdenCompra}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            idEstadoOrdenCompra: getEstadoId(nuevoEstado),
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Error al cambiar estado")
+        }
+
+        setSnackbar({
+          open: true,
+          message: "Estado actualizado a RECIBIDO. Ahora debe registrar la factura del proveedor.",
+          severity: "success",
+        })
+
+        setDialogEstado({ open: false, orden: null })
+        setNuevoEstado("")
+        
+        // Marcar que la factura se abrirá automáticamente
+        setFacturaAbiertaAutomaticamente(true)
+        
+        // Abrir automáticamente el diálogo de factura
+        setTimeout(() => {
+          setDialogFactura({ open: true, orden: dialogEstado.orden })
+        }, 500) // Pequeño delay para que se cierre el diálogo de estado primero
+        
+        fetchOrdenesCompra()
+        return
+      }
+
+      // Si no es cambio a parcialmente recibido ni a recibido, proceder normalmente
       const response = await fetch(`/api/ordenes-compra/${dialogEstado.orden.idOrdenCompra}`, {
         method: "PUT",
         headers: {
@@ -526,6 +573,7 @@ export default function OrdenesCompraPage() {
       })
 
       setDialogFactura({ open: false, orden: null })
+      setFacturaAbiertaAutomaticamente(false) // Resetear el estado
       resetFormularioFactura()
 
       // Redirigir a cuentas por pagar si es a crédito
@@ -665,6 +713,11 @@ export default function OrdenesCompraPage() {
       setVisorFactura({ open: true, facturaId: orden.facturaProveedor[0].idFacturaProveedor })
       handleMenuClose()
     }
+  }
+
+  const handleVerFacturas = (orden) => {
+    setDialogFacturas({ open: true, orden: orden })
+    handleMenuClose()
   }
 
   // Definir el contenido a renderizar según el permiso
@@ -854,6 +907,18 @@ export default function OrdenesCompraPage() {
                                     <ReceiptIcon color="success" fontSize="small" />
                                   </Tooltip>
                                 )}
+                                {orden.facturaProveedor && 
+                                 Array.isArray(orden.facturaProveedor) && 
+                                 orden.facturaProveedor.length > 1 && (
+                                  <Tooltip title={`${orden.facturaProveedor.length} facturas asociadas`}>
+                                    <Chip 
+                                      label={`${orden.facturaProveedor.length} facturas`}
+                                      size="small"
+                                      color="info"
+                                      variant="outlined"
+                                    />
+                                  </Tooltip>
+                                )}
                               </Box>
                             </TableCell>
                             <TableCell>
@@ -873,6 +938,18 @@ export default function OrdenesCompraPage() {
                                     <VisibilityIcon />
                                   </IconButton>
                                 </Tooltip>
+                                {tieneFacturaGuardada(orden) && (
+                                  <Tooltip title="Ver facturas de la orden">
+                                    <IconButton
+                                      component={Link}
+                                      href={`/ordenes-compra/${orden.idOrdenCompra}/facturas`}
+                                      color="info"
+                                      size="small"
+                                    >
+                                      <ReceiptIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                                 <Tooltip title="Más acciones">
                                   <IconButton size="small" onClick={(e) => handleMenuClick(e, orden)}>
                                     <MoreVertIcon />
@@ -989,6 +1066,12 @@ export default function OrdenesCompraPage() {
                 <ListItemText>Ver Factura</ListItemText>
               </MenuItem>
             ),
+            <MenuItem key="verFacturas" onClick={() => handleVerFacturas(selectedOrden)}>
+              <ListItemIcon>
+                <ReceiptIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Ver Facturas de la Orden</ListItemText>
+            </MenuItem>,
             <MenuItem
               key="cambiarEstado"
               onClick={() => {
@@ -1070,11 +1153,20 @@ export default function OrdenesCompraPage() {
                 ))}
             </Select>
           </FormControl>
+          
+          {/* Mensaje informativo cuando se selecciona RECIBIDO */}
+          {nuevoEstado === "RECIBIDO" && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <strong>Importante:</strong> Al cambiar el estado a RECIBIDO, automáticamente se abrirá el formulario 
+              para registrar la factura del proveedor, ya que es obligatorio registrar la factura cuando se recibe 
+              completamente la orden de compra.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialogEstado({ open: false, orden: null })}>Cancelar</Button>
           <Button onClick={handleCambiarEstado} variant="contained" color="primary" disabled={nuevoEstado === "PARCIALMENTE RECIBIDO"}>
-            Guardar
+            {nuevoEstado === "RECIBIDO" ? "Cambiar Estado y Registrar Factura" : "Guardar"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1096,8 +1188,29 @@ export default function OrdenesCompraPage() {
       </Dialog>
 
       {/* Diálogo de factura */}
-      <Dialog open={dialogFactura.open} onClose={() => setDialogFactura({ open: false, orden: null })}>
-        <DialogTitle>Registrar Factura</DialogTitle>
+      <Dialog 
+        open={dialogFactura.open} 
+        onClose={() => {
+          // Si se abrió automáticamente, mostrar confirmación
+          if (facturaAbiertaAutomaticamente) {
+            if (window.confirm("¿Está seguro que desea cancelar? Es obligatorio registrar la factura para completar el proceso de recepción.")) {
+              setDialogFactura({ open: false, orden: null })
+              setFacturaAbiertaAutomaticamente(false)
+            }
+          } else {
+            setDialogFactura({ open: false, orden: null })
+            setFacturaAbiertaAutomaticamente(false)
+          }
+        }}
+      >
+        <DialogTitle>
+          Registrar Factura
+          {facturaAbiertaAutomaticamente && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              <strong>Obligatorio:</strong> Debe registrar la factura del proveedor para completar el proceso de recepción.
+            </Alert>
+          )}
+        </DialogTitle>
         <DialogContent>
           <Box component="form" sx={{ mt: 2 }}>
             <Grid container spacing={2}>
@@ -1107,6 +1220,7 @@ export default function OrdenesCompraPage() {
                   label="Número de Factura"
                   value={datosFactura.nroFactura}
                   onChange={(e) => setDatosFactura({ ...datosFactura, nroFactura: e.target.value })}
+                  required
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1117,6 +1231,7 @@ export default function OrdenesCompraPage() {
                   value={datosFactura.fechaEmision}
                   onChange={(e) => setDatosFactura({ ...datosFactura, fechaEmision: e.target.value })}
                   InputLabelProps={{ shrink: true }}
+                  required
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1183,7 +1298,20 @@ export default function OrdenesCompraPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogFactura({ open: false, orden: null })}>Cancelar</Button>
+          <Button onClick={() => {
+            // Si se abrió automáticamente, mostrar confirmación
+            if (facturaAbiertaAutomaticamente) {
+              if (window.confirm("¿Está seguro que desea cancelar? Es obligatorio registrar la factura para completar el proceso de recepción.")) {
+                setDialogFactura({ open: false, orden: null })
+                setFacturaAbiertaAutomaticamente(false)
+              }
+            } else {
+              setDialogFactura({ open: false, orden: null })
+              setFacturaAbiertaAutomaticamente(false)
+            }
+          }}>
+            Cancelar
+          </Button>
           <Button onClick={handleGuardarFactura} variant="contained" color="primary">
             Guardar
           </Button>
@@ -1275,6 +1403,28 @@ export default function OrdenesCompraPage() {
         onClose={() => setVisorFactura({ open: false, facturaId: null })}
         facturaId={visorFactura.facturaId}
       />
+
+      {/* Diálogo para mostrar facturas de la orden */}
+      <Dialog 
+        open={dialogFacturas.open} 
+        onClose={() => setDialogFacturas({ open: false, orden: null })}
+        maxWidth="xl"
+        fullWidth
+      >
+        <DialogTitle>
+          Facturas de la Orden de Compra #{dialogFacturas.orden?.idOrdenCompra}
+        </DialogTitle>
+        <DialogContent>
+          {dialogFacturas.orden && (
+            <FacturasOrdenCompra idOrdenCompra={dialogFacturas.orden.idOrdenCompra} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogFacturas({ open: false, orden: null })}>
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 
