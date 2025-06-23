@@ -159,6 +159,30 @@ export default function MovimientosPage() {
     }
   }
 
+  const formatearNumero = (numero, decimales = 0) => {
+    const valor = Number.parseFloat(numero || 0)
+    return valor.toLocaleString("es-ES", {
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+      useGrouping: true
+    })
+  }
+
+  const formatearObservacion = (observacion) => {
+    if (!observacion) return observacion
+    
+    // Buscar patrones de números seguidos de "kg" (con o sin espacios)
+    return observacion.replace(/(\d+(?:\.\d+)?)\s*kg/gi, (match, numero) => {
+      const valor = Number.parseFloat(numero)
+      // Si el valor es un número entero (sin decimales), no mostrar decimales
+      const esEntero = valor === Math.floor(valor)
+      const numeroFormateado = esEntero 
+        ? valor.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+        : valor.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+      return `${numeroFormateado} kg`
+    })
+  }
+
   const renderizarTipoMovimiento = (tipo) => {
     const esEntrada = tipo === "ENTRADA"
     return (
@@ -206,12 +230,12 @@ export default function MovimientosPage() {
       valorTab === "materiasprimas"
         ? movimiento.materiaPrima?.nombreMateriaPrima || "N/A"
         : movimiento.producto?.nombreProducto || "N/A",
-    Cantidad: Number.parseFloat(movimiento.cantidad).toFixed(2),
-    "Stock Antes": Number.parseFloat(movimiento.stockAntes || 0).toFixed(2),
-    "Stock Después": Number.parseFloat(movimiento.stockDespues || 0).toFixed(2),
+    Cantidad: formatearNumero(movimiento.cantidad),
+    "Stock Antes": formatearNumero(movimiento.stockAntes),
+    "Stock Después": formatearNumero(movimiento.stockDespues),
     "Unidad Medida": movimiento.unidadMedida || "N/A",
     Motivo: movimiento.motivo || "N/A",
-    Observación: movimiento.observacion || "N/A",
+    Observación: formatearObservacion(movimiento.observacion) || "N/A",
   }))
 
   const handleMovimientoRegistrado = () => {
@@ -500,7 +524,7 @@ export default function MovimientosPage() {
                           Cantidad:
                         </Typography>
                         <Typography variant="body2">
-                          {Number.parseFloat(movimiento.cantidad).toFixed(2)} {movimiento.unidadMedida || "N/A"}
+                          {formatearNumero(movimiento.cantidad)} {movimiento.unidadMedida || "N/A"}
                         </Typography>
                       </Grid>
 
@@ -509,7 +533,7 @@ export default function MovimientosPage() {
                           Stock Antes:
                         </Typography>
                         <Typography variant="body2">
-                          {Number.parseFloat(movimiento.stockAntes || 0).toFixed(2)}
+                          {formatearNumero(movimiento.stockAntes)}
                         </Typography>
                       </Grid>
 
@@ -518,7 +542,7 @@ export default function MovimientosPage() {
                           Stock Después:
                         </Typography>
                         <Typography variant="body2">
-                          {Number.parseFloat(movimiento.stockDespues || 0).toFixed(2)}
+                          {formatearNumero(movimiento.stockDespues)}
                         </Typography>
                       </Grid>
 
@@ -536,7 +560,7 @@ export default function MovimientosPage() {
                           <Typography variant="body2" color="textSecondary">
                             Observación:
                           </Typography>
-                          <Typography variant="body2">{movimiento.observacion}</Typography>
+                          <Typography variant="body2">{formatearObservacion(movimiento.observacion)}</Typography>
                         </Grid>
                       )}
                     </Grid>
@@ -572,17 +596,11 @@ export default function MovimientosPage() {
                           : movimiento.producto?.nombreProducto || "N/A"}
                       </TableCell>
                       <TableCell align="center">{renderizarTipoMovimiento(movimiento.tipoMovimiento)}</TableCell>
-                      <TableCell align="right">
-                        {Number.parseFloat(movimiento.cantidad).toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {Number.parseFloat(movimiento.stockAntes ?? 0).toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {Number.parseFloat(movimiento.stockDespues || 0).toFixed(2)}
-                      </TableCell>
+                      <TableCell align="right">{formatearNumero(movimiento.cantidad)}</TableCell>
+                      <TableCell align="right">{formatearNumero(movimiento.stockAntes)}</TableCell>
+                      <TableCell align="right">{formatearNumero(movimiento.stockDespues)}</TableCell>
                       <TableCell>{movimiento.motivo || "-"}</TableCell>
-                      <TableCell>{movimiento.observacion || "-"}</TableCell>
+                      <TableCell>{formatearObservacion(movimiento.observacion) || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

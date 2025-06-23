@@ -87,7 +87,7 @@ function detectarNavegador(userAgent) {
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params
     console.log(`API: Obteniendo orden de compra con ID: ${id}`)
 
     if (!id || isNaN(Number.parseInt(id))) {
@@ -140,7 +140,7 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params
     console.log(`API: Actualizando orden de compra con ID: ${id}`)
 
     const auditoriaService = new AuditoriaService()
@@ -420,7 +420,7 @@ for (const item of data.recepcionItems) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params
+    const { id } = await params
     console.log(`API: Eliminando orden de compra con ID: ${id}`)
 
     const auditoriaService = new AuditoriaService()

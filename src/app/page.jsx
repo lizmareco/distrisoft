@@ -15,6 +15,14 @@ import {
   CircularProgress,
   Paper,
   Divider,
+  Drawer,
+  Toolbar,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Collapse,
 } from "@mui/material"
 import {
   Person,
@@ -34,12 +42,15 @@ import {
   Inventory2 as InventoryGeneralIcon, 
   ShoppingCart as ShoppingCartIcon, 
   InsertChart as InsertChartIcon,
+  ExpandLess,
+  ExpandMore,
 } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 
+const drawerWidth = 280;
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -48,6 +59,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [userInfo, setUserInfo] = useState(null)
+  const [openMenu, setOpenMenu] = useState({});
+
+  const handleMenuClick = (menu) => {
+    setOpenMenu((prev) => ({ ...prev, [menu]: !prev[menu] }));
+  };
 
   // Estado para controlar la visibilidad de las secciones según el rol
   const [visibleSections, setVisibleSections] = useState({
@@ -61,6 +77,7 @@ export default function DashboardPage() {
     cuentasCobrar: true,
     cuentasPagar: true,
     ReportesPage: true, // Sección de Reportes
+    ordenesProduccion: true,
   })
 
   // Estado para controlar la visibilidad de los elementos dentro de cada sección
@@ -247,8 +264,8 @@ export default function DashboardPage() {
         secciones.produccion = true
         secciones.inventario = true
         items.ordenesProduccion = true
-        items.materiaprima = true
-        items.productos = true
+        items.materiaprima = false
+        items.productos = false
         items.inventario = true
         items.formulas = true
         break
@@ -342,13 +359,142 @@ export default function DashboardPage() {
     )
   }*/
 
+  const menuConfig = [
+    {
+      section: "ventas",
+      title: "Gestión de Ventas",
+      icon: <DescriptionIcon />,
+      visible: visibleSections.ventas,
+      items: [
+        { item: "cotizaciones", title: "Cotizaciones a Clientes", path: "/cotizaciones", icon: <DescriptionIcon />, visible: visibleItems.cotizaciones },
+        { item: "pedidos", title: "Gestión de Pedidos", path: "/pedidos", icon: <ShoppingCartIcon />, visible: visibleItems.pedidos },
+      ],
+    },
+    {
+      section: "compras",
+      title: "Gestión de Compras",
+      icon: <ReceiptLongIcon />,
+      visible: visibleSections.compras,
+      items: [
+        { item: "cotizacionesProveedor", title: "Cotizaciones de Proveedores", path: "/cotizaciones-proveedor", icon: <ReceiptLongIcon />, visible: visibleItems.cotizacionesProveedor },
+        { item: "ordenesCompra", title: "Órdenes de Compra", path: "/ordenes-compra", icon: <LocalShipping />, visible: visibleItems.ordenesCompra },
+      ],
+    },
+    {
+        section: "produccion",
+        title: "Gestión de Producción",
+        icon: <PrecisionManufacturingIcon />,
+        visible: visibleSections.produccion,
+        items: [
+            { item: "ordenesProduccion", title: "Órdenes de Producción", path: "/produccion/ordenes", icon: <PrecisionManufacturingIcon />, visible: visibleItems.ordenesProduccion },
+        ],
+    },
+    {
+      section: "finanzas",
+      title: "Gestión de Finanzas",
+      icon: <AttachMoneyIcon />,
+      visible: visibleSections.finanzas,
+      items: [
+        { item: "finanzas", title: "Finanzas", path: "/finanzas", icon: <AttachMoneyIcon />, visible: visibleItems.finanzas },
+        { item: "cuentasCobrar", title: "Cuentas por Cobrar", path: "/finanzas/cuentas-cobrar", icon: <TrendingUpIcon />, visible: visibleItems.cuentasCobrar },
+        { item: "cuentasPagar", title: "Cuentas por Pagar", path: "/finanzas/cuentas-pagar", icon: <TrendingDownIcon />, visible: visibleItems.cuentasPagar },
+      ],
+    },
+    {
+      section: "entidades",
+      title: "Gestión de Entidades",
+      icon: <People />,
+      visible: visibleSections.entidades,
+      items: [
+        { item: "personas", title: "Gestión de Personas", path: "/personas", icon: <Person />, visible: visibleItems.personas },
+        { item: "clientes", title: "Gestión de Clientes", path: "/clientes", icon: <People />, visible: visibleItems.clientes },
+        { item: "empresas", title: "Gestión de Empresas", path: "/empresas", icon: <Business />, visible: visibleItems.empresas },
+        { item: "proveedores", title: "Gestión de Proveedores", path: "/proveedores", icon: <LocalShipping />, visible: visibleItems.proveedores },
+      ],
+    },
+    {
+      section: "inventario",
+      title: "Gestión de Inventario",
+      icon: <Inventory />,
+      visible: visibleSections.inventario,
+      items: [
+        { item: "materiaprima", title: "Gestión de Materia Prima", path: "/materiaprima", icon: <Category />, visible: visibleItems.materiaprima },
+        { item: "productos", title: "Gestión de Productos", path: "/producto", icon: <Inventory />, visible: visibleItems.productos },
+        { item: "inventario", title: "Inventario General", path: "/inventario", icon: <InventoryGeneralIcon />, visible: visibleItems.inventario },
+        { item: "formulas", title: "Gestión de Fórmulas", path: "/formulas", icon: <ScienceIcon />, visible: visibleItems.formulas },
+      ],
+    },
+    {
+        section: "usuarios",
+        title: "Admin. de Sistema",
+        icon: <AdminPanelSettings />,
+        visible: visibleSections.usuarios,
+        items: [
+            { item: "administracionUsuarios", title: "Gestión de Usuarios", path: "/usuarios", icon: <AdminPanelSettings />, visible: visibleItems.administracionUsuarios },
+            { item: "roles", title: "Gestión de Roles", path: "/roles", icon: <SecurityIcon />, visible: visibleItems.administracionUsuarios },
+            { item: "auditoria", title: "Logs de Auditoría", path: "/admin/auditoria", icon: <HistoryIcon />, visible: visibleItems.administracionUsuarios },
+        ],
+    },
+    {
+        section: "reportes",
+        title: "Gestión de Reportes",
+        icon: <InsertChartIcon />,
+        visible: visibleSections.ReportesPage,
+        items: [
+            { item: "reportes", title: "Reportes", path: "/reportes", icon: <InsertChartIcon />, visible: visibleItems.reportes },
+        ],
+    }
+  ];
+
   return (
+    <Box sx={{ display: 'flex' }}>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+            top: '64px',
+            height: 'calc(100% - 64px)',
+          },
+        }}
+      >
+        <Box sx={{ overflow: 'auto' }}>
+          <List>
+            {menuConfig.map((menu) =>
+              menu.visible ? (
+                <div key={menu.section}>
+                  <ListItemButton onClick={() => handleMenuClick(menu.section)}>
+                    <ListItemIcon sx={{ color: "#1976D2" }}>{menu.icon}</ListItemIcon>
+                    <ListItemText primary={menu.title} />
+                    {openMenu[menu.section] ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                  <Collapse in={openMenu[menu.section]} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {menu.items.map((item) =>
+                        item.visible ? (
+                          <ListItemButton key={item.item} sx={{ pl: 4 }} onClick={() => navigateTo(item.path)}>
+                            <ListItemIcon sx={{ color: "#c60f7b" }}>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.title} />
+                          </ListItemButton>
+                        ) : null
+                      )}
+                    </List>
+                  </Collapse>
+                </div>
+              ) : null
+            )}
+          </List>
+        </Box>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', p: 3 }}>
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 4, mb: 4 }}>
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <DashboardIcon sx={{ fontSize: 32, mr: 2, color: "primary.main" }} />
           <Typography variant="h4" component="h1" gutterBottom>
-            Panel de Control DistriSoft
+            Distribuidora Las niñas
           </Typography>
         </Box>
 
@@ -366,660 +512,11 @@ export default function DashboardPage() {
         )}
 
         <Typography variant="body1" paragraph>
-          Selecciona una de las siguientes opciones para comenzar a gestionar el sistema:
+              Utiliza el menú lateral para navegar por los diferentes módulos del sistema.
         </Typography>
       </Paper>
-
-      {/* Sección de Gestión de Ventas */}
-      {visibleSections.ventas && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-            Gestión de Ventas
-          </Typography>
-
-          <Grid container spacing={3} justifyContent="center">
-            {/* Tarjeta de Gestión de Cotizaciones */}
-            {visibleItems.cotizaciones && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <DescriptionIcon sx={{ fontSize: 60, color: "#009688" }} /> {/* Teal */}
+        </Container>
                     </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Cotizaciones a Clientes
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las cotizaciones del sistema. Cree nuevas cotizaciones, consulte el historial y
-                      gestione el estado.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/cotizaciones")}
-                      sx={{ bgcolor: "#009688", "&:hover": { bgcolor: "#00796b" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Pedidos */}
-            {visibleItems.pedidos && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <ShoppingCartIcon sx={{ fontSize: 60, color: "#ff5722" }} />
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Pedidos
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre los pedidos de clientes. Cree nuevos pedidos, consulte el historial y gestione el
-                      estado de los mismos.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/pedidos")}
-                      sx={{ bgcolor: "#ff5722", "&:hover": { bgcolor: "#d84315" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </Paper>
-      )}
-
-      {/* Nueva Sección de Gestión de Compras */}
-      {visibleSections.compras && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-            Gestión de Compras
-          </Typography>
-
-          <Grid container spacing={3} justifyContent="center">
-            {/* Tarjeta de Gestión de Cotizaciones de Proveedores */}
-            {visibleItems.cotizacionesProveedor && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <ReceiptLongIcon sx={{ fontSize: 60, color: "#e65100" }} /> {/* Naranja oscuro */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Cotizaciones de Proveedores
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las cotizaciones de proveedores. Cree nuevas cotizaciones, consulte el historial y
-                      gestione el estado de las mismas.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/cotizaciones-proveedor")}
-                      sx={{ bgcolor: "#e65100", "&:hover": { bgcolor: "#bf360c" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Órdenes de Compra */}
-            {visibleItems.ordenesCompra && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <LocalShipping sx={{ fontSize: 60, color: "#d32f2f" }} /> {/* Rojo */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Órdenes de Compra
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las órdenes de compra. Cree nuevas órdenes, consulte el historial y gestione el estado
-                      de las mismas.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/ordenes-compra")}
-                      sx={{ bgcolor: "#d32f2f", "&:hover": { bgcolor: "#b71c1c" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </Paper>
-      )}
-
-      {/* Nueva Sección de Gestión de Finanzas */}
-{visibleSections.finanzas && (
-  <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-    <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-      Gestión de Finanzas
-    </Typography>
-
-    <Grid container spacing={3} justifyContent="center">
-      {visibleItems.finanzas && (
-        <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                <AttachMoneyIcon sx={{ fontSize: 60, color: "#2e7d32" }} /> {/* Verde oscuro */}
-              </Box>
-              <Typography variant="h5" component="h2" gutterBottom>
-                Finanzas
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Administre las finanzas del sistema. Revise ingresos, egresos y estado de cuentas.
-              </Typography>
-            </CardContent>
-            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => navigateTo("/finanzas")}
-                sx={{ bgcolor: "#2e7d32", "&:hover": { bgcolor: "#1b5e20" } }}
-              >
-                ACCEDER
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-      )}
-      
-      {/* Tarjeta de Cuentas por Cobrar */}
-      {visibleItems.cuentasCobrar && (
-        <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                <TrendingUpIcon sx={{ fontSize: 60, color: "#1976d2" }} /> {/* Azul */}
-              </Box>
-              <Typography variant="h5" component="h2" gutterBottom>
-                Cuentas por Cobrar
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Gestione las cuentas pendientes por cobrar. Controle pagos y vencimientos.
-              </Typography>
-            </CardContent>
-            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => navigateTo("/finanzas/cuentas-cobrar")}
-                sx={{ bgcolor: "#1976d2", "&:hover": { bgcolor: "#0d47a1" } }}
-              >
-                ACCEDER
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-      )}
-      
-      {/* Tarjeta de Cuentas por Pagar */}
-      {visibleItems.cuentasPagar && (
-        <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                <TrendingDownIcon sx={{ fontSize: 60, color: "#ed6c02" }} /> {/* Naranja */}
-              </Box>
-              <Typography variant="h5" component="h2" gutterBottom>
-                Cuentas por Pagar
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Administre las cuentas pendientes por pagar. Programe pagos y controle vencimientos.
-              </Typography>
-            </CardContent>
-            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => navigateTo("/finanzas/cuentas-pagar")}
-                sx={{ bgcolor: "#ed6c02", "&:hover": { bgcolor: "#e65100" } }}
-              >
-                ACCEDER
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-      )}
-    </Grid>
-  </Paper>
-)}
-
-
-      {/* Sección de Gestión de Entidades */}
-      {visibleSections.entidades && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-            Gestión de Entidades
-          </Typography>
-
-          <Grid container spacing={3}>
-            {/* Tarjeta de Gestión de Personas */}
-            {visibleItems.personas && (
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <Person sx={{ fontSize: 60, color: "#2e7d32" }} /> {/* Verde */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Personas
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las personas del sistema. Visualice, registre y modifique la información personal.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/personas")}
-                      sx={{ bgcolor: "#2e7d32", "&:hover": { bgcolor: "#1b5e20" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Clientes */}
-            {visibleItems.clientes && (
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <People sx={{ fontSize: 60, color: "#1976d2" }} /> {/* Azul */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Clientes
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre los clientes del sistema. Visualice, registre y modifique la información de los
-                      clientes.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/clientes")}
-                      sx={{ bgcolor: "#1976d2", "&:hover": { bgcolor: "#0d47a1" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Empresas */}
-            {visibleItems.empresas && (
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <Business sx={{ fontSize: 60, color: "#9c27b0" }} /> {/* Morado */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Empresas
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las empresas del sistema. Visualice, registre y modifique la información de las
-                      empresas.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/empresas")}
-                      sx={{ bgcolor: "#9c27b0", "&:hover": { bgcolor: "#7b1fa2" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Proveedores */}
-            {visibleItems.proveedores && (
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <LocalShipping sx={{ fontSize: 60, color: "#0288d1" }} /> {/* Azul claro */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Proveedores
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre los proveedores del sistema. Visualice, registre y modifique la información de los
-                      proveedores.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/proveedores")}
-                      sx={{ bgcolor: "#0288d1", "&:hover": { bgcolor: "#01579b" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </Paper>
-      )}
-
-      {/* Sección de Gestión de Inventario */}
-      {visibleSections.inventario && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-            Gestión de Inventario
-          </Typography>
-
-          <Grid container spacing={3}>
-            {/* Tarjeta de Gestión de Materia Prima */}
-            {visibleItems.materiaprima && (
-              <Grid item xs={12} sm={6}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <Category sx={{ fontSize: 60, color: "#ff9800" }} /> {/* Naranja */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Materia Prima
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre el catálogo de materias primas. Visualice, registre y modifique la información de
-                      stock, unidades de medida y estados de las materias primas.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/materiaprima")}
-                      sx={{ bgcolor: "#ff9800", "&:hover": { bgcolor: "#e65100" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Productos */}
-            {visibleItems.productos && (
-              <Grid item xs={12} sm={6}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <Inventory sx={{ fontSize: 60, color: "#f44336" }} /> {/* Rojo */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Productos
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre el catálogo de productos. Visualice, registre y modifique la información de precios,
-                      tipos, pesos y estados de los productos.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/producto")}
-                      sx={{ bgcolor: "#f44336", "&:hover": { bgcolor: "#b71c1c" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Inventario de Materia Prima y Producto*/}
-            {visibleItems.inventario && (
-              <Grid item xs={12} sm={6}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <InventoryGeneralIcon sx={{ fontSize: 60, color: "#607d8b" }} /> {/* Gris azulado */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Inventario de Materia Prima y Producto
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre el Inventario de Materia Prima y Producto. Visualice stock total, movimientos de inventario.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/inventario")}
-                      sx={{ bgcolor: "#607d8b", "&:hover": { bgcolor: "#455a64" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Fórmulas */}
-            {visibleItems.formulas && (
-              <Grid item xs={12} sm={6}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <ScienceIcon sx={{ fontSize: 60, color: "#3f51b5" }} /> {/* Índigo */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Fórmulas
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre las fórmulas de producción. Cree, modifique y gestione las recetas y fórmulas para la
-                      fabricación de productos.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/formulas")}
-                      sx={{ bgcolor: "#3f51b5", "&:hover": { bgcolor: "#303f9f" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </Paper>
-      )}
-
-      {/* Sección de Gestión de Producción */}
-{visibleSections.produccion && (
-  <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-    <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-      Gestión de Producción
-    </Typography>
-    <Grid container spacing={3} justifyContent="center">
-      {visibleItems.ordenesProduccion && (
-        <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-            <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                <PrecisionManufacturingIcon sx={{ fontSize: 60, color: "#FFC107" }} />
-              </Box>
-              <Typography variant="h5" component="h2" gutterBottom>
-                Órdenes de Producción
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Administre las producciones de pedidos de clientes.
-              </Typography>
-            </CardContent>
-            <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => navigateTo("/produccion/ordenes")}
-                sx={{ bgcolor: "#FFC107", "&:hover": { bgcolor: "#FFA000" } }}
-              >
-                ACCEDER
-              </Button>
-            </CardActions>
-          </Card>
-        </Grid>
-      )}
-    </Grid>
-  </Paper>
-)}
-
-      {/* Sección de Gestión de Usuarios y Roles */}
-      {visibleSections.usuarios && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-            Gestión de Usuarios, Roles, Auditoría
-          </Typography>
-          <Grid container spacing={3}>
-            {/* Tarjeta de Gestión de Usuarios */}
-            {visibleItems.administracionUsuarios && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <AdminPanelSettings sx={{ fontSize: 60, color: "#673ab7" }} /> {/* Morado oscuro */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Usuarios
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Administre los usuarios del sistema. Cree, modifique y gestione las cuentas de usuario.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/usuarios")}
-                      sx={{ bgcolor: "#673ab7", "&:hover": { bgcolor: "#4a148c" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Gestión de Roles */}
-            {visibleItems.administracionUsuarios && (
-              <Grid item xs={12} sm={6} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <SecurityIcon sx={{ fontSize: 60, color: "#2e7d32" }} /> {/* Verde */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Gestión de Roles
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Configure los roles y permisos del sistema. Defina los niveles de acceso para los usuarios.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/roles")}
-                      sx={{ bgcolor: "#2e7d32", "&:hover": { bgcolor: "#1b5e20" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-
-            {/* Tarjeta de Logs de Auditoría */}
-            {visibleItems.administracionUsuarios && (
-              <Grid item xs={12} sm={12} md={4}>
-                <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 2 }}>
-                  <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                    <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                      <HistoryIcon sx={{ fontSize: 60, color: "#1976d2" }} /> {/* Azul */}
-                    </Box>
-                    <Typography variant="h5" component="h2" gutterBottom>
-                      Logs de Auditoría
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Visualiza los registros de auditoría del sistema.
-                    </Typography>
-                  </CardContent>
-                  <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={() => navigateTo("/admin/auditoria")}
-                      sx={{ bgcolor: "#1976d2", "&:hover": { bgcolor: "#0d47a1" } }}
-                    >
-                      ACCEDER
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            )}
-          </Grid>
-        </Paper>
-      )}
-
-      {/* Tarjeta de Gestión de Reportes */}
-      {visibleSections.ReportesPage && (
-        <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: "medium", textAlign: "center" }}>
-            Gestión de Reportes
-          </Typography>
-          <Grid container spacing={3} justifyContent="center">
-            <Grid item xs={12} sm={6} md={4}>
-              <Card sx={{ height: "100%", display: "flex", flexDirection: "column", boxShadow: 3 }}>
-                <CardContent sx={{ flexGrow: 1, textAlign: "center" }}>
-                  <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                    <InsertChartIcon sx={{ fontSize: 60, color: "#0288d1" }} /> {/* Azul claro */}
                   </Box>
-                  <Typography variant="h5" component="h2" gutterBottom>
-                    Reportes
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Visualice y exporte los reportes de compras y ventas.
-                  </Typography>
-                </CardContent>
-                <CardActions sx={{ justifyContent: "center", pb: 2 }}>
-                  <Button
-                    variant="contained"
-                    onClick={() => navigateTo("/reportes")}
-                    sx={{ bgcolor: "#0288d1", "&:hover": { bgcolor: "#01579b" } }}
-                  >
-                    ACCEDER
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
-    </Container>
   )
 }

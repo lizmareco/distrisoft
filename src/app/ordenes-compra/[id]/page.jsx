@@ -33,7 +33,7 @@ import {
   MenuItem,
   Checkbox,
 } from "@mui/material"
-import { ArrowBack, Edit, Save, Cancel, Delete, Inventory } from "@mui/icons-material"
+import { ArrowBack, Edit, Save, Cancel, Delete, Inventory, PictureAsPdf } from "@mui/icons-material"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -481,6 +481,60 @@ export default function VerOrdenCompraPage({ params }) {
     return []
   }
 
+  // Agregar función para generar PDF
+  const handleGeneratePDF = async () => {
+    try {
+      setProcesandoAccion(true)
+      
+      // Obtener el token de autenticación
+      const token =
+        localStorage.getItem("accessToken") ||
+        sessionStorage.getItem("accessToken") ||
+        localStorage.getItem("token") ||
+        sessionStorage.getItem("token") ||
+        document.cookie.replace(/(?:(?:^|.*;\s*)accessToken\s*=\s*([^;]*).*$)|^.*$/, "$1")
+
+      const response = await fetch(`/api/ordenes-compra/${id}/pdf`, {
+        method: "GET",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Error al generar PDF")
+      }
+
+      // Crear blob y descargar
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `orden-compra-${id}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      // Mostrar mensaje de éxito
+      setSnackbarMessage("PDF generado exitosamente")
+      setSnackbarSeverity("success")
+      setOpenSnackbar(true)
+
+    } catch (error) {
+      console.error("Error:", error)
+      setError(error.message)
+
+      // Mostrar mensaje de error
+      setSnackbarMessage(`Error al generar PDF: ${error.message}`)
+      setSnackbarSeverity("error")
+      setOpenSnackbar(true)
+    } finally {
+      setProcesandoAccion(false)
+    }
+  }
+
   // Si no tiene permiso, mostrar alerta y no permitir acceso
   if (!hasPermission) {
     return (
@@ -515,6 +569,18 @@ export default function VerOrdenCompraPage({ params }) {
               Orden de Compra #{ordenCompra.idOrdenCompra}
             </Typography>
             <Box>
+              {/* Botón para generar PDF */}
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<PictureAsPdf />}
+                onClick={handleGeneratePDF}
+                disabled={procesandoAccion}
+                sx={{ mr: 1 }}
+              >
+                Generar PDF
+              </Button>
+              
               {!editMode && canReceivePartially() && (
                 <Button
                   variant="contained"
@@ -550,7 +616,6 @@ export default function VerOrdenCompraPage({ params }) {
                   </Button>
                 </>
               )}
-
             </Box>
           </Box>
 

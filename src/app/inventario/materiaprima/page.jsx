@@ -230,6 +230,41 @@ export default function MateriaPrimaPage() {
     })
   }
 
+  // Función para formatear números con separadores de miles y mostrar gramos/kg
+  const formatearNumero = (numero) => {
+    const valor = Number.parseFloat(numero || 0)
+    const gramos = valor.toLocaleString("es-ES", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      useGrouping: true
+    })
+    
+    // Calcular kilogramos si el valor es mayor a 0
+    if (valor > 0) {
+      const kilogramos = valor / 1000
+      
+      // Si los kilogramos son un número entero, no mostrar decimales
+      if (Number.isInteger(kilogramos)) {
+        const kgFormateado = kilogramos.toLocaleString("es-ES", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+          useGrouping: true
+        })
+        return `${gramos} g (${kgFormateado} kg)`
+      } else {
+        // Si tiene decimales, mostrar máximo 2 decimales con formato español
+        const kgFormateado = kilogramos.toLocaleString("es-ES", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+          useGrouping: true
+        })
+        return `${gramos} g (${kgFormateado} kg)`
+      }
+    }
+    
+    return `${gramos} g`
+  }
+
   // Renderizar estado de stock con color
   const renderStockStatus = (stock) => {
     if (stock <= 0) {
@@ -364,7 +399,7 @@ export default function MateriaPrimaPage() {
                     <TableCell align="right">
                       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                         <Typography variant="body2" sx={{ mr: 1 }}>
-                          {Number.parseFloat(materiaPrima.stockActual || 0).toFixed(2)}
+                          {formatearNumero(materiaPrima.stockActual || 0)}
                         </Typography>
                         {renderStockStatus(materiaPrima.stockActual || 0)}
                       </Box>
@@ -388,7 +423,7 @@ export default function MateriaPrimaPage() {
                 Materia Prima: {selectedMateriaPrima.nombreMateriaPrima}
               </Typography>
               <Typography variant="body2" gutterBottom>
-                Stock actual: {Number.parseFloat(selectedMateriaPrima.stockActual || 0).toFixed(2)}
+                Stock actual: {formatearNumero(selectedMateriaPrima.stockActual || 0)}
               </Typography>
 
               <TextField

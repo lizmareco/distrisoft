@@ -63,7 +63,6 @@ export default function ListaOrdenesProduccionPage() {
     idPedido: "",
     estado: "",
     operador: "",
-    busquedaGeneral: "",
   })
 
   // Paginación
@@ -88,10 +87,10 @@ export default function ListaOrdenesProduccionPage() {
   const cargarUsuarios = async () => {
     try {
       setCargandoUsuarios(true)
-      const respuesta = await fetch("/api/usuarios")
+      const respuesta = await fetch("/api/usuarios?descripcionRol=PRODUCCION")
       if (respuesta.ok) {
         const datos = await respuesta.json()
-        console.log("Usuarios cargados:", datos)
+        console.log("Usuarios de producción cargados:", datos)
         // Manejar la estructura { usuarios: [...] }
         if (datos.usuarios && Array.isArray(datos.usuarios)) {
           setUsuarios(datos.usuarios)
@@ -100,7 +99,7 @@ export default function ListaOrdenesProduccionPage() {
         }
       }
     } catch (error) {
-      console.error("Error al cargar usuarios:", error)
+      console.error("Error al cargar usuarios de producción:", error)
     } finally {
       setCargandoUsuarios(false)
     }
@@ -120,7 +119,6 @@ export default function ListaOrdenesProduccionPage() {
       if (filtros.idPedido) params.append("idPedido", filtros.idPedido)
       if (filtros.estado) params.append("estado", filtros.estado)
       if (filtros.operador) params.append("operador", filtros.operador)
-      if (filtros.busquedaGeneral) params.append("search", filtros.busquedaGeneral)
 
       const respuesta = await fetch(`/api/ordenes-produccion/buscar?${params}`)
       if (!respuesta.ok) {
@@ -151,7 +149,6 @@ export default function ListaOrdenesProduccionPage() {
       idPedido: "",
       estado: "",
       operador: "",
-      busquedaGeneral: "",
     })
     await buscarOrdenes(1)
   }
@@ -162,7 +159,6 @@ export default function ListaOrdenesProduccionPage() {
       idPedido: "",
       estado: "",
       operador: "",
-      busquedaGeneral: "",
     })
     setOrdenes([])
     setDatosIniciales(false)
@@ -351,22 +347,6 @@ export default function ListaOrdenesProduccionPage() {
                 ))}
               </Select>
             </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Búsqueda general"
-              value={filtros.busquedaGeneral}
-              onChange={(e) => handleFiltroChange("busquedaGeneral", e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
           </Grid>
           <Grid item xs={12} sm={6} md={2}>
             <Box sx={{ display: "flex", gap: 1, flexDirection: "column" }}>

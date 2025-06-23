@@ -40,9 +40,15 @@ import PersonIcon from "@mui/icons-material/Person"
 import ArrowBackIcon from "@mui/icons-material/ArrowBack"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useRootContext } from "@/src/app/context/root"
 
 export default function UsuariosPage() {
   const router = useRouter()
+  const { session } = useRootContext()
+  const permisos = session?.permisos || []
+  const hasPermission =
+    permisos.find(permiso => permiso === "VIEW_USUARIO") || session?.isAdmin
+
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -347,6 +353,14 @@ export default function UsuariosPage() {
       page: newPage,
       pageSize: paginacion.pageSize,
     })
+  }
+
+  if (!hasPermission) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Alert severity="error">No tiene permisos para ver esta página</Alert>
+      </Container>
+    )
   }
 
   if (loading) {

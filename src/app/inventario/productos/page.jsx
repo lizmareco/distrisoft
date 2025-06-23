@@ -272,6 +272,67 @@ export default function ProductosInventarioPage() {
     setSnackbar({ ...snackbar, open: false })
   }
 
+  // Función para formatear números con separadores de miles y decimales
+  const formatearNumero = (numero, unidadMedida = null) => {
+    const valor = Number.parseFloat(numero || 0)
+    
+    // Si el valor es un número entero, no mostrar decimales
+    if (Number.isInteger(valor)) {
+      const numeroFormateado = valor.toLocaleString("es-ES", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+        useGrouping: true
+      })
+      
+      // Si la unidad es gramos y el valor es mayor a 0, mostrar también kilogramos
+      if (unidadMedida && (unidadMedida.toLowerCase() === 'g' || unidadMedida.toLowerCase() === 'gramos') && valor > 0) {
+        const kilogramos = valor / 1000
+        if (Number.isInteger(kilogramos)) {
+          return `${numeroFormateado} g (${kilogramos.toLocaleString("es-ES", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+            useGrouping: true
+          })} kg)`
+        } else {
+          return `${numeroFormateado} g (${kilogramos.toLocaleString("es-ES", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+            useGrouping: true
+          })} kg)`
+        }
+      }
+      
+      return numeroFormateado
+    } else {
+      // Si tiene decimales, mostrar máximo 2 decimales con formato español
+      const numeroFormateado = valor.toLocaleString("es-ES", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+        useGrouping: true
+      })
+      
+      // Si la unidad es gramos y el valor es mayor a 0, mostrar también kilogramos
+      if (unidadMedida && (unidadMedida.toLowerCase() === 'g' || unidadMedida.toLowerCase() === 'gramos') && valor > 0) {
+        const kilogramos = valor / 1000
+        if (Number.isInteger(kilogramos)) {
+          return `${numeroFormateado} g (${kilogramos.toLocaleString("es-ES", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+            useGrouping: true
+          })} kg)`
+        } else {
+          return `${numeroFormateado} g (${kilogramos.toLocaleString("es-ES", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+            useGrouping: true
+          })} kg)`
+        }
+      }
+      
+      return numeroFormateado
+    }
+  }
+
   // Renderizar estado de stock con color
   const renderStockStatus = (stock) => {
     if (stock <= 0) {
@@ -414,7 +475,8 @@ export default function ProductosInventarioPage() {
                   <TableCell align="right">
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
                       <Typography variant="body2" sx={{ mr: 1 }}>
-                        {Number.parseFloat(producto.stockActual || 0).toFixed(2)}
+                        {formatearNumero(producto.stockActual || 0, producto.unidadMedida?.abreviatura)}
+                        {producto.unidadMedida && !producto.unidadMedida.abreviatura.toLowerCase().includes('g') ? ` ${producto.unidadMedida.abreviatura}` : ""}
                       </Typography>
                       {renderStockStatus(producto.stockActual || 0)}
                     </Box>
@@ -456,8 +518,8 @@ export default function ProductosInventarioPage() {
                 Producto: {selectedProducto.nombreProducto}
               </Typography>
               <Typography variant="body2" gutterBottom>
-                Stock actual: {Number.parseFloat(selectedProducto.stockActual || 0).toFixed(2)}
-                {selectedProducto.unidadMedida ? selectedProducto.unidadMedida.abreviatura : ""}
+                Stock actual: {formatearNumero(selectedProducto.stockActual || 0, selectedProducto.unidadMedida?.abreviatura)}
+                {selectedProducto.unidadMedida && !selectedProducto.unidadMedida.abreviatura.toLowerCase().includes('g') ? ` ${selectedProducto.unidadMedida.abreviatura}` : ""}
               </Typography>
 
               <TextField
