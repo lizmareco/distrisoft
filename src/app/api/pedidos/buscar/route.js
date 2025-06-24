@@ -44,14 +44,11 @@ export async function GET(request) {
       whereClause.fechaPedido = {}
 
       if (fechaDesde && fechaDesde !== "") {
-        whereClause.fechaPedido.gte = new Date(fechaDesde)
+        whereClause.fechaPedido.gte = new Date(`${fechaDesde}T00:00:00`)
       }
 
       if (fechaHasta && fechaHasta !== "") {
-        // Agregar 23:59:59 para incluir todo el día
-        const fechaHastaCompleta = new Date(fechaHasta)
-        fechaHastaCompleta.setHours(23, 59, 59, 999)
-        whereClause.fechaPedido.lte = fechaHastaCompleta
+        whereClause.fechaPedido.lte = new Date(`${fechaHasta}T23:59:59.999`)
       }
     }
     whereClause.deletedAt = null

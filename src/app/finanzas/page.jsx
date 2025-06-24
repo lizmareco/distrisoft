@@ -386,6 +386,21 @@ function FacturacionClientes() {
                   {cargando ? "Buscando..." : "Buscar"}
                 </Button>
               </Grid>
+              <Grid item xs={12} md={2}>
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => {
+                    setFiltros({ tipo: "", estado: "", fechaDesde: "", fechaHasta: "" });
+                    setFacturas([]);
+                    setBusquedaRealizada(false);
+                    setPaginacion((prev) => ({ ...prev, pagina: 1, totalPaginas: 1, totalRegistros: 0 }));
+                  }}
+                  fullWidth
+                >
+                  Borrar Filtros
+                </Button>
+              </Grid>
             </Grid>
           </CardContent>
         </Card>

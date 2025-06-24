@@ -73,13 +73,24 @@ export async function GET(request) {
     }
 
     if (estado) {
-      whereClause.estadoFactuCliente = { descEstFactCliente: estado }
+      // Hacer el filtro insensible a mayúsculas/minúsculas
+      whereClause.estadoFactuCliente = { descEstFactCliente: { equals: estado, mode: "insensitive" } }
     }
 
     if (fechaDesde && fechaHasta) {
+      const gte = new Date(`${fechaDesde}T00:00:00`)
+      const lte = new Date(`${fechaHasta}T23:59:59.999`)
       whereClause.fechaEmision = {
-        gte: new Date(fechaDesde),
-        lte: new Date(fechaHasta),
+        gte,
+        lte,
+      }
+    } else if (fechaDesde) {
+      whereClause.fechaEmision = {
+        gte: new Date(`${fechaDesde}T00:00:00`),
+      }
+    } else if (fechaHasta) {
+      whereClause.fechaEmision = {
+        lte: new Date(`${fechaHasta}T23:59:59.999`),
       }
     }
 

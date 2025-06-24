@@ -163,25 +163,39 @@ export async function POST(request) {
       }, 0)
 
     const nota = await prisma.$transaction(async (tx) => {
-        const notaCreada = await tx.notaCredito.create({
-          data: {    // visible
-            nroNota: nroNotaFormateado,    // interno
-            fechaEmision: new Date(),
-            motivo,
-            montoTotal,
-            cliente: {
-                connect: { idCliente: factura.idCliente }
-              },
-              facturaOrigen: {
-                connect: {
-                  nroFactura: Number(nroFactura), 
-                }
-              },
-            estadoNotaCredito: {
-              connect: { idEstadoNota: 1 },
-            },
+      // Calcular el monto total de notas de crédito para la factura (antes de crear la nueva)
+      const notasCreditoPrevias = await tx.notaCredito.findMany({
+        where: { idFacturaOrigen: factura.nroFactura },
+        select: { montoTotal: true },
+      })
+      const totalNotasCreditoPrevias = notasCreditoPrevias.reduce((sum, n) => sum + Number(n.montoTotal), 0)
+      const totalNotasCredito = totalNotasCreditoPrevias + montoTotal;
+
+      // Validación: no permitir que la suma supere el monto total de la factura
+      if (totalNotasCredito > Number(factura.montoTotalFactura)) {
+        throw new Error("La suma de las notas de crédito no puede superar el monto total de la factura.");
+      }
+
+      // Crear la nota de crédito
+      const notaCreada = await tx.notaCredito.create({
+        data: {
+          nroNota: nroNotaFormateado,
+          fechaEmision: new Date(),
+          motivo,
+          montoTotal,
+          cliente: {
+            connect: { idCliente: factura.idCliente }
           },
-        })
+          facturaOrigen: {
+            connect: {
+              nroFactura: Number(nroFactura),
+            }
+          },
+          estadoNotaCredito: {
+            connect: { idEstadoNota: 1 },
+          },
+        },
+      })
 
       // Crear los detalles
       for (const detalle of detalles) {
@@ -201,18 +215,15 @@ export async function POST(request) {
         })
       }
 
-      // Calcular el monto total de notas de crédito para la factura
-      const notasCredito = await tx.notaCredito.findMany({
-        where: { idFacturaOrigen: factura.nroFactura },
-        select: { montoTotal: true },
-      })
-      const totalNotasCredito = notasCredito.reduce((sum, n) => sum + Number(n.montoTotal), 0) + montoTotal;
-      // Sumar la nota recién creada (montoTotal)
-
       // Determinar el nuevo estado de la factura
-      let nuevoEstado = 5; // Parcial por defecto
-      if (totalNotasCredito === Number(factura.montoTotalFactura)) {
-        nuevoEstado = 4; // Anulada - solo cuando es exactamente igual
+      let nuevoEstado = factura.idEstadoFactuCliente; // Por defecto, mantener el actual
+      if (totalNotasCredito === 0) {
+        // No cambiar el estado
+        nuevoEstado = factura.idEstadoFactuCliente;
+      } else if (totalNotasCredito === Number(factura.montoTotalFactura)) {
+        nuevoEstado = 4; // Anulada
+      } else if (totalNotasCredito > 0 && totalNotasCredito < Number(factura.montoTotalFactura)) {
+        nuevoEstado = 5; // Parcial
       }
       await tx.facturaCliente.update({
         where: { nroFactura: factura.nroFactura },

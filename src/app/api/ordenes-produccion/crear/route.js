@@ -260,26 +260,30 @@ async function verificarYDescontarStock(idPedido) {
       console.log(`Rendimiento por lote: ${cantidadPorLote}g`)
       console.log(`Lotes necesarios: ${lotesNecesarios}`)
 
-      // Verificar stock de cada materia prima
+      // Calcular consumo proporcional de materia prima
       for (const detalleFormula of formula.FormulaDetalle) {
-        const cantidadMateriaPrimaPorLote = detalleFormula.cantidad
-        const cantidadTotalMateriaPrima = cantidadMateriaPrimaPorLote * lotesNecesarios
-        const materiaPrima = detalleFormula.materiaPrima
+        const cantidadMateriaPrimaPorLote = detalleFormula.cantidad;
+        const unidadesPorLote = formula.rendimiento;
+        // Consumo proporcional según cantidad pedida
+        const cantidadTotalMateriaPrima = (detalle.cantidad / unidadesPorLote) * cantidadMateriaPrimaPorLote;
+        const materiaPrima = detalleFormula.materiaPrima;
 
-        console.log(`--- Materia Prima ---`)
-        console.log(`Materia prima: ${materiaPrima.nombreMateriaPrima}`)
-        console.log(`Cantidad por lote: ${cantidadMateriaPrimaPorLote}g`)
-        console.log(`Cantidad total necesaria: ${cantidadTotalMateriaPrima}g`)
-        console.log(`Stock actual: ${materiaPrima.stockActual}g`)
+        console.log(`--- Materia Prima (corregido) ---`);
+        console.log(`Materia prima: ${materiaPrima.nombreMateriaPrima}`);
+        console.log(`Cantidad por lote: ${cantidadMateriaPrimaPorLote}g`);
+        console.log(`Unidades por lote: ${unidadesPorLote}`);
+        console.log(`Cantidad pedida: ${detalle.cantidad}`);
+        console.log(`Cantidad total necesaria (proporcional): ${cantidadTotalMateriaPrima}g`);
+        console.log(`Stock actual: ${materiaPrima.stockActual}g`);
 
         if (materiaPrima.stockActual < cantidadTotalMateriaPrima) {
-          const stockKg = (materiaPrima.stockActual / 1000).toFixed(3)
-          const necesarioKg = (cantidadTotalMateriaPrima / 1000).toFixed(3)
+          const stockKg = (materiaPrima.stockActual / 1000).toFixed(3);
+          const necesarioKg = (cantidadTotalMateriaPrima / 1000).toFixed(3);
 
           return {
             success: false,
             error: `Stock insuficiente de ${materiaPrima.nombreMateriaPrima}. Disponible: ${materiaPrima.stockActual}g (${stockKg}kg), Necesario: ${cantidadTotalMateriaPrima}g (${necesarioKg}kg)`,
-          }
+          };
         }
       }
     }
@@ -320,38 +324,28 @@ async function descontarStockMateriasPrimas(tx, idPedido, idUsuario, auditoriaSe
 
     if (formulas.length > 0) {
       const formula = formulas[0]
-      const pesoPorUnidad = detalle.producto.pesoUnidad
-      const gramosNecesarios = detalle.cantidad * pesoPorUnidad
-      const cantidadPorLote = formula.rendimiento
-      const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
-
-      console.log(`=== DESCUENTO DE STOCK ===`)
-      console.log(`Producto: ${detalle.producto.nombreProducto}`)
-      console.log(`Cantidad pedida: ${detalle.cantidad} unidades`)
-      console.log(`Peso por unidad (DB): ${pesoPorUnidad}g`)
-      console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
-      console.log(`Lotes necesarios: ${lotesNecesarios}`)
-
       for (const detalleFormula of formula.FormulaDetalle) {
-        const cantidadMateriaPrimaPorLote = detalleFormula.cantidad
-        const cantidadTotalMateriaPrima = cantidadMateriaPrimaPorLote * lotesNecesarios
+        const cantidadMateriaPrimaPorLote = detalleFormula.cantidad;
+        const unidadesPorLote = formula.rendimiento;
+        // Consumo proporcional según cantidad pedida
+        const cantidadTotalMateriaPrima = (detalle.cantidad / unidadesPorLote) * cantidadMateriaPrimaPorLote;
 
         const materiaPrima = await tx.materiaPrima.findUnique({
           where: { idMateriaPrima: detalleFormula.idMateriaPrima },
-        })
+        });
 
         if (!materiaPrima) {
-          console.warn(`Materia prima ID ${detalleFormula.idMateriaPrima} no encontrada. Saltando.`)
-          continue
+          console.warn(`Materia prima ID ${detalleFormula.idMateriaPrima} no encontrada. Saltando.`);
+          continue;
         }
 
-        const stockAntes = Number.parseFloat(materiaPrima.stockActual ?? 0)
-        const stockDespues = stockAntes - cantidadTotalMateriaPrima
+        const stockAntes = Number.parseFloat(materiaPrima.stockActual ?? 0);
+        const stockDespues = stockAntes - cantidadTotalMateriaPrima;
 
-        console.log(`--- Descuento ---`)
-        console.log(`Materia prima: ${materiaPrima.nombreMateriaPrima}`)
-        console.log(`Descontando: ${cantidadTotalMateriaPrima}g`)
-        console.log(`Stock: ${stockAntes}g -> ${stockDespues}g`)
+        console.log(`--- Descuento (corregido) ---`);
+        console.log(`Materia prima: ${materiaPrima.nombreMateriaPrima}`);
+        console.log(`Descontando: ${cantidadTotalMateriaPrima}g`);
+        console.log(`Stock: ${stockAntes}g -> ${stockDespues}g`);
 
         // Actualizar stock
         await tx.materiaPrima.update({
@@ -360,10 +354,10 @@ async function descontarStockMateriasPrimas(tx, idPedido, idUsuario, auditoriaSe
             stockActual: stockDespues,
             updatedAt: new Date(),
           },
-        })
+        });
 
         // Crear movimiento de inventario con stockAntes y stockDespues
-        const cantidadKg = (cantidadTotalMateriaPrima / 1000).toFixed(3)
+        const cantidadKg = (cantidadTotalMateriaPrima / 1000).toFixed(3);
         await tx.inventario.create({
           data: {
             idMateriaPrima: detalleFormula.idMateriaPrima,
@@ -372,11 +366,11 @@ async function descontarStockMateriasPrimas(tx, idPedido, idUsuario, auditoriaSe
             fechaMovimiento: new Date(),
             tipoMovimiento: "SALIDA",
             motivo: `Salida para orden de producción - Pedido #${idPedido}`,
-            observacion: `Salida para producción de ${detalle.producto.nombreProducto}. Pedido: ${detalle.cantidad} unidades x ${pesoPorUnidad}g = ${gramosNecesarios}g. Materia prima utilizada: ${cantidadTotalMateriaPrima}g (${cantidadKg}kg)`,
+            observacion: `Salida para producción de ${detalle.producto.nombreProducto}. Pedido: ${detalle.cantidad} unidades. Materia prima utilizada: ${cantidadTotalMateriaPrima}g (${cantidadKg}kg)`,
             stockAntes,
             stockDespues,
           },
-        })
+        });
 
         // Auditoría de salida de stock
         await auditoriaService.registrarAuditoria({
@@ -388,7 +382,7 @@ async function descontarStockMateriasPrimas(tx, idPedido, idUsuario, auditoriaSe
           idUsuario,
           direccionIP: auditoriaService.obtenerDireccionIP(request),
           navegador: auditoriaService.obtenerInfoNavegador(request),
-        })
+        });
       }
     }
   }

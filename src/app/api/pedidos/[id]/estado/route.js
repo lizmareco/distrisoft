@@ -117,6 +117,21 @@ export async function PUT(request, { params }) {
       )
     }
 
+    // Validar que el pedido tenga factura antes de entregar
+    if (nuevoEstadoId === 5) {
+      const facturasAsociadas = await prisma.facturaCliente.count({
+        where: {
+          idPedido: idPedido,
+          deletedAt: null,
+        },
+      });
+      if (facturasAsociadas === 0) {
+        return NextResponse.json({
+          error: "No se puede entregar el pedido porque no tiene ninguna factura generada. Debe facturar antes de entregar al cliente.",
+        }, { status: HTTP_STATUS_CODES.badRequest });
+      }
+    }
+
     // Guardar el valor anterior para auditoría
     const valorAnterior = {
       idEstadoPedido: pedidoExistente.idEstadoPedido,
@@ -125,15 +140,19 @@ export async function PUT(request, { params }) {
 
     // INICIAR TRANSACCIÓN para actualizar estado, procesar inventario y facturas
     const resultado = await prisma.$transaction(async (tx) => {
-      // Actualizar el estado del pedido
+      // Actualizar el estado del pedido y la fecha de entrega si es entregado
+      let updateData = {
+        idEstadoPedido: nuevoEstadoId,
+        updatedAt: new Date(),
+      };
+      if (nuevoEstadoId === 5) {
+        updateData.fechaEntrega = new Date();
+      }
       const pedidoActualizado = await tx.pedidoCliente.update({
         where: {
           idPedido: idPedido,
         },
-        data: {
-          idEstadoPedido: nuevoEstadoId,
-          updatedAt: new Date(),
-        },
+        data: updateData,
         include: {
           estadoPedido: true,
           cliente: {
