@@ -211,8 +211,8 @@ export async function POST(request) {
 
       // Determinar el nuevo estado de la factura
       let nuevoEstado = 5; // Parcial por defecto
-      if (totalNotasCredito >= Number(factura.montoTotalFactura)) {
-        nuevoEstado = 4; // Anulada
+      if (totalNotasCredito === Number(factura.montoTotalFactura)) {
+        nuevoEstado = 4; // Anulada - solo cuando es exactamente igual
       }
       await tx.facturaCliente.update({
         where: { nroFactura: factura.nroFactura },

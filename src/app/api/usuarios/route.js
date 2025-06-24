@@ -124,6 +124,36 @@ export async function GET(request) {
       }
     }
 
+    // Si hay filtro por descripción de rol, primero obtener el ID del rol
+    let rolId = null
+    if (descripcionRol) {
+      const rolEncontrado = await prisma.rol.findFirst({
+        where: {
+          nombreRol: { equals: descripcionRol, mode: "insensitive" },
+          deletedAt: null,
+        },
+        select: { idRol: true }
+      })
+      
+      if (rolEncontrado) {
+        rolId = rolEncontrado.idRol
+        where.idRol = rolId
+      } else {
+        // Si no se encuentra el rol, devolver array vacío
+        return NextResponse.json({ 
+          usuarios: [],
+          pagination: {
+            page: validPage,
+            pageSize: validPageSize,
+            totalItems: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPrevPage: false,
+          }
+        }, { status: 200 })
+      }
+    }
+
     // Obtener el total de registros para calcular el total de páginas
     const totalUsuarios = await prisma.usuario.count({
       where,
@@ -141,7 +171,7 @@ export async function GET(request) {
       take: validPageSize,
     })
 
-    // Filtrar por persona si corresponde
+    // Filtrar por persona si corresponde (esto se mantiene en JS porque es más complejo)
     if (persona) {
       const personaLower = persona.toLowerCase()
       usuarios = usuarios.filter(
@@ -154,18 +184,7 @@ export async function GET(request) {
       )
     }
 
-    // Filtrar por descripciónRol ("PRODUCCION") en JS
-    if (descripcionRol) {
-      const descripcionRolLower = descripcionRol.toLowerCase()
-      usuarios = usuarios.filter(
-        u =>
-          u.rol &&
-          u.rol.nombreRol &&
-          u.rol.nombreRol.toLowerCase() === descripcionRolLower
-      )
-    }
-
-    // Calcular el total de páginas (ajustar después de filtros JS)
+    // Calcular el total de páginas
     const totalPages = Math.ceil(totalUsuarios / validPageSize)
 
     return NextResponse.json({ 

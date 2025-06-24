@@ -545,7 +545,7 @@ export default function NuevaCotizacionPage() {
                 <Grid item xs={12} md={2}>
                   <TextField
                     fullWidth
-                    label="Cantidad"
+                    label="Cantidad(Unidades)"
                     type="number"
                     value={cantidadProducto}
                     onChange={(e) => setCantidadProducto(Number.parseInt(e.target.value) || 0)}
@@ -660,7 +660,7 @@ export default function NuevaCotizacionPage() {
                     <TableCell>Producto</TableCell>
                     <TableCell>Peso Unidad</TableCell>
                     <TableCell align="right">Precio Unitario</TableCell>
-                    <TableCell align="right">Cantidad</TableCell>
+                    <TableCell align="right">Cantidad(Unidades)</TableCell>
                     <TableCell align="right">Subtotal</TableCell>
                     <TableCell>Acciones</TableCell>
                   </TableRow>

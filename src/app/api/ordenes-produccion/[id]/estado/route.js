@@ -125,8 +125,6 @@ export async function PUT(request, { params }) {
           })
         }
       } else if (idEstadoInt === 3) {
-        const lotes = ordenActual.cantidadLotes || 1
-
         for (const detalle of ordenActual.pedidoCliente.pedidoDetalle) {
           const producto = detalle.producto
           const formula = await tx.formula.findFirst({
@@ -140,11 +138,32 @@ export async function PUT(request, { params }) {
             where: { idFormula: formula.idFormula, deletedAt: null },
           })
 
+          const pesoPorUnidad = producto.pesoUnidad
+          const gramosNecesarios = detalle.cantidad * pesoPorUnidad
+          const cantidadPorLote = formula.rendimiento
+          const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
+
+          console.log(`=== DEVOLUCIÓN DE STOCK ===`)
+          console.log(`Producto: ${producto.nombreProducto}`)
+          console.log(`Cantidad pedida: ${detalle.cantidad} unidades`)
+          console.log(`Peso por unidad: ${pesoPorUnidad}g`)
+          console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
+          console.log(`Rendimiento por lote: ${cantidadPorLote}g`)
+          console.log(`Lotes necesarios: ${lotesNecesarios}`)
+
           for (const item of detallesFormula) {
-            const cantidadTotal = item.cantidad * detalle.cantidad * lotes
+            const cantidadMateriaPrimaPorLote = item.cantidad
+            const cantidadTotal = cantidadMateriaPrimaPorLote * lotesNecesarios
+            
             const materia = await tx.materiaPrima.findUnique({ where: { idMateriaPrima: item.idMateriaPrima } })
             const stockAntes = Number(materia?.stockActual ?? 0)
             const stockDespues = stockAntes + cantidadTotal
+
+            console.log(`--- Devolución ---`)
+            console.log(`Materia prima: ${materia?.nombreMateriaPrima}`)
+            console.log(`Cantidad por lote: ${cantidadMateriaPrimaPorLote}g`)
+            console.log(`Devolviendo: ${cantidadTotal}g`)
+            console.log(`Stock: ${stockAntes}g -> ${stockDespues}g`)
 
             await tx.materiaPrima.update({
               where: { idMateriaPrima: item.idMateriaPrima },

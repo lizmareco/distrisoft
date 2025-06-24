@@ -521,7 +521,7 @@ export default function MovimientosPage() {
 
                       <Grid item xs={6}>
                         <Typography variant="body2" color="textSecondary">
-                          Cantidad:
+                          Cantidad({valorTab === "materiasprimas" ? "gramos" : "unidades"}):
                         </Typography>
                         <Typography variant="body2">
                           {formatearNumero(movimiento.cantidad)} {movimiento.unidadMedida || "N/A"}
@@ -579,7 +579,7 @@ export default function MovimientosPage() {
                     <TableCell>Fecha</TableCell>
                     <TableCell>{valorTab === "materiasprimas" ? "Materia Prima" : "Producto"}</TableCell>
                     <TableCell align="center">Tipo</TableCell>
-                    <TableCell align="right">Cantidad</TableCell>
+                    <TableCell align="right">Cantidad({valorTab === "materiasprimas" ? "gramos" : "unidades"})</TableCell>
                     <TableCell align="right">Stock Antes</TableCell>
                     <TableCell align="right">Stock Después</TableCell>
                     <TableCell>Motivo</TableCell>
