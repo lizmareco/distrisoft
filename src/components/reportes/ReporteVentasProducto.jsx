@@ -82,9 +82,14 @@ export default function ReporteVentasProducto({ onVolver }) {
         const response = await fetch(`/api/productos?nombre=${encodeURIComponent(valor)}`)
         if (response.ok) {
           const data = await response.json()
-          setResultados(data)
+          // La API devuelve { productos: [...], pagination: {...} }
+          const productos = data.productos || []
+          setResultados(Array.isArray(productos) ? productos : [])
+        } else {
+          setResultados([])
         }
       } catch (error) {
+        console.error("Error al buscar productos:", error)
         setResultados([])
       }
     } else {
@@ -104,13 +109,16 @@ export default function ReporteVentasProducto({ onVolver }) {
   useEffect(() => {
     const cargarProductos = async () => {
       try {
-        const response = await fetch("/api/productos")
+        const response = await fetch("/api/productos?all=true")
         if (response.ok) {
           const data = await response.json()
-          setProductos(data)
+          // La API devuelve { productos: [...], pagination: {...} }
+          const productos = data.productos || []
+          setProductos(Array.isArray(productos) ? productos : [])
         }
       } catch (error) {
         console.error("Error al cargar productos:", error)
+        setProductos([])
       }
     }
 
@@ -343,14 +351,26 @@ export default function ReporteVentasProducto({ onVolver }) {
     }
   }
 
-  // Función para parsear fecha en formato DD-MM-YYYY
+  // Función para parsear fecha en diferentes formatos
   const parsearFecha = (fechaStr) => {
     if (!fechaStr) return new Date(0)
 
-    // Si la fecha viene en formato DD-MM-YYYY
+    // Si la fecha viene en formato YYYY-MM-DD (formato ISO)
     if (fechaStr.includes("-") && fechaStr.length === 10) {
-      const [dia, mes, año] = fechaStr.split("-")
-      return new Date(año, mes - 1, dia) // mes - 1 porque los meses en JS van de 0-11
+      const partes = fechaStr.split("-")
+      // Verificar si es YYYY-MM-DD o DD-MM-YYYY
+      if (partes[0].length === 4) {
+        // Es YYYY-MM-DD
+        return new Date(partes[0], partes[1] - 1, partes[2])
+      } else {
+        // Es DD-MM-YYYY
+        return new Date(partes[2], partes[1] - 1, partes[0])
+      }
+    }
+
+    // Si viene en formato YYYY-MM-DDTHH:mm:ss.sssZ (formato ISO completo)
+    if (fechaStr.includes("T")) {
+      return new Date(fechaStr)
     }
 
     // Si viene en otro formato, intentar parsearlo directamente
@@ -367,10 +387,22 @@ export default function ReporteVentasProducto({ onVolver }) {
     const datosOrdenados = [...ventasAgrupadas].sort((a, b) => {
       const fechaA = parsearFecha(a.fecha)
       const fechaB = parsearFecha(b.fecha)
+      
+      console.log(`Comparando fechas: ${a.fecha} (${fechaA}) vs ${b.fecha} (${fechaB})`)
+      
       return fechaA - fechaB
     })
 
     console.log("Datos ordenados:", datosOrdenados)
+
+    // Verificar que las fechas estén realmente ordenadas
+    const fechasOrdenadas = datosOrdenados.map(item => ({
+      fechaOriginal: item.fecha,
+      fechaParseada: parsearFecha(item.fecha),
+      totalVenta: item.totalVenta
+    }))
+    
+    console.log("Verificación de ordenamiento:", fechasOrdenadas)
 
     return {
       labels: datosOrdenados.map((item) => {
@@ -429,10 +461,21 @@ export default function ReporteVentasProducto({ onVolver }) {
         },
       },
       x: {
+        type: 'category',
         title: {
           display: true,
           text: "Fecha",
         },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 0,
+        },
+      },
+    },
+    elements: {
+      point: {
+        radius: 6,
+        hoverRadius: 8,
       },
     },
   }
@@ -689,7 +732,7 @@ export default function ReporteVentasProducto({ onVolver }) {
             onChange={handleInputBusqueda}
           />
           <List>
-            {resultados.map((prod) => (
+            {Array.isArray(resultados) && resultados.map((prod) => (
               <ListItem key={prod.idProducto} disablePadding>
                 <ListItemButton onClick={() => handleSeleccionarProducto(prod)}>
                   <ListItemText
@@ -699,7 +742,7 @@ export default function ReporteVentasProducto({ onVolver }) {
                 </ListItemButton>
               </ListItem>
             ))}
-            {busqueda.length > 2 && resultados.length === 0 && (
+            {busqueda.length > 2 && Array.isArray(resultados) && resultados.length === 0 && (
               <ListItem>
                 <ListItemText primary="Sin resultados" />
               </ListItem>

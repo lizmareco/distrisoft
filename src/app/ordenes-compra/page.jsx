@@ -143,6 +143,13 @@ export default function OrdenesCompraPage() {
     }
   }, [hasPermission])
 
+  // Efecto para verificar facturas existentes cuando cambian las órdenes
+  useEffect(() => {
+    if (ordenesCompra.length > 0 && mostrarOrdenes) {
+      verificarFacturasExistentes(ordenesCompra)
+    }
+  }, [ordenesCompra, mostrarOrdenes])
+
   // Cargar órdenes de compra
   const fetchOrdenesCompra = async (overrideMostrarTodas = null) => {
     try {
@@ -221,8 +228,12 @@ export default function OrdenesCompraPage() {
   // Agregar esta función después de fetchMetodosPago:
   const verificarFacturasExistentes = async (ordenes) => {
     try {
+      // Filtrar órdenes que están en estado RECIBIDO o PARCIALMENTE RECIBIDO
       const ordenesRecibidas = ordenes.filter(
-        (orden) => orden.estadoOrdenCompra?.descEstadoOrdenCompra?.toLowerCase() === "recibido",
+        (orden) => {
+          const estado = orden.estadoOrdenCompra?.descEstadoOrdenCompra?.toLowerCase()
+          return estado === "recibido" || estado === "parcialmente recibido"
+        }
       )
 
       if (ordenesRecibidas.length === 0) {
@@ -241,7 +252,9 @@ export default function OrdenesCompraPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setFacturasExistentes(new Set(data.ordenesConFactura || []))
+        const nuevasFacturasExistentes = new Set(data.ordenesConFactura || [])
+        setFacturasExistentes(nuevasFacturasExistentes)
+        console.log("Facturas existentes actualizadas:", Array.from(nuevasFacturasExistentes))
       }
     } catch (error) {
       console.error("Error al verificar facturas existentes:", error)
@@ -382,12 +395,14 @@ export default function OrdenesCompraPage() {
         // Marcar que la factura se abrirá automáticamente
         setFacturaAbiertaAutomaticamente(true)
         
+        // Actualizar la orden específica que cambió de estado
+        await actualizarOrdenEspecifica(dialogEstado.orden.idOrdenCompra)
+        
         // Abrir automáticamente el diálogo de factura
         setTimeout(() => {
           setDialogFactura({ open: true, orden: dialogEstado.orden })
         }, 500) // Pequeño delay para que se cierre el diálogo de estado primero
         
-        fetchOrdenesCompra()
         return
       }
 
@@ -490,7 +505,12 @@ export default function OrdenesCompraPage() {
       setOpenRecepcionDialog(false)
       setOrdenParaRecepcion(null)
       setItemsRecepcion([])
-      fetchOrdenesCompra()
+      
+      // Actualizar la orden específica que cambió de estado
+      await actualizarOrdenEspecifica(ordenParaRecepcion.idOrdenCompra)
+      
+      // También actualizar toda la lista para asegurar consistencia
+      await fetchOrdenesCompra()
     } catch (error) {
       setSnackbar({
         open: true,
@@ -525,6 +545,30 @@ export default function OrdenesCompraPage() {
         message: error.message,
         severity: "error",
       })
+    }
+  }
+
+  // Función para actualizar una orden específica después de cambios
+  const actualizarOrdenEspecifica = async (idOrdenCompra) => {
+    try {
+      const response = await fetch(`/api/ordenes-compra/${idOrdenCompra}`)
+      if (response.ok) {
+        const ordenActualizada = await response.json()
+        
+        // Actualizar la orden en el estado local
+        setOrdenesCompra(prevOrdenes => 
+          prevOrdenes.map(orden => 
+            orden.idOrdenCompra === idOrdenCompra ? ordenActualizada : orden
+          )
+        )
+        
+        // Verificar facturas existentes para esta orden específica
+        await verificarFacturasExistentes([ordenActualizada])
+        
+        console.log("Orden actualizada:", ordenActualizada)
+      }
+    } catch (error) {
+      console.error("Error al actualizar orden específica:", error)
     }
   }
 
@@ -575,6 +619,12 @@ export default function OrdenesCompraPage() {
       setDialogFactura({ open: false, orden: null })
       setFacturaAbiertaAutomaticamente(false) // Resetear el estado
       resetFormularioFactura()
+
+      // Actualizar la orden específica que se facturó
+      await actualizarOrdenEspecifica(dialogFactura.orden.idOrdenCompra)
+      
+      // También actualizar toda la lista para asegurar consistencia
+      await fetchOrdenesCompra()
 
       // Redirigir a cuentas por pagar si es a crédito
       if (!datosFactura.esContado) {
@@ -1066,12 +1116,6 @@ export default function OrdenesCompraPage() {
                 <ListItemText>Ver Factura</ListItemText>
               </MenuItem>
             ),
-            <MenuItem key="verFacturas" onClick={() => handleVerFacturas(selectedOrden)}>
-              <ListItemIcon>
-                <ReceiptIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Ver Facturas de la Orden</ListItemText>
-            </MenuItem>,
             <MenuItem
               key="cambiarEstado"
               onClick={() => {

@@ -362,9 +362,6 @@ export default function CotizacionesProveedorPage() {
               <Button variant="contained" color="primary" onClick={handleSearch}>
                 Buscar
               </Button>
-              <Button variant="outlined" onClick={loadAllCotizaciones}>
-                Mostrar Todos
-              </Button>
             </Box>
           </Grid>
         </Grid>
