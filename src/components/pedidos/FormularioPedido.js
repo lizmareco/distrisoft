@@ -344,6 +344,13 @@ export default function FormularioPedido() {
     }
   }
 
+  // --- VALIDACIÓN DE CANTIDAD ---
+  const esCantidadValida = () => {
+    if (!productoActual) return false;
+    const unidadesPorPaquete = productoActual.unidadesPorPaquete || 1;
+    return cantidad > 0 && cantidad % unidadesPorPaquete === 0;
+  };
+
   // Agregar producto al detalle
   const agregarProducto = () => {
     if (!productoActual) {
@@ -684,13 +691,19 @@ export default function FormularioPedido() {
 
           <Grid item xs={12} md={2}>
             <TextField
-              label="Cantidad (unidades)"
+              label={`Cantidad${productoActual?.unidadesPorPaquete ? ` (múltiplos de ${productoActual.unidadesPorPaquete})` : ' (unidades)'}`}
               type="number"
               value={cantidad}
               onChange={(e) => setCantidad(Math.max(1, Number.parseInt(e.target.value) || 0))}
               fullWidth
               margin="normal"
-              InputProps={{ inputProps: { min: 1 } }}
+              InputProps={{ inputProps: { min: 1, step: productoActual?.unidadesPorPaquete || 1 } }}
+              error={cantidad > 0 && !esCantidadValida()}
+              helperText={
+                productoActual?.unidadesPorPaquete && productoActual.unidadesPorPaquete > 1
+                  ? `Debe ingresar múltiplos de ${productoActual.unidadesPorPaquete} unidades (un paquete)`
+                  : ''
+              }
             />
           </Grid>
 
@@ -717,6 +730,7 @@ export default function FormularioPedido() {
               onClick={agregarProducto}
               fullWidth
               sx={{ mt: 1 }}
+              disabled={!esCantidadValida()}
             >
               Agregar
             </Button>
