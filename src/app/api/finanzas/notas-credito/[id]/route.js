@@ -56,7 +56,9 @@ export async function GET(request, { params }) {
       },
       detalles: nota.detallesNota.map((d) => ({
         cantidad: d.cantidad,
-        descripcion: d.detalleFacturaOrig.producto?.nombreProducto || "Producto",
+        nombreProducto: d.detalleFacturaOrig.producto?.nombreProducto || "Producto",
+        descripcion: d.detalleFacturaOrig.producto?.descripcion || "",
+        pesoUnidad: d.detalleFacturaOrig.producto?.pesoUnidad || null,
         precioUnitario: d.precioUnitario,
       })),
       montoTotal: nota.montoTotal,

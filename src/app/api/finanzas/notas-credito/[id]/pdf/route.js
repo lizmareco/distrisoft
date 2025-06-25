@@ -62,7 +62,9 @@ export async function GET(request, { params }) {
         ruc: nota.facturaOrigen.cliente.persona.nroDocumento,
       },
       productos: nota.detallesNota.map((d) => ({
-        descripcion: d.detalleFacturaOrig.producto.nombreProducto,
+        nombreProducto: d.detalleFacturaOrig.producto.nombreProducto || "Producto",
+        descripcion: d.detalleFacturaOrig.producto.descripcion || "",
+        pesoUnidad: d.detalleFacturaOrig.producto.pesoUnidad || null,
         cantidad: d.cantidad,
         precio: d.precioUnitario,
         total: d.cantidad * d.precioUnitario,
@@ -183,7 +185,7 @@ function generarHTMLNota(nota) {
               (p) => `
                 <tr>
                   <td>${p.cantidad}</td>
-                  <td class="left">${p.descripcion}</td>
+                  <td class="left">${p.nombreProducto}${p.descripcion ? ` - ${p.descripcion}` : ''}${p.pesoUnidad ? ` (${p.pesoUnidad}g)` : ''}</td>
                   <td>₲ ${p.precio.toLocaleString("es-PY")}</td>
                   <td>₲ ${p.total.toLocaleString("es-PY")}</td>
                 </tr>`

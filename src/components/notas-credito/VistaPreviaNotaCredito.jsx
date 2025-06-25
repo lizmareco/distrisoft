@@ -225,7 +225,11 @@ export default function VistaPreviaNotaCredito({ open, onClose, notaId }) {
                 {datosNota.detalles?.map((detalle, idx) => (
                   <TableRow key={idx}>
                     <TableCell sx={{ textAlign: "center" }}>{detalle.cantidad}</TableCell>
-                    <TableCell sx={{ textAlign: "left" }}>{detalle.descripcion}</TableCell>
+                    <TableCell sx={{ textAlign: "left" }}>
+                      {detalle.nombreProducto ? detalle.nombreProducto : ''}
+                      {detalle.descripcion ? ` - ${detalle.descripcion}` : ''}
+                      {detalle.pesoUnidad ? ` (${detalle.pesoUnidad}g)` : ''}
+                    </TableCell>
                     <TableCell sx={{ textAlign: "right" }}>₲ {detalle.precioUnitario.toLocaleString("es-PY")}</TableCell>
                     <TableCell sx={{ textAlign: "right" }}>₲ {(detalle.cantidad * detalle.precioUnitario).toLocaleString("es-PY")}</TableCell>
                   </TableRow>

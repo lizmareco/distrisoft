@@ -186,6 +186,13 @@ export default function NuevaCotizacionPage() {
     setProductosEncontrados([])
   }
 
+  // Validar que la cantidad sea múltiplo de unidadesPorPaquete
+  const esCantidadValida = () => {
+    if (!productoSeleccionado) return false;
+    const unidadesPorPaquete = productoSeleccionado.unidadesPorPaquete || 1;
+    return cantidadProducto > 0 && cantidadProducto % unidadesPorPaquete === 0;
+  };
+
   // Agregar producto a la cotización
   const agregarProducto = () => {
     if (!productoSeleccionado) {
@@ -523,6 +530,19 @@ export default function NuevaCotizacionPage() {
                       <IconButton onClick={buscarProducto} disabled={buscandoProducto}>
                         <Search />
                       </IconButton>
+                      {productoBusqueda && (
+                        <IconButton
+                          onClick={() => {
+                            setProductoBusqueda("");
+                            setProductosEncontrados([]);
+                            setProductoSeleccionado(null);
+                            setCantidadProducto(1);
+                          }}
+                          disabled={buscandoProducto}
+                        >
+                          <Delete />
+                        </IconButton>
+                      )}
                     </InputAdornment>
                   ),
                 }}
@@ -545,15 +565,28 @@ export default function NuevaCotizacionPage() {
                 <Grid item xs={12} md={2}>
                   <TextField
                     fullWidth
-                    label="Cantidad(Unidades)"
+                    label={`Cantidad (múltiplos de ${productoSeleccionado.unidadesPorPaquete || 1})`}
                     type="number"
                     value={cantidadProducto}
                     onChange={(e) => setCantidadProducto(Number.parseInt(e.target.value) || 0)}
-                    inputProps={{ min: 1 }}
+                    inputProps={{ min: 1, step: productoSeleccionado.unidadesPorPaquete || 1 }}
+                    error={cantidadProducto > 0 && !esCantidadValida()}
+                    helperText={
+                      productoSeleccionado
+                        ? `Debe ingresar múltiplos de ${productoSeleccionado.unidadesPorPaquete || 1} unidades (un paquete)`
+                        : ""
+                    }
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <Button variant="contained" color="secondary" onClick={agregarProducto} startIcon={<Add />} fullWidth>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={agregarProducto}
+                    startIcon={<Add />}
+                    fullWidth
+                    disabled={!esCantidadValida()}
+                  >
                     Agregar a Cotización
                   </Button>
                 </Grid>

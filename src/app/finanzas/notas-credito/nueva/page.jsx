@@ -137,7 +137,7 @@ export default function NuevaNotaCredito() {
                       />
                     </Grid>
                     <Grid item xs={4} key={`producto-${d.idDetalleFactura || index}`}>{d.producto}</Grid>
-                    <Grid item xs={2} key={`precio-${d.idDetalleFactura || index}`}>Precio: ₲ {d.precioUnitario.toLocaleString('es-PY')}</Grid>
+                    <Grid item xs={2} key={`precio-${d.idDetalleFactura || index}`}>Precio unitario: ₲ {d.precioUnitario.toLocaleString('es-PY')}</Grid>
                     <Grid item xs={2} key={`facturado-${d.idDetalleFactura || index}`}>Facturado: {d.cantidad}</Grid>
                     <Grid item xs={3} key={`cantidadNC-${d.idDetalleFactura || index}`}>
                       <TextField
