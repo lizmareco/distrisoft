@@ -163,39 +163,38 @@ export default function DetallePedido({ id, isEmbedded = false }) {
 
   // Función para formatear la cantidad faltante según el tipo de material
   const formatearCantidadFaltante = (material) => {
-    const nombreMaterial = material.materiaPrima.toLowerCase()
+  
     const faltanteGramos = Math.ceil(material.faltante)
-
+    const necesarioGramos = Math.ceil(material.cantidadNecesaria)
+    const stockActualGramos = Math.floor(material.stockActual)
+  
     const formatKg = (value) => {
       return new Intl.NumberFormat("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 1000)
     }
-
-    const faltanteKg = formatKg(material.faltante)
-    const stockActualKg = formatKg(material.stockActual)
-    const necesarioKg = formatKg(material.cantidadNecesaria)
-
-    // Formatear para edulcorante (mostrar en gramos y paquetes)
-    if (
-      nombreMaterial.includes("edulcorante") ||
-      nombreMaterial.includes("azúcar") ||
-      nombreMaterial.includes("azucar")
-    ) {
-      const paquetesFaltantes = Math.ceil(material.faltante / 1000) // 1000g por paquete
-      return `Faltan ${faltanteGramos}g (${faltanteKg}kg) - ${paquetesFaltantes} paquetes de 1000g. Stock actual: ${material.stockActual}g (${stockActualKg}kg), Necesario: ${Math.ceil(material.cantidadNecesaria)}g (${necesarioKg}kg)`
+  
+    const faltanteKg = formatKg(faltanteGramos)
+    const stockActualKg = formatKg(stockActualGramos)
+    const necesarioKg = formatKg(necesarioGramos)
+  
+    // Usar el tamaño de lote real de la fórmula
+    const tamPaquete = Number(material.detalleCalculo?.cantidadPorLote) || null
+    let paquetesFaltantes = null
+    let paquetesStock = null
+    let paquetesNecesarios = null
+    if (tamPaquete && tamPaquete > 0) {
+      paquetesFaltantes = Math.ceil(faltanteGramos / tamPaquete)
+      paquetesStock = Math.floor(stockActualGramos / tamPaquete)
+      paquetesNecesarios = Math.ceil(necesarioGramos / tamPaquete)
     }
-
-    // Formatear para sal (mostrar en gramos)
-    if (nombreMaterial.includes("sal")) {
-      return `Faltan ${faltanteGramos}g (${faltanteKg}kg). Stock actual: ${material.stockActual}g (${stockActualKg}kg), Necesario: ${Math.ceil(material.cantidadNecesaria)}g (${necesarioKg}kg)`
-    }
-
-    // Formatear para cocido (mostrar en gramos)
-    if (nombreMaterial.includes("cocido")) {
-      return `Faltan ${faltanteGramos}g (${faltanteKg}kg). Stock actual: ${material.stockActual}g (${stockActualKg}kg), Necesario: ${Math.ceil(material.cantidadNecesaria)}g (${necesarioKg}kg)`
-    }
-
-    // Formato por defecto para otros materiales
-    return `Faltan ${faltanteGramos}g (${faltanteKg}kg). Stock actual: ${material.stockActual}g (${stockActualKg}kg), Necesario: ${Math.ceil(material.cantidadNecesaria)}g (${necesarioKg}kg)`
+  
+    // Construir mensaje
+    let mensaje = `Faltan ${faltanteGramos}g (${faltanteKg}kg)`
+    
+    mensaje += `. Stock actual: ${stockActualGramos}g (${stockActualKg}kg)`
+   
+    mensaje += `, Necesario: ${necesarioGramos}g (${necesarioKg}kg)`
+    
+    return mensaje
   }
 
   // Función para verificar el stock de materias primas
@@ -683,8 +682,7 @@ export default function DetallePedido({ id, isEmbedded = false }) {
             {/* Información adicional sobre el cálculo */}
             <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                <strong>Nota:</strong> Los pedidos se ingresan por unidades individuales (sobres), pero se facturan por
-                paquetes completos. El sistema calcula automáticamente los paquetes necesarios y el costo correspondiente.
+                <strong>Nota:</strong> Los pedidos se ingresan por unidades individuales (sobres).
               </Typography>
             </Box>
           </Paper>

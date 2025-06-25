@@ -248,9 +248,9 @@ async function verificarYDescontarStock(idPedido) {
       // Calcular gramos totales necesarios
       const gramosNecesarios = detalle.cantidad * pesoPorUnidad
 
-      // Calcular cuántos lotes de producción se necesitan basado en el rendimiento de la fórmula
+      // Calcular la cantidad de materia prima proporcional (NO redondear a lotes completos)
       const cantidadPorLote = formula.rendimiento
-      const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
+      // const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
 
       console.log(`=== VERIFICACIÓN DE STOCK ===`)
       console.log(`Producto: ${detalle.producto.nombreProducto}`)
@@ -258,14 +258,14 @@ async function verificarYDescontarStock(idPedido) {
       console.log(`Peso por unidad (DB): ${pesoPorUnidad}g`)
       console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
       console.log(`Rendimiento por lote: ${cantidadPorLote}g`)
-      console.log(`Lotes necesarios: ${lotesNecesarios}`)
+      console.log(`Lotes necesarios: ${cantidadPorLote}`)
 
       // Calcular consumo proporcional de materia prima
       for (const detalleFormula of formula.FormulaDetalle) {
         const cantidadMateriaPrimaPorLote = detalleFormula.cantidad;
         const unidadesPorLote = formula.rendimiento;
         // Consumo proporcional según cantidad pedida
-        const cantidadTotalMateriaPrima = (detalle.cantidad / unidadesPorLote) * cantidadMateriaPrimaPorLote;
+        const cantidadTotalMateriaPrima = (gramosNecesarios / cantidadPorLote) * cantidadMateriaPrimaPorLote;
         const materiaPrima = detalleFormula.materiaPrima;
 
         console.log(`--- Materia Prima (corregido) ---`);

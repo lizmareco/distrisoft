@@ -58,10 +58,10 @@ export async function GET(request, { params }) {
         telefono: facturaDB.proveedor.persona?.telefono || "N/A",
       },
       productos: (facturaDB.detalleFacturaProveedor || []).map((detalle) => ({
-        cantidad: detalle.cantidad || 1,
+        cantidad: Math.round((detalle.cantidad || 0) / 1000),
         descripcion: detalle.producto?.nombreProducto || "Producto",
-        unidad: detalle.producto?.unidadMedida?.descUnidadMedida || "Unidad",
-        precioUnitario: Number.parseFloat(detalle.precioUnitario || 0),
+        unidad: "kg",
+        precioUnitario: Math.round(Number.parseFloat(detalle.precioUnitario || 0) * 1000),
         subtotal: Number.parseFloat(detalle.subtotal || 0),
         iva: Number.parseFloat(detalle.montoImpuesto || 0),
         total: Number.parseFloat(detalle.totalLinea || 0),

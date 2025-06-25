@@ -52,6 +52,7 @@ import {
   ExpandLess as ExpandLessIcon,
   UnfoldMore as UnfoldMoreIcon,
   UnfoldLess as UnfoldLessIcon,
+  Download as DownloadIcon,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -149,6 +150,17 @@ export default function OrdenesCompraPage() {
       verificarFacturasExistentes(ordenesCompra)
     }
   }, [ordenesCompra, mostrarOrdenes])
+
+  // Efecto para autocompletar la fecha de vencimiento cuando es a crédito y cambia el plazo o la fecha de emisión
+  useEffect(() => {
+    if (!datosFactura.esContado && datosFactura.fechaEmision && datosFactura.plazoPago) {
+      const fechaEmision = new Date(datosFactura.fechaEmision)
+      const fechaVencimiento = new Date(fechaEmision)
+      fechaVencimiento.setDate(fechaEmision.getDate() + Number(datosFactura.plazoPago))
+      setDatosFactura((prev) => ({ ...prev, fechaVencimiento: fechaVencimiento.toISOString().split("T")[0] }))
+    }
+    // eslint-disable-next-line
+  }, [datosFactura.esContado, datosFactura.fechaEmision, datosFactura.plazoPago])
 
   // Cargar órdenes de compra
   const fetchOrdenesCompra = async (overrideMostrarTodas = null) => {
@@ -469,7 +481,7 @@ export default function OrdenesCompraPage() {
         .filter((item) => item.seleccionado && item.cantidad > 0)
         .map((item) => ({
           idMateriaPrima: item.idMateriaPrima,
-          cantidad: item.cantidad,
+          cantidad: Math.round(item.cantidad * 1000), // Convertir a gramos
           unidadMedida: item.unidadMedida,
         }))
 
@@ -683,7 +695,7 @@ export default function OrdenesCompraPage() {
         return todosLosEstados.filter(e => ["RECIBIDO", "ANULADO"].includes(e.id));
       default:
         return [];
-    }
+    };
   };
 
   // Reemplazar la función puedeGuardarFactura existente con:
@@ -978,28 +990,8 @@ export default function OrdenesCompraPage() {
                             </TableCell>
                             <TableCell align="center">
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Tooltip title="Ver detalles">
-                                  <IconButton
-                                    component={Link}
-                                    href={`/ordenes-compra/${orden.idOrdenCompra}`}
-                                    color="primary"
-                                    size="small"
-                                  >
-                                    <VisibilityIcon />
-                                  </IconButton>
-                                </Tooltip>
-                                {tieneFacturaGuardada(orden) && (
-                                  <Tooltip title="Ver facturas de la orden">
-                                    <IconButton
-                                      component={Link}
-                                      href={`/ordenes-compra/${orden.idOrdenCompra}/facturas`}
-                                      color="info"
-                                      size="small"
-                                    >
-                                      <ReceiptIcon />
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
+                                
+
                                 <Tooltip title="Más acciones">
                                   <IconButton size="small" onClick={(e) => handleMenuClick(e, orden)}>
                                     <MoreVertIcon />
@@ -1030,8 +1022,8 @@ export default function OrdenesCompraPage() {
                                       <TableHead>
                                         <TableRow>
                                           <TableCell>Materia Prima</TableCell>
-                                          <TableCell align="right">Cantidad</TableCell>
-                                          <TableCell align="right">Precio Unitario</TableCell>
+                                          <TableCell align="right">Cantidad (kg)</TableCell>
+                                          <TableCell align="right">Precio por kilo</TableCell>
                                           <TableCell align="right">Subtotal</TableCell>
                                         </TableRow>
                                       </TableHead>
@@ -1040,16 +1032,16 @@ export default function OrdenesCompraPage() {
                                           <TableRow key={index}>
                                             <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
                                             <TableCell align="right">
-                                              {detalle.cantidad} {detalle.unidadMedida || "Unidad"}
+                                              {((detalle.cantidad || 0) / 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                             </TableCell>
                                             <TableCell align="right">
-                                              {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                                                detalle.precioUnitario || 0
+                                              {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", maximumFractionDigits: 0 }).format(
+                                                (detalle.precioUnitario || 0) * 1000
                                               )}
                                             </TableCell>
                                             <TableCell align="right">
                                               {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                                                (detalle.cantidad || 0) * (detalle.precioUnitario || 0)
+                                                detalle.subtotal || 0
                                               )}
                                             </TableCell>
                                           </TableRow>
@@ -1102,11 +1094,14 @@ export default function OrdenesCompraPage() {
       >
         {selectedOrden && (() => {
           return [
-            <MenuItem key="verDetalles" onClick={() => handleMenuClose()}>
+            <MenuItem key="descargarPDF" onClick={() => {
+              window.open(`/api/ordenes-compra/${selectedOrden.idOrdenCompra}/pdf`, '_blank')
+              handleMenuClose()
+            }}>
               <ListItemIcon>
-                <VisibilityIcon fontSize="small" />
+                <DownloadIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText>Ver detalles</ListItemText>
+              <ListItemText>Descargar PDF</ListItemText>
             </MenuItem>,
             puedeVerFactura(selectedOrden) && (
               <MenuItem key="verFactura" onClick={() => handleVerFactura(selectedOrden)}>
@@ -1324,6 +1319,7 @@ export default function OrdenesCompraPage() {
                       value={datosFactura.fechaVencimiento}
                       onChange={(e) => setDatosFactura({ ...datosFactura, fechaVencimiento: e.target.value })}
                       InputLabelProps={{ shrink: true }}
+                      disabled={!datosFactura.esContado}
                     />
                   </Grid>
                 </>
@@ -1375,8 +1371,8 @@ export default function OrdenesCompraPage() {
                 <TableRow>
                   <TableCell padding="checkbox">Seleccionar</TableCell>
                   <TableCell>Materia Prima</TableCell>
-                  <TableCell align="right">Cantidad Total</TableCell>
-                  <TableCell align="right">Cantidad Recibida</TableCell>
+                  <TableCell align="right">Cantidad Total (kg)</TableCell>
+                  <TableCell align="right">Cantidad Recibida (kg)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1389,7 +1385,7 @@ export default function OrdenesCompraPage() {
                       />
                     </TableCell>
                     <TableCell>{item.nombreMateriaPrima}</TableCell>
-                    <TableCell align="right">{item.cantidadTotal}</TableCell>
+                    <TableCell align="right">{(item.cantidadTotal / 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</TableCell>
                     <TableCell align="right">
                       <TextField
                         type="number"
@@ -1397,8 +1393,9 @@ export default function OrdenesCompraPage() {
                         value={item.cantidad}
                         onChange={(e) => handleItemCantidadChange(index, e.target.value)}
                         disabled={!item.seleccionado}
-                        inputProps={{ min: 0, max: item.cantidadTotal, step: "any" }}
+                        inputProps={{ min: 0, max: item.cantidadTotal / 1000, step: "any" }}
                         sx={{ width: 100 }}
+                        label="kg"
                       />
                     </TableCell>
                   </TableRow>

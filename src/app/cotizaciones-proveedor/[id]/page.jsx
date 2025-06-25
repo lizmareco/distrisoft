@@ -474,8 +474,8 @@ export default function VerCotizacionProveedorPage({ params }) {
                   <TableHead>
                     <TableRow>
                       <TableCell>Materia Prima</TableCell>
-                      <TableCell align="right">Precio Unitario</TableCell>
-                      <TableCell align="right">Cantidad</TableCell>
+                      <TableCell align="right">Precio por kilo (Gs)</TableCell>
+                      <TableCell align="right">Cantidad (kg)</TableCell>
                       <TableCell align="right">Subtotal</TableCell>
                     </TableRow>
                   </TableHead>
@@ -484,11 +484,13 @@ export default function VerCotizacionProveedorPage({ params }) {
                       <TableRow key={detalle.idDetalleCotizacionProv || index}>
                         <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
                         <TableCell align="right">
-                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                            detalle.precioUnitario || 0,
+                          {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", maximumFractionDigits: 0 }).format(
+                            (detalle.precioUnitario || 0) * 1000
                           )}
                         </TableCell>
-                        <TableCell align="right">{detalle.cantidad}</TableCell>
+                        <TableCell align="right">
+                          {((detalle.cantidad || 0) / 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </TableCell>
                         <TableCell align="right">
                           {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
                             detalle.subtotal || 0,

@@ -221,7 +221,7 @@ export default function VerOrdenCompraPage({ params }) {
         .filter((item) => item.seleccionado && item.cantidad > 0)
         .map((item) => ({
           idMateriaPrima: item.idMateriaPrima,
-          cantidad: item.cantidad,
+          cantidad: Math.round(item.cantidad * 1000), // Convertir a gramos
           unidadMedida: item.unidadMedida,
         }))
 
@@ -318,7 +318,11 @@ export default function VerOrdenCompraPage({ params }) {
       // Si se está cambiando a RECIBIDO, incluir un array vacío de recepcionItems
       // para que el backend sepa que debe procesar la recepción completa
       if (cambioARecibido) {
-        requestBody.recepcionItems = []
+        requestBody.recepcionItems = itemsRecepcion.map(item => ({
+          idMateriaPrima: item.idMateriaPrima,
+          cantidad: Math.round((item.cantidadTotal || 0)), // ya está en gramos
+          unidadMedida: item.unidadMedida,
+        }))
       }
 
       console.log("Enviando solicitud con cuerpo:", requestBody)
@@ -844,8 +848,8 @@ export default function VerOrdenCompraPage({ params }) {
                 <TableRow>
                   <TableCell padding="checkbox">Seleccionar</TableCell>
                   <TableCell>Materia Prima</TableCell>
-                  <TableCell align="right">Cantidad Total</TableCell>
-                  <TableCell align="right">Cantidad Recibida</TableCell>
+                  <TableCell align="right">Cantidad Total (kg)</TableCell>
+                  <TableCell align="right">Cantidad Recibida (kg)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -858,7 +862,7 @@ export default function VerOrdenCompraPage({ params }) {
                       />
                     </TableCell>
                     <TableCell>{item.nombreMateriaPrima}</TableCell>
-                    <TableCell align="right">{item.cantidadTotal}</TableCell>
+                    <TableCell align="right">{(item.cantidadTotal / 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</TableCell>
                     <TableCell align="right">
                       <TextField
                         type="number"
@@ -866,8 +870,9 @@ export default function VerOrdenCompraPage({ params }) {
                         value={item.cantidad}
                         onChange={(e) => handleItemCantidadChange(index, e.target.value)}
                         disabled={!item.seleccionado}
-                        inputProps={{ min: 0, max: item.cantidadTotal, step: "any" }}
+                        inputProps={{ min: 0, max: item.cantidadTotal / 1000, step: "any" }}
                         sx={{ width: 100 }}
+                        label="kg"
                       />
                     </TableCell>
                   </TableRow>

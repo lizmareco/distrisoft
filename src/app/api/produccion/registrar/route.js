@@ -92,14 +92,16 @@ export async function POST(request) {
       );
     }
 
+    
     // Calcular cuántos lotes se están produciendo
-    const lotesProducidos = Math.ceil(cantidadProducida / formula.rendimiento);
+    // const lotesProducidos = Math.ceil(cantidadProducida / formula.rendimiento);
     
     // Iniciar transacción para asegurar la integridad de los datos
     const resultado = await prisma.$transaction(async (prisma) => {
       // 1. Verificar stock suficiente de todas las materias primas
       for (const detalleFormula of formula.FormulaDetalle) {
-        const cantidadConsumida = detalleFormula.cantidad * lotesProducidos;
+        // Consumo proporcional según cantidad producida
+        const cantidadConsumida = (cantidadProducida / formula.rendimiento) * detalleFormula.cantidad;
         
         if (detalleFormula.materiaPrima.stockActual < cantidadConsumida) {
           throw new Error(`Stock insuficiente de ${detalleFormula.materiaPrima.nombreMateriaPrima}`);
@@ -123,7 +125,8 @@ export async function POST(request) {
       const movimientosInventario = [];
       
       for (const detalleFormula of formula.FormulaDetalle) {
-        const cantidadConsumida = detalleFormula.cantidad * lotesProducidos;
+        // Consumo proporcional según cantidad producida
+        const cantidadConsumida = (cantidadProducida / formula.rendimiento) * detalleFormula.cantidad;
         
         // Actualizar stock de materia prima
         await prisma.materiaPrima.update({

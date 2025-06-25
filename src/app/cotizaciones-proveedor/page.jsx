@@ -563,8 +563,8 @@ export default function CotizacionesProveedorPage() {
                                           <TableHead>
                                             <TableRow>
                                               <TableCell>Materia Prima</TableCell>
-                                              <TableCell align="right">Precio Unitario</TableCell>
-                                              <TableCell align="right">Cantidad</TableCell>
+                                              <TableCell align="right">Precio Unitario (Gs/kg)</TableCell>
+                                              <TableCell align="right">Cantidad (kg)</TableCell>
                                               <TableCell align="right">Subtotal</TableCell>
                                             </TableRow>
                                           </TableHead>
@@ -573,14 +573,16 @@ export default function CotizacionesProveedorPage() {
                                               <TableRow key={detalle.idDetalleCotizacionProv || index}>
                                                 <TableCell>{detalle.materiaPrima?.nombreMateriaPrima || "N/A"}</TableCell>
                                                 <TableCell align="right">
-                                                  {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                                                    detalle.precioUnitario || 0,
+                                                  {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG", maximumFractionDigits: 0 }).format(
+                                                    (detalle.precioUnitario || 0) * 1000
                                                   )}
                                                 </TableCell>
-                                                <TableCell align="right">{detalle.cantidad}</TableCell>
+                                                <TableCell align="right">
+                                                  {((detalle.cantidad || 0) / 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                </TableCell>
                                                 <TableCell align="right">
                                                   {new Intl.NumberFormat("es-PY", { style: "currency", currency: "PYG" }).format(
-                                                    detalle.subtotal || 0,
+                                                    detalle.subtotal || 0
                                                   )}
                                                 </TableCell>
                                               </TableRow>
@@ -639,7 +641,7 @@ export default function CotizacionesProveedorPage() {
         )
       ) : (
         <Alert severity="info" sx={{ mb: 3 }}>
-          Ingrese un ID de cotización o nombre de proveedor para buscar, o haga clic en "Mostrar Todos"
+          Ingrese un ID de cotización o nombre de proveedor para buscar"
         </Alert>
       )}
 

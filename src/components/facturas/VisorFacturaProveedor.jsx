@@ -241,8 +241,8 @@ export default function VisorFacturaProveedor({ open, onClose, facturaId }) {
                   <TableHead>
                     <TableRow>
                       <TableCell>Materia Prima</TableCell>
-                      <TableCell align="center">Cantidad</TableCell>
-                      <TableCell align="right">Precio Unitario</TableCell>
+                      <TableCell align="center">Cantidad (kg)</TableCell>
+                      <TableCell align="right">Precio por kilo (Gs)</TableCell>
                       <TableCell align="right">Subtotal</TableCell>
                     </TableRow>
                   </TableHead>
@@ -257,8 +257,12 @@ export default function VisorFacturaProveedor({ open, onClose, facturaId }) {
                             {detalle.detalleCotizacion?.materiaPrima?.descMateriaPrima}
                           </Typography>
                         </TableCell>
-                        <TableCell align="center">{detalle.cantidadFacturada?.toLocaleString("es-PY")}</TableCell>
-                        <TableCell align="right">₲ {detalle.precioUnitarioFinal?.toLocaleString("es-PY")}</TableCell>
+                        <TableCell align="center">
+                          {((detalle.cantidadFacturada || 0) / 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </TableCell>
+                        <TableCell align="right">
+                          ₲ {((detalle.precioUnitarioFinal || 0) * 1000).toLocaleString("es-PY", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </TableCell>
                         <TableCell align="right">
                           <Typography fontWeight="bold">₲ {detalle.subtotalFinal?.toLocaleString("es-PY")}</Typography>
                         </TableCell>

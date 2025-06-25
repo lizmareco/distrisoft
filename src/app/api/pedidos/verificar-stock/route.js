@@ -66,40 +66,39 @@ export async function POST(request) {
       // Usar el peso por unidad del producto desde la base de datos
       const pesoPorUnidad = detalle.producto.pesoUnidad
 
-      // Calcular gramos totales necesarios
-      const gramosNecesarios = detalle.cantidad * pesoPorUnidad
-
-      // Calcular cuántos lotes de producción se necesitan
-      const cantidadPorLote = formula.rendimiento
-      const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
-
       console.log(`=== VERIFICACIÓN STOCK API ===`)
       console.log(`Producto: ${detalle.producto.nombreProducto}`)
       console.log(`Cantidad pedida: ${detalle.cantidad} unidades`)
       console.log(`Peso por unidad (DB): ${pesoPorUnidad}g`)
-      console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
+
+      // Calcular la cantidad de materia prima proporcional (NO redondear a lotes completos)
+      const cantidadPorLote = formula.rendimiento
 
       // Verificar stock de cada materia prima
       for (const detalleFormula of formula.FormulaDetalle) {
         const cantidadMateriaPrimaPorLote = detalleFormula.cantidad
-        const cantidadTotalMateriaPrima = cantidadMateriaPrimaPorLote * lotesNecesarios
+        // Cálculo proporcional CORREGIDO: solo por unidades, no por peso
+        const cantidadTotalMateriaPrima = (detalle.cantidad / cantidadPorLote) * cantidadMateriaPrimaPorLote;
+        // Redondear a gramos enteros
+        const cantidadTotalMateriaPrimaRedondeada = Math.ceil(cantidadTotalMateriaPrima);
+        const faltante = cantidadTotalMateriaPrimaRedondeada - detalleFormula.materiaPrima.stockActual;
+
         const materiaPrima = detalleFormula.materiaPrima
 
-        if (materiaPrima.stockActual < cantidadTotalMateriaPrima) {
+        if (detalleFormula.materiaPrima.stockActual < cantidadTotalMateriaPrima) {
           stockSuficiente = false
           materialesFaltantes.push({
             idMateriaPrima: materiaPrima.idMateriaPrima,
             materiaPrima: materiaPrima.nombreMateriaPrima,
-            stockActual: materiaPrima.stockActual,
-            cantidadNecesaria: cantidadTotalMateriaPrima,
-            faltante: cantidadTotalMateriaPrima - materiaPrima.stockActual,
+            stockActual: Math.floor(materiaPrima.stockActual),
+            cantidadNecesaria: cantidadTotalMateriaPrimaRedondeada,
+            faltante: Math.max(faltante, 0),
             unidadMedida: "g",
             detalleCalculo: {
               producto: detalle.producto.nombreProducto,
               cantidadPedida: detalle.cantidad,
               pesoPorUnidad: pesoPorUnidad,
-              gramosNecesarios: gramosNecesarios,
-              lotesNecesarios: lotesNecesarios,
+              gramosNecesarios: detalle.cantidad * pesoPorUnidad,
               cantidadPorLote: cantidadMateriaPrimaPorLote,
             },
           })
@@ -110,8 +109,7 @@ export async function POST(request) {
         producto: detalle.producto.nombreProducto,
         cantidad: detalle.cantidad,
         pesoPorUnidad: pesoPorUnidad,
-        gramosNecesarios: gramosNecesarios,
-        lotesNecesarios,
+        gramosNecesarios: detalle.cantidad * pesoPorUnidad,
         cantidadPorLote,
       })
     }

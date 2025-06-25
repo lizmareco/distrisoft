@@ -1,40 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/prisma/client"
 import { HTTP_STATUS_CODES } from "@/src/lib/http/http-status-code"
-import AuthController from "@/src/backend/controllers/auth-controller"
-import AuditoriaService from "@/src/backend/services/auditoria-service"
-import cookie from "cookie"
 
 // Importar jsPDF
 import jsPDF from "jspdf"
 
-async function getUserIdFromRequest(request) {
-  const authController = new AuthController()
-  let token = null
-
-  // Leer la cookie "at" del header
-  const cookieHeader = request.headers.get("cookie")
-  if (cookieHeader) {
-    const cookies = cookie.parse(cookieHeader)
-    token = cookies.at
-  }
-
-  // Fallback: Authorization header (Bearer)
-  if (!token) {
-    const authHeader = request.headers.get("authorization")
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.replace("Bearer ", "")
-    }
-  }
-
-  if (!token) {
-    console.warn("NO TOKEN FOUND, defaulting to 1")
-    return 1
-  }
-
-  const userData = await authController.getUserFromToken(token)
-  return userData?.idUsuario || 1
-}
 
 export async function GET(request, { params }) {
   try {
@@ -95,18 +65,7 @@ export async function GET(request, { params }) {
       'Content-Disposition': `attachment; filename="orden-compra-${ordenCompra.idOrdenCompra}.pdf"`
     }
 
-    // Registrar auditoría
-    const auditoriaService = new AuditoriaService()
-    const idUsuario = await getUserIdFromRequest(request)
-    await auditoriaService.registrarAuditoria({
-      idUsuario,
-      accion: "GENERAR_PDF",
-      tabla: "ordenCompra",
-      idRegistro: ordenCompra.idOrdenCompra,
-      detalles: `PDF generado para orden de compra #${ordenCompra.idOrdenCompra}`,
-      ip: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "IP no disponible",
-      userAgent: request.headers.get("user-agent") || "User-Agent no disponible"
-    })
+    
 
     return new NextResponse(pdfBytes, { headers })
 
@@ -167,8 +126,8 @@ function generatePDFContent(doc, ordenCompra) {
       // Headers de la tabla
       doc.setFontSize(9)
       doc.text('Materia Prima', 20, 195)
-      doc.text('Precio Unit.', 100, 195)
-      doc.text('Cantidad', 140, 195)
+      doc.text('Precio por kilo', 100, 195)
+      doc.text('Cantidad (kg)', 140, 195)
       doc.text('Subtotal', 170, 195)
 
       // Línea bajo headers
@@ -178,12 +137,15 @@ function generatePDFContent(doc, ordenCompra) {
       let totalGeneral = 0
 
       detalles.forEach((detalle) => {
-        const subtotal = (detalle.precioUnitario || 0) * (detalle.cantidad || 0)
+        // Calcular valores convertidos
+        const cantidadKg = Math.round((detalle.cantidad || 0) / 1000)
+        const precioPorKilo = Math.round((detalle.precioUnitario || 0) * 1000)
+        const subtotal = precioPorKilo * cantidadKg
         totalGeneral += subtotal
-        
+
         doc.text(detalle.materiaPrima?.nombreMateriaPrima || 'N/A', 20, yPosition)
-        doc.text(new Intl.NumberFormat('es-PY', { style: 'currency', currency: 'PYG' }).format(detalle.precioUnitario || 0), 100, yPosition)
-        doc.text(detalle.cantidad?.toString() || '0', 140, yPosition)
+        doc.text(new Intl.NumberFormat('es-PY', { style: 'currency', currency: 'PYG', maximumFractionDigits: 0 }).format(precioPorKilo), 100, yPosition)
+        doc.text(cantidadKg.toString(), 140, yPosition)
         doc.text(new Intl.NumberFormat('es-PY', { style: 'currency', currency: 'PYG' }).format(subtotal), 170, yPosition)
         
         yPosition += 10

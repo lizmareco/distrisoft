@@ -161,18 +161,19 @@ export default function NuevaCotizacionProveedorPage() {
       setBuscandoMateriaPrima(true)
       setError(null)
 
-      const response = await fetch(`/api/materiaprima/buscar?query=${encodeURIComponent(materiaPrimaBusqueda.trim())}`)
+      // Agregar el parámetro activas=true para filtrar solo materias primas activas
+      const response = await fetch(`/api/materiaprima/buscar?query=${encodeURIComponent(materiaPrimaBusqueda.trim())}&activas=true`)
 
       if (!response.ok) {
         throw new Error("Error al buscar materias primas")
       }
 
       const data = await response.json()
-      console.log("Materias primas encontradas:", data)
+      console.log("Materias primas activas encontradas:", data)
       setMateriasPrimasEncontradas(data || []) // Asegurar que siempre sea un array
 
       if (!data || data.length === 0) {
-        setError("No se encontraron materias primas con ese criterio")
+        setError("No se encontraron materias primas activas con ese criterio")
       }
     } catch (error) {
       console.error("Error:", error)
@@ -296,15 +297,20 @@ export default function NuevaCotizacionProveedorPage() {
         idProveedor: formData.idProveedor,
         validez: Number.parseInt(formData.validez),
         montoTotal: montoTotal,
-        materiasPrimas: materiasPrimasEnCotizacion.map((item) => ({
-          idMateriaPrima: item.idMateriaPrima,
-          cantidad: item.cantidad,
-          precioUnitario: item.precioUnitario,
-          subtotal: item.subtotal,
-        })),
+        materiasPrimas: materiasPrimasEnCotizacion.map((item) => {
+          // Conversión a gramos y precio por gramo
+          const cantidadEnGramos = item.cantidad * 1000
+          const precioPorGramo = item.precioUnitario / 1000
+          return {
+            idMateriaPrima: item.idMateriaPrima,
+            cantidad: cantidadEnGramos,
+            precioUnitario: precioPorGramo,
+            subtotal: cantidadEnGramos * precioPorGramo,
+          }
+        }),
       }
 
-      console.log("Enviando datos de cotización:", cotizacionData)
+      console.log("Enviando datos de cotización (convertidos a gramos):", cotizacionData)
 
       // Crear una solicitud con el token en el encabezado
       const response = await fetch("/api/cotizaciones-proveedor", {
@@ -480,6 +486,13 @@ export default function NuevaCotizacionProveedorPage() {
               </Grid>
             </Grid>
 
+            {/* Nota informativa sobre materias primas activas */}
+            <Box sx={{ mt: 1, mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Nota:</strong> Solo se muestran materias primas con estado "ACTIVO" para cotizaciones.
+              </Typography>
+            </Box>
+
             {proveedoresEncontrados && proveedoresEncontrados.length > 0 && (
               <TableContainer component={Paper} sx={{ mt: 2 }}>
                 <Table size="small">
@@ -526,7 +539,7 @@ export default function NuevaCotizacionProveedorPage() {
             <Grid item xs={12} md={5}>
               <TextField
                 fullWidth
-                label="Buscar materia prima (nombre o descripción)"
+                label="Buscar materia prima activa (nombre o descripción)"
                 value={materiaPrimaBusqueda}
                 onChange={(e) => setMateriaPrimaBusqueda(e.target.value)}
                 onKeyPress={handleMateriaPrimaKeyPress}
@@ -550,7 +563,7 @@ export default function NuevaCotizacionProveedorPage() {
                 disabled={buscandoMateriaPrima || !proveedorSeleccionado}
                 startIcon={<Search />}
               >
-                {buscandoMateriaPrima ? <CircularProgress size={24} /> : "Buscar Materia Prima"}
+                {buscandoMateriaPrima ? <CircularProgress size={24} /> : "Buscar Materias Primas Activas"}
               </Button>
             </Grid>
           </Grid>
@@ -608,7 +621,7 @@ export default function NuevaCotizacionProveedorPage() {
                 <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
-                    label="Cantidad"
+                    label="Cantidad (en kilos)"
                     type="number"
                     value={cantidadMateriaPrima}
                     onChange={(e) => setCantidadMateriaPrima(Number(e.target.value))}
@@ -619,7 +632,7 @@ export default function NuevaCotizacionProveedorPage() {
                 <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
-                    label="Precio Unitario"
+                    label="Precio por kilo (Gs)"
                     type="number"
                     value={precioUnitario}
                     onChange={(e) => setPrecioUnitario(Number(e.target.value))}

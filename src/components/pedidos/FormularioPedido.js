@@ -684,7 +684,7 @@ export default function FormularioPedido() {
 
           <Grid item xs={12} md={2}>
             <TextField
-              label="Cantidad"
+              label="Cantidad (unidades)"
               type="number"
               value={cantidad}
               onChange={(e) => setCantidad(Math.max(1, Number.parseInt(e.target.value) || 0))}
@@ -696,7 +696,7 @@ export default function FormularioPedido() {
 
           <Grid item xs={12} md={3}>
             <TextField
-              label="Precio Unitario"
+              label="Precio Unitario (por unidad)"
               type="number"
               value={precio}
               onChange={(e) => setPrecio(Number.parseFloat(e.target.value) || 0)}
