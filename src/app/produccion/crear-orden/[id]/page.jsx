@@ -44,7 +44,6 @@ export default function CrearOrdenProduccionPage({ params }) {
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState(null)
-  const [verificacionStock, setVerificacionStock] = useState(null)
 
   const [formData, setFormData] = useState({
     operadorEncargado: "",
@@ -65,36 +64,13 @@ export default function CrearOrdenProduccionPage({ params }) {
         const datosPedido = await respuestaPedido.json()
         setPedido(datosPedido)
 
-        // Verificar stock nuevamente
-        const respuestaStock = await fetch("/api/pedidos/verificar-stock", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idPedido: Number.parseInt(id) }),
-        })
-
-        if (!respuestaStock.ok) {
-          throw new Error("Error al verificar stock")
-        }
-
-        const datosStock = await respuestaStock.json()
-        setVerificacionStock(datosStock)
-
-        if (!datosStock.stockSuficiente) {
-          setError("No hay stock suficiente para crear la orden de producción")
-          return
-        }
-
         // Cargar usuarios para operadores
         const respuestaUsuarios = await fetch("/api/usuarios?descripcionRol=PRODUCCION")
         if (respuestaUsuarios.ok) {
           const datosUsuarios = await respuestaUsuarios.json()
-          console.log("Datos de usuarios recibidos:", datosUsuarios)
-
-          // La API devuelve { usuarios: [...] }
           if (datosUsuarios.usuarios && Array.isArray(datosUsuarios.usuarios)) {
             setUsuarios(datosUsuarios.usuarios)
           } else {
-            console.warn("Los datos de usuarios no tienen el formato esperado:", datosUsuarios)
             setUsuarios([])
           }
         }
@@ -314,26 +290,6 @@ export default function CrearOrdenProduccionPage({ params }) {
             </TableContainer>
           </CardContent>
         </Card>
-
-        {/* Verificación de stock */}
-        {verificacionStock && (
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Verificación de Stock
-              </Typography>
-              <Alert severity="success" sx={{ mb: 2 }}>
-                ✓ Stock suficiente para todos los productos
-              </Alert>
-              {verificacionStock.resultadosVerificacion?.map((resultado, index) => (
-                <Typography key={index} variant="body2" sx={{ mb: 1 }}>
-                  • {resultado.producto}: {resultado.cantidad} unidades ({resultado.lotesNecesarios} lotes de{" "}
-                  {resultado.cantidadPorLote} unidades c/u)
-                </Typography>
-              ))}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Formulario de orden de producción */}
         <Paper sx={{ p: 3 }}>

@@ -563,7 +563,7 @@ export default function CotizacionesProveedorPage() {
                                           <TableHead>
                                             <TableRow>
                                               <TableCell>Materia Prima</TableCell>
-                                              <TableCell align="right">Precio Unitario (Gs/kg)</TableCell>
+                                              <TableCell align="right">Precio (Gs/kg)</TableCell>
                                               <TableCell align="right">Cantidad (kg)</TableCell>
                                               <TableCell align="right">Subtotal</TableCell>
                                             </TableRow>

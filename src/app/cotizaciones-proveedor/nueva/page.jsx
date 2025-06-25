@@ -693,8 +693,8 @@ export default function NuevaCotizacionProveedorPage() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Materia Prima</TableCell>
-                    <TableCell align="right">Precio Unitario</TableCell>
-                    <TableCell align="right">Cantidad</TableCell>
+                    <TableCell align="right">Precio por kg</TableCell>
+                    <TableCell align="right">Cantidad kg</TableCell>
                     <TableCell align="right">Subtotal</TableCell>
                     <TableCell>Acciones</TableCell>
                   </TableRow>

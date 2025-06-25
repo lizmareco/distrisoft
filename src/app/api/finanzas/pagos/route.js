@@ -144,7 +144,7 @@ export async function POST(request) {
     const auditoriaService = new AuditoriaService()
     const idUsuario = await getUserIdFromRequest(request)
     const data = await request.json()
-    const { nroFactura, montoPago, idMetodoPago, comprobantePago = "", observaciones = "", operador = 1 } = data
+    const { nroFactura, montoPago, idMetodoPago, comprobantePago = "", observaciones = "", operador = idUsuario } = data
 
     // Validaciones
     if (!nroFactura || !montoPago || !idMetodoPago) {

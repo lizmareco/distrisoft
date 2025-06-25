@@ -601,8 +601,8 @@ export default function NuevaCotizacionPage() {
                   <TableRow>
                     <TableCell>Nombre</TableCell>
                     <TableCell>Descripción</TableCell>
-                    <TableCell>Peso Unidad</TableCell>
-                    <TableCell>Precio Unitario</TableCell>
+                    <TableCell>Peso Unidad (Sobre)</TableCell>
+                    <TableCell>Precio Unitario (Sobre)</TableCell>
                     <TableCell>Unidad de Medida</TableCell>
                     <TableCell>Acciones</TableCell>
                   </TableRow>
@@ -691,9 +691,9 @@ export default function NuevaCotizacionPage() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Producto</TableCell>
-                    <TableCell>Peso Unidad</TableCell>
-                    <TableCell align="right">Precio Unitario</TableCell>
-                    <TableCell align="right">Cantidad(Unidades)</TableCell>
+                    <TableCell>Peso Unidad (Sobre)</TableCell>
+                    <TableCell align="right">Precio Unitario (Sobre)</TableCell>
+                    <TableCell align="right">Cantidad(Sobre)</TableCell>
                     <TableCell align="right">Subtotal</TableCell>
                     <TableCell>Acciones</TableCell>
                   </TableRow>

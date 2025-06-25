@@ -242,36 +242,16 @@ async function verificarYDescontarStock(idPedido) {
       // Usar la primera fórmula
       const formula = formulas[0]
 
-      // Usar el peso por unidad del producto desde la base de datos
-      const pesoPorUnidad = detalle.producto.pesoUnidad
-
-      // Calcular gramos totales necesarios
-      const gramosNecesarios = detalle.cantidad * pesoPorUnidad
-
-      // Calcular la cantidad de materia prima proporcional (NO redondear a lotes completos)
-      const cantidadPorLote = formula.rendimiento
-      // const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
-
-      console.log(`=== VERIFICACIÓN DE STOCK ===`)
-      console.log(`Producto: ${detalle.producto.nombreProducto}`)
-      console.log(`Cantidad pedida: ${detalle.cantidad} unidades`)
-      console.log(`Peso por unidad (DB): ${pesoPorUnidad}g`)
-      console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
-      console.log(`Rendimiento por lote: ${cantidadPorLote}g`)
-      console.log(`Lotes necesarios: ${cantidadPorLote}`)
-
       // Calcular consumo proporcional de materia prima
       for (const detalleFormula of formula.FormulaDetalle) {
-        const cantidadMateriaPrimaPorLote = detalleFormula.cantidad;
-        const unidadesPorLote = formula.rendimiento;
-        // Consumo proporcional según cantidad pedida
-        const cantidadTotalMateriaPrima = (gramosNecesarios / cantidadPorLote) * cantidadMateriaPrimaPorLote;
+        // Fórmula CORRECTA:
+        const cantidadTotalMateriaPrima = (detalle.cantidad / formula.rendimiento) * detalleFormula.cantidad;
         const materiaPrima = detalleFormula.materiaPrima;
 
         console.log(`--- Materia Prima (corregido) ---`);
         console.log(`Materia prima: ${materiaPrima.nombreMateriaPrima}`);
-        console.log(`Cantidad por lote: ${cantidadMateriaPrimaPorLote}g`);
-        console.log(`Unidades por lote: ${unidadesPorLote}`);
+        console.log(`Cantidad por lote: ${detalleFormula.cantidad}g`);
+        console.log(`Unidades por lote: ${formula.rendimiento}`);
         console.log(`Cantidad pedida: ${detalle.cantidad}`);
         console.log(`Cantidad total necesaria (proporcional): ${cantidadTotalMateriaPrima}g`);
         console.log(`Stock actual: ${materiaPrima.stockActual}g`);
@@ -325,10 +305,8 @@ async function descontarStockMateriasPrimas(tx, idPedido, idUsuario, auditoriaSe
     if (formulas.length > 0) {
       const formula = formulas[0]
       for (const detalleFormula of formula.FormulaDetalle) {
-        const cantidadMateriaPrimaPorLote = detalleFormula.cantidad;
-        const unidadesPorLote = formula.rendimiento;
-        // Consumo proporcional según cantidad pedida
-        const cantidadTotalMateriaPrima = (detalle.cantidad / unidadesPorLote) * cantidadMateriaPrimaPorLote;
+        // Fórmula CORRECTA:
+        const cantidadTotalMateriaPrima = (detalle.cantidad / formula.rendimiento) * detalleFormula.cantidad;
 
         const materiaPrima = await tx.materiaPrima.findUnique({
           where: { idMateriaPrima: detalleFormula.idMateriaPrima },

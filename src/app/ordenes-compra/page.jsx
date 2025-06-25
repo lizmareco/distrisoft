@@ -61,6 +61,7 @@ import { ArrowBack } from "@mui/icons-material"
 import { useRootContext } from "@/src/app/context/root"
 import VisorFacturaProveedor from "@/src/components/facturas/VisorFacturaProveedor"
 import FacturasOrdenCompra from "@/src/components/facturas/FacturasOrdenCompra"
+import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
 
 export default function OrdenesCompraPage() {
   console.log("Renderizando OrdenesCompraPage");
@@ -792,20 +793,35 @@ export default function OrdenesCompraPage() {
       <Button component={Link} href="/" startIcon={<ArrowBack />} variant="outlined" sx={{ mr: 2 }}>
           Volver a Gestión
       </Button>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Órdenes de Compra
-        </Typography>
-        <Button
-          component={Link}
-          href="/finanzas"
-          variant="contained"
-          color="primary"
-          startIcon={<ReceiptIcon />}
-        >
-          IR A FINANZAS
-        </Button>
-      </Box>
+      <Box mb={3}>
+  <Box display="flex" justifyContent="space-between" alignItems="center">
+    <Typography variant="h4" component="h1" gutterBottom>
+      Órdenes de Compra
+    </Typography>
+
+    <Box display="flex" flexDirection="column" gap={1}>
+      <Button
+        component={Link}
+        href="/finanzas"
+        variant="contained"
+        color="primary"
+        startIcon={<ReceiptIcon />}
+      >
+        IR A FINANZAS
+      </Button>
+      <Button
+        component={Link}
+        href="/inventario/movimientos"
+        variant="contained"
+        color="primary"
+        startIcon={<InventoryOutlinedIcon />}
+      >
+        IR A INVENTARIO
+      </Button>
+    </Box>
+  </Box>
+</Box>
+
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -1023,7 +1039,7 @@ export default function OrdenesCompraPage() {
                                         <TableRow>
                                           <TableCell>Materia Prima</TableCell>
                                           <TableCell align="right">Cantidad (kg)</TableCell>
-                                          <TableCell align="right">Precio por kilo</TableCell>
+                                          <TableCell align="right">Precio por kg</TableCell>
                                           <TableCell align="right">Subtotal</TableCell>
                                         </TableRow>
                                       </TableHead>
@@ -1307,8 +1323,14 @@ export default function OrdenesCompraPage() {
                       fullWidth
                       type="number"
                       label="Plazo de Pago (días)"
-                      value={datosFactura.plazoPago}
-                      onChange={(e) => setDatosFactura({ ...datosFactura, plazoPago: parseInt(e.target.value) })}
+                      value={datosFactura.plazoPago === "" ? "" : datosFactura.plazoPago}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setDatosFactura({
+                          ...datosFactura,
+                          plazoPago: value === "" ? "" : parseInt(value)
+                        });
+                      }}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>

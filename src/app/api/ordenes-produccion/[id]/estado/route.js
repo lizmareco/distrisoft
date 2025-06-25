@@ -115,6 +115,34 @@ export async function PUT(request, { params }) {
             },
           })
 
+          // Crear movimiento de inventario de producto dentro de la transacción
+          await tx.inventarioProducto.create({
+            data: {
+              idProducto: detalle.idProducto,
+              cantidad: detalle.cantidad,
+              unidadMedida: detalle.producto.unidadMedida?.nombre || "unidades",
+              fechaMovimiento: fechaActual,
+              tipoMovimiento: "ENTRADA",
+              motivo: "Entrada por producción finalizada",
+              observacion: `Entrada por finalización de producción - Orden #${idOrdenInt}`,
+              stockAntes: stockAntes,
+              stockDespues: stockDespues,
+            },
+          })
+
+          // Auditoría dentro de la transacción
+          await auditoriaService.registrarAuditoria({
+            entidad: "Producto",
+            idRegistro: detalle.idProducto,
+            accion: "ACTUALIZAR_STOCK_PRODUCTO",
+            valorAnterior: { stockActual: stockAntes },
+            valorNuevo: { stockActual: stockDespues },
+            idUsuario,
+            direccionIP: auditoriaService.obtenerDireccionIP(request),
+            navegador: auditoriaService.obtenerInfoNavegador(request),
+            tx,
+          })
+
           detallesFinales.push({
             tipo: "PRODUCTO",
             idProducto: detalle.idProducto,
@@ -141,7 +169,7 @@ export async function PUT(request, { params }) {
           const pesoPorUnidad = producto.pesoUnidad
           const gramosNecesarios = detalle.cantidad * pesoPorUnidad
           const cantidadPorLote = formula.rendimiento
-          const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
+          // const lotesNecesarios = Math.ceil(gramosNecesarios / cantidadPorLote)
 
           console.log(`=== DEVOLUCIÓN DE STOCK ===`)
           console.log(`Producto: ${producto.nombreProducto}`)
@@ -149,12 +177,12 @@ export async function PUT(request, { params }) {
           console.log(`Peso por unidad: ${pesoPorUnidad}g`)
           console.log(`Gramos totales necesarios: ${gramosNecesarios}g`)
           console.log(`Rendimiento por lote: ${cantidadPorLote}g`)
-          console.log(`Lotes necesarios: ${lotesNecesarios}`)
+          // console.log(`Lotes necesarios: ${lotesNecesarios}`)
 
           for (const item of detallesFormula) {
             const cantidadMateriaPrimaPorLote = item.cantidad
-            const cantidadTotal = cantidadMateriaPrimaPorLote * lotesNecesarios
-            
+            // Fórmula proporcional para devolución:
+            const cantidadTotal = (detalle.cantidad / formula.rendimiento) * cantidadMateriaPrimaPorLote
             const materia = await tx.materiaPrima.findUnique({ where: { idMateriaPrima: item.idMateriaPrima } })
             const stockAntes = Number(materia?.stockActual ?? 0)
             const stockDespues = stockAntes + cantidadTotal
@@ -168,6 +196,34 @@ export async function PUT(request, { params }) {
             await tx.materiaPrima.update({
               where: { idMateriaPrima: item.idMateriaPrima },
               data: { stockActual: stockDespues, updatedAt: fechaActual },
+            })
+
+            // Crear movimiento de inventario de materia prima dentro de la transacción
+            await tx.inventario.create({
+              data: {
+                idMateriaPrima: item.idMateriaPrima,
+                cantidad: cantidadTotal,
+                unidadMedida: item.unidadMedida,
+                fechaMovimiento: fechaActual,
+                tipoMovimiento: "ENTRADA",
+                motivo: "Cancelación de orden de producción",
+                observacion: `Orden cancelada #${idOrdenInt} - Producto: ${producto.nombreProducto}`,
+                stockAntes: stockAntes,
+                stockDespues: stockDespues,
+              },
+            })
+
+            // Auditoría dentro de la transacción
+            await auditoriaService.registrarAuditoria({
+              entidad: "MateriaPrima",
+              idRegistro: item.idMateriaPrima,
+              accion: "DEVOLVER_STOCK_MATERIA_PRIMA",
+              valorAnterior: { stockActual: stockAntes },
+              valorNuevo: { stockActual: stockDespues },
+              idUsuario,
+              direccionIP: auditoriaService.obtenerDireccionIP(request),
+              navegador: auditoriaService.obtenerInfoNavegador(request),
+              tx,
             })
 
             detallesFinales.push({
@@ -193,63 +249,11 @@ export async function PUT(request, { params }) {
       })
 
       return { ordenActualizada, fechaActual, movimientos: detallesFinales }
+    }, {
+      maxWait: 15000, // 15 segundos para esperar a que inicie la tx
+      timeout: 30000, // 30 segundos para ejecutar la tx
     })
     
-    
-    for (const detalle of resultado.movimientos) {
-      if (detalle.tipo === "PRODUCTO") {
-        await prisma.inventarioProducto.create({
-          data: {
-            idProducto: detalle.idProducto,
-            cantidad: detalle.cantidad,
-            unidadMedida: detalle.unidadMedida,
-            fechaMovimiento: resultado.fechaActual,
-            tipoMovimiento: "ENTRADA",
-            motivo: "Entrada por producción finalizada",
-            observacion: `Entrada por finalización de producción - Orden #${idOrdenInt}`,
-            stockAntes: detalle.stockAntes,
-            stockDespues: detalle.stockDespues,
-          },
-        })
-
-        await auditoriaService.registrarAuditoria({
-          entidad: "Producto",
-          idRegistro: detalle.idProducto,
-          accion: "ACTUALIZAR_STOCK_PRODUCTO",
-          valorAnterior: { stockActual: detalle.stockAntes },
-          valorNuevo: { stockActual: detalle.stockDespues },
-          idUsuario,
-          direccionIP: auditoriaService.obtenerDireccionIP(request),
-          navegador: auditoriaService.obtenerInfoNavegador(request),
-        })
-      } else if (detalle.tipo === "MATERIA_PRIMA") {
-        await prisma.inventario.create({
-          data: {
-            idMateriaPrima: detalle.idMateriaPrima,
-            cantidad: detalle.cantidad,
-            unidadMedida: detalle.unidadMedida,
-            fechaMovimiento: resultado.fechaActual,
-            tipoMovimiento: "ENTRADA",
-            motivo: "Cancelación de orden de producción",
-            observacion: `Orden cancelada #${idOrdenInt} - Producto: ${detalle.productoNombre}`,
-            stockAntes: detalle.stockAntes,
-            stockDespues: detalle.stockDespues,
-          },
-        })
-
-        await auditoriaService.registrarAuditoria({
-          entidad: "MateriaPrima",
-          idRegistro: detalle.idMateriaPrima,
-          accion: "DEVOLVER_STOCK_MATERIA_PRIMA",
-          valorAnterior: { stockActual: detalle.stockAntes },
-          valorNuevo: { stockActual: detalle.stockDespues },
-          idUsuario,
-          direccionIP: auditoriaService.obtenerDireccionIP(request),
-          navegador: auditoriaService.obtenerInfoNavegador(request),
-        })
-      }
-    }
-
     await auditoriaService.registrarActualizacion(
       "OrdenProduccion",
       idOrdenInt,
