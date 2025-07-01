@@ -511,9 +511,50 @@ export default function DashboardPage() {
           </Typography>
         )}
 
-        <Typography variant="body1" paragraph>
-              Utiliza el menú lateral para navegar por los diferentes módulos del sistema.
-        </Typography>
+        <Grid container spacing={2} sx={{ mb: 3, alignItems: "stretch" }}>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={2} sx={{ p: 2, bgcolor: "#e3f2fd", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <Typography variant="h6" gutterBottom>Accesos Rápidos</Typography>
+              <Typography variant="body2">
+                Utiliza la barra lateral para navegar entre los diferentes módulos del sistema.<br />
+                Las secciones se expanden al hacer clic para mostrar sus opciones.
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={2} sx={{ p: 2, bgcolor: "#f1faee", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <Typography variant="h6" gutterBottom>Permisos</Typography>
+              <Typography variant="body2">
+                {userInfo.rol === "ADMINISTRADOR" && (
+                  <>
+                    Tu rol actual (<b>ADMINISTRADOR</b>) determina las funcionalidades disponibles.<br />
+                    Contacta al administrador si necesitas acceso adicional.
+                  </>
+                )}
+                {userInfo.rol === "ADMINISTRATIVO" && (
+                  <>
+                    Tu rol actual (<b>ADMINISTRATIVO</b>) te permite gestionar ventas, compras, finanzas y reportes.<br />
+                    Si necesitas más permisos, contacta al administrador.
+                  </>
+                )}
+                {userInfo.rol === "PRODUCCION" && (
+                  <>
+                    Tu rol actual (<b>PRODUCCIÓN</b>) te permite gestionar órdenes de producción e inventario.<br />
+                    Si necesitas más permisos, contacta al administrador.
+                  </>
+                )}
+                {!["ADMINISTRADOR", "ADMINISTRATIVO", "PRODUCCION"].includes(userInfo.rol) && (
+                  <>
+                    Tu rol actual (<b>{userInfo.rol}</b>) tiene permisos limitados.<br />
+                    Contacta al administrador si necesitas acceso adicional.
+                  </>
+                )}
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+
+
       </Paper>
         </Container>
                     </Box>

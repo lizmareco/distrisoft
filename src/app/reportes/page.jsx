@@ -77,7 +77,7 @@ export default function ReportesPage() {
       ],
       compras: [
         { id: "compras-proveedor", title: "Compras por Proveedor", icon: <PieChartIcon fontSize="large" /> },
-        { id: "compras-producto", title: "Compras por Producto", icon: <ShoppingCartIcon fontSize="large" /> },
+        /*{ id: "compras-producto", title: "Compras por Producto", icon: <ShoppingCartIcon fontSize="large" /> },*/
         { id: "ordenes", title: "Órdenes de Compra", icon: <InventoryIcon fontSize="large" /> },
       ],
 
